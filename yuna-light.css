@@ -209,8 +209,9 @@
   filter: drop-shadow(var(--yuna-glow-x) -1px 6px rgb(var(--yuna-light) / .85));
 }
 
-.yuna-operator { bottom: 5%; }
+.yuna-operator { bottom: 5%; width: clamp(80px, 25%, 106px); }
 .yuna-operator .yuna-cast { background-image: url("art/walk/cast-light.webp"); }
+.yuna-operator figcaption { padding-inline: 5px; }
 .yuna-gesture-tip {
   margin: 7px 12px 0;
   color: #e7d8ee;
@@ -305,6 +306,8 @@
   .yuna-dress-actions, .yuna-options { margin-inline: 9px; }
   .yuna-status, .yuna-dialogue, .yuna-light-note { margin-inline: 9px; }
   .yuna-room .yuna-primary { width: calc(100% - 18px); margin-inline: 9px; }
+  .yuna-options button { padding-inline: 4px; }
+  .yuna-options button strong { font-size: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
