@@ -59,3 +59,10 @@
 .encore-arena::before{left:0;transform:skewY(23deg)}.encore-arena::after{right:0;transform:skewY(-23deg)}
 .secret-set[data-arena-lit] .encore-arena::before,.secret-set[data-arena-lit] .encore-arena::after{opacity:.95}
 @media(prefers-reduced-motion:reduce){.encore-arena::before,.encore-arena::after{transition:none}}
+.card-film{position:absolute;inset:0;width:100%;display:flex;align-items:flex-start;justify-content:flex-end;padding:10px 8px;background:transparent;border-radius:inherit}
+.card-film span{background:#231623eb;border:1px solid #fbe3ff9c;color:#fff4ff;font-weight:700;font-size:clamp(10px,2.9vw,13px);padding:4px 7px;border-radius:14px}
+.card-film:focus-visible{outline:3px solid #fff4d5;outline-offset:-5px}.card-film:hover span{background:#522a50}
+.fan-replay{padding-bottom:15px}.film-head,.film-timeline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;color:#ecd1e3;font:700 12px system-ui}
+.film-head span:last-child{letter-spacing:.14em}.fan-replay .live-set{height:clamp(215px,40svh,350px)}.film-timeline progress{flex:1;min-width:0;height:5px;accent-color:#fcb5de}
+.film-timeline output{font-variant-numeric:tabular-nums}.fan-replay .held-stick{pointer-events:none}
+.fan-replay .shop-go{margin-top:12px}.fan-replay button[hidden]{display:none}.fan-replay .secondary{width:100%}

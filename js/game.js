@@ -5,6 +5,7 @@ import { renderWorld, mountWorld, worldAlbum, worldChallenge, selectBackstageMem
 import { renderHongdae, mountHongdae } from './hongdae.js';
 import { renderBooth, mountBooth, boothAlbum, boothPhotoCount } from './booth.js';
 import { stickId, renderMinho, renderLightResult, renderBlackout, secretPhotocard, lightBeat } from './lightstick.js';
+import { encodeFanRecording, readFanRecording, renderFanReplay, mountFanReplay } from './fan-replay.js';
 import { renderPerformance } from './performance.js';
 import { renderLobby } from './lobby.js';
 import { renderPets, petAction, petAlbum, petTourNote, openPet, openPetLobby } from './pets.js';
@@ -68,7 +69,9 @@ function memoryLook(id) {
 let sound = read('sound') !== 'off';
 let album = cardIds(read('album'));
 let lightstick = stickId(read('lightstick'));
-const fanCards = () => ['heart', 'moon', 'star'].filter(id => read('secret-card.' + id) === '1');
+let replay = null;
+let secretTimes = [];
+const fanCards = () => ['heart', 'moon', 'star'].filter(id => readFanRecording(id, read('secret-card.' + id)) !== null);
 let tourEncore = false;
 let firstSongScore = 0;
 let playing = false;
@@ -117,7 +120,7 @@ function isTravelWardrobe() { return studioBack === 'world' || studioBack === 'h
 function sceneHash(next) {
     if (next === 'world')
         return '#play';
-    if (next === 'light-result' || (next === 'album' && albumSection === 'concert'))
+    if (next === 'fan-replay' || next === 'light-result' || (next === 'album' && albumSection === 'concert'))
         return '#concert-album/' + tripMember;
     if (next === 'blackout' || next === 'secret')
         return '#secret/' + tripMember;
@@ -271,7 +274,7 @@ function ending() {
 function albumPage() {
     const tabs = [['concert', t('Konser', 'Концерт')], ['pets', t('Patiler', 'Питомцы')], ['city', t('Şehir', 'Город')], ['hongdae', t('Fotokabin', 'Фотобудка')], ['studio', t('Stil', 'Стиль')], ['crew', t('Ekip', 'Команда')], ['world', t('Kulis', 'Гримёрка')]];
     const special = fanCards();
-    const concertCards = `${special.length ? '<div class="foil-album">' + special.map(id => secretPhotocard(lang, id)).join('') + '</div>' : ''}<div class="album">${album.map(id => {
+    const concertCards = `${special.length ? '<div class="foil-album">' + special.map(id => secretPhotocard(lang, id, true)).join('') + '</div>' : ''}<div class="album">${album.map(id => {
         const p = passes[id];
         if (!p)
             throw new Error(id);
@@ -284,6 +287,8 @@ function albumPage() {
     return `<h2>${albumTitle()}</h2><div class="segmented">${tabs.map(([id, name]) => action('section-' + id, String(name), albumSection === id ? 'chosen' : '')).join('')}</div>${sections[albumSection]?.() ?? concertCards}`;
 }
 function back() {
+    if (page === 'fan-replay')
+        return 'album';
     if (page === 'album' && albumSection === 'hongdae' || page === 'booth')
         return 'hongdae';
     if (page === 'minho' || page === 'light-result')
@@ -315,10 +320,13 @@ function draw() {
     unmountScene = undefined;
     app.dataset.page = page;
     document.documentElement.lang = lang;
-    const screens = { home, world: () => renderWorld(lang), minho: () => renderMinho(lang, lightstick), lightshow: stage, secret: stage, blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick), hongdae: () => renderHongdae(lang, tripMember), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
-    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(page === 'lightshow' || page === 'secret') ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
+    const screens = { home, world: () => renderWorld(lang), minho: () => renderMinho(lang, lightstick), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick), hongdae: () => renderHongdae(lang, tripMember), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
+    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result', 'fan-replay'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(page === 'lightshow' || page === 'secret') ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
     element('feedback').textContent = feedback;
-    if (page === 'blackout') {
+    if (page === 'fan-replay' && replay) {
+        unmountScene = mountFanReplay(app, replay, sound, lang);
+    }
+    else if (page === 'blackout') {
         if (!document.hidden) {
             const timer = window.setTimeout(() => { go('secret'); void play(); }, 2800);
             unmountScene = () => window.clearTimeout(timer);
@@ -385,7 +393,7 @@ function chooseFinale() {
 }
 function finish(free) {
     if (page === 'secret' && lightstick) {
-        save('secret-card.' + lightstick, '1');
+        save('secret-card.' + lightstick, encodeFanRecording(secretTimes));
         save('lastAlbum', 'concert');
         if (tourEncore) {
             forecast = 'solo';
@@ -471,6 +479,7 @@ async function play() {
     if (token !== epoch)
         return;
     hits = new Set();
+    secretTimes = [];
     playing = true;
     start = performance.now();
     draw();
@@ -495,8 +504,10 @@ function tapRhythm(now) {
             lightBeat(set, hits.size);
             window.clearTimeout(glowTimer);
             glowTimer = window.setTimeout(() => { delete set.dataset.pulse; }, 530);
-            if (page === 'secret')
+            if (page === 'secret') {
+                secretTimes.push(Math.round(now - start));
                 set.dataset.arenaLit = 'true';
+            }
             element('light-feedback').textContent = page === 'secret' && hits.size === 1 ? t('Bütün salon senin renginde!', 'Весь зал сияет твоим цветом!') : t('Tam ritminde!', 'Точно в такт!');
         }
         element('note-rail').dataset.hit = String(i % 2);
@@ -529,6 +540,17 @@ app.addEventListener('click', e => {
     if (act === 'stick-concert' && lightstick && (page === 'minho' || page === 'light-result')) {
         hits.clear();
         go('lightshow');
+        return;
+    }
+    if (page === 'album' && act.startsWith('watch-fan-')) {
+        const id = stickId(act.slice('watch-fan-'.length));
+        replay = id ? readFanRecording(id, read('secret-card.' + id)) : null;
+        if (replay)
+            go('fan-replay');
+        return;
+    }
+    if (page === 'fan-replay' && act === 'rewatch-fan') {
+        draw();
         return;
     }
     if (act === 'fan-album') {
@@ -792,6 +814,11 @@ app.addEventListener('click', e => {
     }
 });
 document.addEventListener('visibilitychange', () => {
+    if (page === 'fan-replay' && document.hidden) {
+        albumSection = 'concert';
+        go('album');
+        return;
+    }
     if (page === 'blackout') {
         draw();
         return;

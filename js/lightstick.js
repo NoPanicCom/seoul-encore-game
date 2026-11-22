@@ -6,6 +6,7 @@ const sticks = {
 export function stickId(value) {
     return value === 'heart' || value === 'moon' || value === 'star' ? value : null;
 }
+export function stickName(id, lang) { return sticks[id][lang]; }
 function wand(id) {
     return `<img class="wand-art" src="art/lightsticks/${id}.webp" alt="">`;
 }
@@ -24,9 +25,13 @@ export function renderMinho(lang, selected) {
     <button class="shop-go" data-act="stick-concert" ${selected ? '' : 'disabled'}>${tr ? 'Konsere götür' : 'Взять на концерт'} →</button>
   </section>`;
 }
-export function renderHeldStick(id, lang, playing) {
+export function renderHeldStick(id, lang, playing, watching = false) {
     const item = sticks[id];
-    return `<div class="fan-lights" aria-hidden="true" style="--stick:${item.color}">${'<i></i>'.repeat(12)}</div><button type="button" class="held-stick" data-held-stick="${id}" data-act="${playing ? 'tap' : 'play'}" aria-label="${item[lang]} · ${lang === 'tr' ? 'Ritimle yak' : 'Зажечь в такт'}" style="--stick:${item.color}"><span class="wand-aura"></span>${wand(id)}<i class="wand-grip" aria-hidden="true"></i></button>`;
+    const content = `<span class="wand-aura"></span>${wand(id)}<i class="wand-grip" aria-hidden="true"></i>`;
+    const model = `class="held-stick" data-held-stick="${id}" style="--stick:${item.color}"`;
+    const held = watching ? `<div ${model} aria-hidden="true">${content}</div>` :
+        `<button type="button" ${model} data-act="${playing ? 'tap' : 'play'}" aria-label="${item[lang]} · ${lang === 'tr' ? 'Ritimle yak' : 'Зажечь в такт'}">${content}</button>`;
+    return `<div class="fan-lights" aria-hidden="true" style="--stick:${item.color}">${'<i></i>'.repeat(12)}</div>${held}`;
 }
 export function lightBeat(area, beat) {
     // The hit rank advances on each accepted tap, including after a missed beat.
@@ -44,11 +49,13 @@ export function renderArena(id) {
     const rows = Array.from({ length: 5 }, (_, row) => `<div style="--row:${row}">${'<i></i>'.repeat(22)}</div>`).join('');
     return `<div class="encore-arena" aria-hidden="true" style="--stick:${sticks[id].color}">${rows}</div>`;
 }
-export function secretPhotocard(lang, id) {
+export function secretPhotocard(lang, id, playable = false) {
     const title = lang === 'tr' ? 'Lisa’nın gizli bisi' : 'Секретный бис Лисы';
+    const watch = lang === 'tr' ? 'Sahneyi izle' : 'Посмотреть выступление';
+    const trigger = playable ? `<button type="button" class="card-film" data-act="watch-fan-${id}" aria-label="${watch} · ${title} · ${sticks[id][lang]}"><span>▶ ${watch}</span></button>` : '';
     return `<figure class="lisa-foil" data-encore-card="${id}" style="--stick:${sticks[id].color}">
     <img src="art/lisa-secret-encore.webp" alt="${lang === 'tr' ? 'Lisa sahnede parmaklarıyla kalp yapıyor' : 'Лиса показывает сердечко со сцены'}">
-    <figcaption><b>${title}</b><small>${sticks[id][lang]}</small></figcaption></figure>`;
+    <figcaption><b>${title}</b><small>${sticks[id][lang]}</small></figcaption>${trigger}</figure>`;
 }
 export function renderLightResult(lang, id, score, total) {
     const tr = lang === 'tr';
