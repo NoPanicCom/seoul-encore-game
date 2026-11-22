@@ -1,0 +1,42 @@
+.el-cover{background:#25132b url("art/mainstage.webp") center 53%/cover}
+.el-cover::before{opacity:.24}
+.el-cover::after{background:linear-gradient(180deg,#1d0a1722,transparent 20%,transparent 45%,#1a0d234f 70%,#180a20 101%)}
+.el-lineup{inset:12% 3% 15%;transform:none;align-items:end;gap:0}
+.el-portrait,.el-portrait:nth-child(n){position:relative;overflow:visible;background:none;border:0;box-shadow:none;border-radius:0;transform:none}
+.el-portrait img{width:140%;max-width:none;height:100%;margin-left:-20%;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 8px 5px #100615aa);animation:cover-bob 3s ease-in-out infinite}
+.el-portrait:nth-child(2n) img{animation-delay:-1.5s}
+.el-title strong{text-shadow:0 3px 0 #8f355e,0 5px 15px #320723}
+.el-role-select{width:100%;min-height:45px}
+@keyframes cover-bob{0%,100%{transform:translateY(1px) rotate(-1deg)}50%{transform:translateY(-3px) rotate(1deg)}}
+.live-stage{overflow:hidden;position:relative;padding:0 14px 8px;border-radius:16px;background:#291526}
+.live-set{height:clamp(174px,29svh,265px);position:relative;isolation:isolate;overflow:hidden;margin:0 -14px;background:#401f3b url("art/mainstage.webp") center 57%/cover}
+.live-set::after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:12%;background:linear-gradient(transparent,#291526)}
+.live-bug{position:absolute;top:12px;left:12px;background:#291526c9;color:white;padding:4px 8px;border-radius:5px;font:700 10px system-ui;letter-spacing:.12em}
+.live-light{position:absolute;inset:-5% 0;transform-origin:50% 0;background:conic-gradient(from 159deg at 50% -7%,transparent,#fce5ff59 6deg,#e1a1ff11 35deg,transparent 42deg);animation:move-beam 5s ease-in-out infinite alternate}
+.live-dancer{position:absolute;bottom:12%;left:50%;transform:translateX(-50%);height:76%;aspect-ratio:128 / 160;filter:drop-shadow(0 4px 3px #351933aa)}
+.live-dancer>div{height:100%;width:100%;background-size:400% 300%;background-repeat:no-repeat}
+.live-stage[data-playing=true] .live-dancer{animation:stage-dance 1.3s ease-in-out infinite}
+.live-stage[data-playing=true] .live-dancer>div{animation:dance-poses 1.3s steps(1,end) infinite}
+@keyframes move-beam{from{transform:rotate(-16deg)}to{transform:rotate(16deg)}}
+@keyframes stage-dance{0%,100%{transform:translate(-55%,0) rotate(-4deg)}25%{transform:translate(-50%,-3%) rotate(1deg)}50%{transform:translate(-45%,0) rotate(4deg)}75%{transform:translate(-50%,-3%) rotate(-1deg)}}
+@keyframes dance-poses{0%,100%{background-position:0 0}25%{background-position:33.333% 0}50%{background-position:66.666% 0}75%{background-position:100% 0}}
+.timing-lane{position:relative;margin:7px auto 4px;height:30px;width:90%;background:linear-gradient(transparent 45%,#ffb2d8 46%,#eb7bbf 54%,transparent 55%);--phase:0}
+.rail-target,.rail-note{position:absolute;top:50%;transform:translate(-50%,-50%);font-style:normal}
+.rail-target{left:12%;height:25px;width:25px;border-radius:50%;border:2px solid #fff3ab;background:#6d3b69}
+.rail-note{left:calc(92% - 80% * var(--phase));color:#fffbd8;font-size:25px;text-shadow:0 0 9px #ffb0db}
+#note-rail[data-hit="0"] .rail-target{animation:score-glow .36s ease-out}
+#note-rail[data-hit="1"] .rail-target{animation:score-glow-alt .36s ease-out}
+@keyframes score-glow{from{box-shadow:0 0 16px 5px #ffeec6}to{box-shadow:none}}
+@keyframes score-glow-alt{from{box-shadow:0 0 16px 5px #ffeec6}to{box-shadow:none}}
+.live-stage .disc{height:88px;width:88px;margin:8px auto;font-size:15px}
+.live-stage h2{font-size:clamp(22px,6vw,30px);margin:5px 0}
+.live-stage p{margin:7px auto}
+.live-stage .rhythm-look{height:52px;width:42px}
+.live-stage>.kicker,.timing-guide:empty{display:none}
+.timing-guide{font-size:12px;color:#ffe1ed}
+@media(prefers-reduced-motion:reduce){.el-portrait img,.live-light,.live-stage .live-dancer,.live-stage .live-dancer>div,#note-rail .rail-target{animation:none!important}.rail-note{left:12%;opacity:calc(.25 + var(--phase) * .75)}}
+
+.live-light::before{content:"";display:block;width:100%;height:100%;background:linear-gradient(180deg,var(--cue-0),transparent);clip-path:polygon(48% 0,52% 0,88% 100%,24% 100%);opacity:.25}
+.live-stage[data-playing=true] .live-light::before{animation:live-cues 3.9s ease-in-out infinite}
+@keyframes live-cues{0%,100%{background-color:var(--cue-0)}33%{background-color:var(--cue-1)}66%{background-color:var(--cue-2)}}
+@media(prefers-reduced-motion:reduce){.live-stage[data-playing=true] .live-light::before{animation:none}}

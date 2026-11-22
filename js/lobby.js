@@ -1,7 +1,7 @@
 const copy = {
     tr: {
         concert: 'Konser gecesi',
-        start: 'Oyuna başla',
+        start: 'Rol seç', world: 'Kulise gir',
         explore: 'Keşfet',
         city: 'Seul',
         pets: 'Patili dostlar',
@@ -13,7 +13,7 @@ const copy = {
     },
     ru: {
         concert: 'Вечер концерта',
-        start: 'Начать игру',
+        start: 'Выбрать роль', world: 'Войти за кулисы',
         explore: 'Исследуй',
         city: 'Сеул',
         pets: 'Питомцы',
@@ -41,7 +41,7 @@ function shortcut(id, name, count = '') {
 export function renderLobby(lang, count, total, hasReplay, resumeLabel = '') {
     const label = copy[lang];
     const portraits = lineup.map(member => `<span class="el-portrait">
-    <img src="art/lobby/${member}.webp" alt="" width="257" height="520">
+    <img src="art/world/hero-${member}.webp" alt="" width="256" height="410">
   </span>`).join('');
     return `<div class="encore-lobby">
     <section class="el-cover" aria-labelledby="encore-title">
@@ -54,11 +54,12 @@ export function renderLobby(lang, count, total, hasReplay, resumeLabel = '') {
       <span class="el-glint el-glint--right" aria-hidden="true"></span>
       <h1 class="el-title" id="encore-title"><span>Seoul</span> <strong>Encore</strong></h1>
     </section>
-    <button type="button" class="el-start" data-act="start">
+    <button type="button" class="el-start" data-act="world">
       <span class="el-play" aria-hidden="true"></span>
-      <strong>${label.start}</strong>
+      <strong>${label.world}</strong>
       <i class="el-arrow" aria-hidden="true"></i>
     </button>
+    <button type="button" class="el-role-select secondary" data-act="start">${label.start}</button>
     ${resumeLabel ? `<button class="resume" data-act="resume">${resumeLabel}</button>` : ''}
     <nav class="el-shortcuts" aria-labelledby="encore-explore">
       <h2 id="encore-explore">${label.explore}</h2>
@@ -76,7 +77,7 @@ export function renderLobby(lang, count, total, hasReplay, resumeLabel = '') {
     </button>` : ''}
     <footer class="el-footer">
       <span>${label.fan}</span>
-      <a href="plan.html" lang="tr">${label.plan}</a>
+      <a href="tasarim-odasi.html" lang="tr">${label.plan}</a>
     </footer>
   </div>`;
 }

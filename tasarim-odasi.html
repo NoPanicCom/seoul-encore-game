@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Sofia için Seoul Encore: İlk Sahne Çağrısı bölümünün oyun, sanat, ses ve teknik üretim planı.">
+  <title>Tasarım odası · Seoul Encore</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #15101b;
+      --panel: #231829;
+      --text: #fff2f7;
+      --muted: #e0cbdc;
+      --line: #674c61;
+      --pink: #ffc0df;
+      --mint: #bce9d9;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--background); }
+    body {
+      margin: 0;
+      color: var(--text);
+      font: 1rem/1.65 system-ui, sans-serif;
+    }
+    a { color: var(--pink); text-underline-offset: .24em; }
+    a:focus-visible { outline: 3px solid var(--mint); outline-offset: 4px; }
+    .skip { position: fixed; top: .5rem; left: .5rem; z-index: 2; padding: .5rem; background: var(--background); }
+    .skip:not(:focus) { clip-path: inset(50%); }
+    .shell { max-width: 66rem; padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right)); margin-inline: auto; }
+    .masthead { border-top: .4rem solid var(--pink); background: linear-gradient(120deg, #3a2038, #24172a 70%); }
+    .masthead .shell { padding-block: clamp(1.5rem, 6vw, 4.5rem); }
+    .brand { font-weight: 720; color: var(--mint); margin: 0 0 .75rem; }
+    h1, h2 { font-family: Georgia, serif; line-height: 1.13; }
+    h1 { font-size: clamp(2.45rem, 7.5vw, 5rem); margin: 0; font-weight: 500; }
+    .lede { font-size: clamp(1.08rem, 2.2vw, 1.3rem); max-width: 36rem; margin: 1rem 0 1.35rem; }
+    .links { display: flex; flex-wrap: wrap; gap: .65rem 1rem; }
+    .links a, nav a { min-height: 44px; display: inline-flex; align-items: center; }
+    .action { color: #261323; background: var(--pink); padding: .5rem .95rem; font-weight: 720; text-decoration: none; }
+    nav { display: flex; flex-wrap: wrap; column-gap: 1.15rem; padding-block: .55rem; border-bottom: 1px solid var(--line); }
+    nav a { font-size: .94rem; }
+    section { margin-block: clamp(2rem, 5vw, 3.75rem); scroll-margin-top: 1rem; }
+    section + section, footer { border-top: 1px solid var(--line); padding-top: 1.55rem; }
+    h2 { font-size: clamp(1.8rem, 4vw, 2.7rem); margin: 0 0 1rem; font-weight: 500; }
+    h3 { font-size: 1.13rem; line-height: 1.35; margin: 1.3rem 0 .45rem; }
+    p, dd, li { max-width: 74ch; }
+    p { margin: .45rem 0 .85rem; }
+    ul, ol { padding-inline-start: 1.4rem; }
+    li + li { margin-top: .55rem; }
+    dt { font-weight: 750; color: var(--mint); }
+    dd { margin: .2rem 0 .95rem; }
+    .callout { background: var(--panel); border-inline-start: .25rem solid var(--mint); padding: .9rem 1.05rem; margin-block: 1rem; }
+    .callout p:last-child, .tiles p:last-child { margin-bottom: 0; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: .75rem; }
+    .tiles > div { background: var(--panel); border: 1px solid var(--line); padding: .9rem 1rem; min-width: 0; }
+    .tiles h3 { margin-top: 0; }
+    figure { max-width: 48rem; margin: 1rem 0 1.25rem; }
+    figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
+    figcaption { margin-top: .45rem; font-size: .94rem; color: var(--muted); }
+    .muted { color: var(--muted); }
+    footer { padding-bottom: max(2.5rem, env(safe-area-inset-bottom)); }
+    @media print {
+      :root { color-scheme: light; --background: #fff; --panel: #fff; --text: #161216; --muted: #333; --line: #aaa; --pink: #782650; --mint: #245548; }
+      .masthead, .action { background: none; }
+      nav, .skip { display: none; }
+      .tiles > div { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#icerik">İçeriğe geç</a>
+  <header class="masthead">
+    <div class="shell">
+      <p class="brand">Seoul Encore · Tasarım odası</p>
+      <h1>İlk Sahne Çağrısı</h1>
+      <p class="lede">Sofia kuliste sevdiği üyeyi yürütür, Pixel’in yardımıyla pembe kulaklığı bulur ve kendi hazırladığı girişin sahnede canlanmasını izler.</p>
+      <div class="links">
+        <a class="action" href="./#play">Kuliste oyna</a>
+        <a href="./plan.html">Turnenin tasarımını oku</a>
+      </div>
+    </div>
+  </header>
+  <div class="shell">
+    <nav aria-label="Tasarım planı içindekiler">
+      <a href="#oyun">Oyun döngüsü</a>
+      <a href="#hikaye">Hikâye ve dil</a>
+      <a href="#sanat">Sanat ve ses</a>
+      <a href="#motor">Motor ve erişim</a>
+      <a href="#kabul">Cihaz kabulü</a>
+      <a href="#uretim">Üretim sırası</a>
+      <a href="#oda">Odanın kararları</a>
+    </nav>
+    <main id="icerik">
+      <section aria-labelledby="yayin">
+        <h2 id="yayin">Bu sürümde Sofia ne oynayabilir?</h2>
+        <p>Oyuna <a href="./#play">doğrudan kulisten</a> girilir. Lisa ile başlar. Üstteki üye portresinden Jisoo, Jennie veya Rosé seçilebilir. Joystick ve yere dokunma aynı karakteri hareket ettirir. Üyenin prova dizisi, sahnedeki üç ışık renginin sırasını belirler. Ritim bölümünde karakter adım atar ve her başarılı dokunuş skor halkasını aydınlatır.</p>
+        <p>İlk mobil sürüm için kararımız TypeScript, Canvas 2D ve Web Audio. Kulis ve sahne çizimleri, dört yönlü yürüyüş görünümü ve özgün müzik telefonun tarayıcısında çalışır. Yayın GitHub Pages üzerinde herkese açık bir HTTPS bağlantısıdır. İlk dil Rusçadır. Türkçe tercihi, ilerleme ve kartlar o tarayıcıda saklanır.</p>
+        <p>Bir sonraki oda için önerimiz Hongdae fotoğraf kabini. Kızın kendi seçtiği üye, kostüm ve Pixel aynı kareye girer. Önce bir gerçek iPhone 14 Pro Max üzerinde Sofia’nın ilk yönergeyi okuyup Pixel’e kendi başına ulaşıp ulaşmadığını gözlemleyelim. Gözlemden sonra ikinci odanın kontrol ve kamera ölçülerini sabitleyelim.</p>
+      </section>
+      <section id="oyun">
+        <h2>Kuliste bir iş, sahnede bir sonuç</h2>
+        <p>İlk oynanabilir bölüm 11–12 yaş için yaklaşık 3–5 dakikalık bir tur hedefler. Çocuk yürüyerek bir sorunu çözer, bir ekip üyesinden karşılık alır ve açılış ışığının sahnede çalıştığını görür. İlk turda dört üyeden biri seçilir. Kulis tek bir sürekli mekândır ve sahne kapısı final sekansına geçer.</p>
+        <ol>
+          <li><strong>Kulise gir.</strong> Jisoo, Jennie, Rosé veya Lisa’yı seç. Zemine dokun, ekrandaki yön kolunu kullan ya da klavyede yön tuşlarını kullan. Ekrandaki tek görev satırı önce Pixel’e çağırır. Pixel’e dokunmak karakteri yanına götürür.</li>
+          <li><strong>İpucunu bul.</strong> Pixel’in bakışı gardıroba döner. Kutuların arasındaki alt rafı inceleyip pembe kulaklığı al. İsteğe bağlı “İpucu” hedefin yönünü söyler. “Odadaki yerler” listesindeki gardırop düğmesi aynı noktaya yürütür.</li>
+          <li><strong>Ekibe teslim et.</strong> Hazırlık masasına fiziksel olarak yaklaş ve kulaklığı ver. Ekip kısa bir teşekkür eder. Çantadaki kulaklık teslim edilir ve görev listesi güncellenir.</li>
+          <li><strong>Girişi hazırla.</strong> Aynı prova panelindeki iki çalışmayı istediğin sırada dene. Işıkta üç işareti tekrarla. Seste kısa çağrıyı üç görünür nota simgesiyle eşleştir. Diziyi yeniden göstermek ve denemek serbesttir. Her notanın biçimi ve sırası sessizde de görülebilir.</li>
+          <li><strong>Sahne kapısına yürü.</strong> Kapıda açılış işareti gelir. Perde açılır, kulis anısı albüme eklenir ve ana konser akışına geçilir. Oyuncu kuliste dolaşmaya devam edebilir veya hazırlığı başka bir üyeyle yeniden yapabilir.</li>
+        </ol>
+        <div class="callout">
+          <p><strong>Albümde katkı görünür.</strong> “İlk sahne çağrısı” kartında seçilen üyenin sahne portresi ve ona özgü bir cümle yer alır. Daha sonraki dinamik kartta prova ışığı görselin parçası olur. Katkı metni eylemi sahneye bağlar. “Pembe kulaklığı buldun. Ekip sahneye hazır çıktı.”</p>
+        </div>
+        <p>İkinci turda oda tanıdık kalır. Üye motivasyonu, kutu, iki kısa prova dizisi ve albüm görseli değişir. Geniş sürümde oda içindeki saklama noktası, çağrı dizisi ve ekip arkadaşının karşılığı tur başında belirlenebilir. Seçimler kayda alınırsa yenileme ve tekrar izleme aynı sonucu verir.</p>
+      </section>
+
+      <section id="hikaye">
+        <h2>Bir cümle, bir sonraki adım</h2>
+        <p>Pixel’in ipucu, ekip arkadaşının teşekkürü ve kapının açılması bölümün üç duygusal durağıdır. Hikâye bir sorunla başlar, çocuğa çözmek için zaman verir ve yaptığı yardımın sonucunu gösterir. İlk yönergede en fazla bir iş ve bir varış noktası kullanılır. Teknik terimler yerine çocuğun ekranda gördüğü eşyanın adı kullanılır.</p>
+        <dl>
+          <dt>Görevin ilk adı</dt>
+          <dd>“Pixel’e yaklaş ve onu sev.” <span lang="ru">«Подойди к Пикселю и погладь его.»</span></dd>
+          <dt>Araştırma ipucu</dt>
+          <dd>“Gardırobun alt rafında pembe kulaklığı ara.” <span lang="ru">«Поищи розовый наушник на нижней полке гардероба.»</span></dd>
+          <dt>Denemeye dönüş</dt>
+          <dd>“Sırayı baştan deneyebilirsin.” <span lang="ru">«Повтори порядок с начала.»</span></dd>
+          <dt>Hatıra</dt>
+          <dd>“İlk sahne çağrısı” <span lang="ru">«Первый вызов на сцену»</span></dd>
+        </dl>
+        <p>Jisoo açılış ışığına, Jennie ilk sese, Rosé grubun birlikte duyulmasına ve Lisa ilk sahne adımına odaklanır. Türkçe ve Rusça metinler aynı dil anahtarlarını paylaşır. Görev adı, erişilebilir kontrol adı, ipucu ve albüm açıklaması beraber çevrilir. Kiril satır kırımı ve Türkçenin karakterleri küçük ekranda kontrol edilir. Diller arasında geçiş aynı görev adımını ve seçimleri korur.</p>
+      </section>
+
+      <section id="sanat">
+        <h2>Görüntü, hareket ve ses birlikte okunur</h2>
+        <figure>
+          <img src="./art/world/backstage.webp" width="1440" height="960" loading="lazy" decoding="async" alt="Lila gardıroptan koyu pembe sahne perdesine uzanan ahşap kulis.">
+          <figcaption>Oyundaki kulis zemini. Gardırop, hazırlık masası, turkuaz prova paneli, perde ve Pixel’in yatağı aynı odada.</figcaption>
+        </figure>
+        <div class="tiles">
+          <div>
+            <h3>Kulis ve sahne</h3>
+            <p>2,5B bakışlı kuliste geniş bir orta yürüyüş alanı bırak. Gardırop, hazırlık masası, ışık ve ses köşeleri ile sahne kapısı siluet ve simgeleriyle okunur. Zemin, öndeki nesneler ve hareketli karakterler ayrı derinlik sıraları kullanır. Parlak ahşap zemine lila dolap, sıcak ışıklı hazırlık aynası, turkuaz konsol, koyu pembe perde ve Pixel’in nane yeşili yatağı yön verir.</p>
+          </div>
+          <div>
+            <h3>Karakter hareketi</h3>
+            <p>Dört üyenin her biri için üç görünüş yönü ve yön başına dört kare. Bir kare bekleme, üç kare yürüyüş. Pixel ayrı çizilir. Karakterin ayak noktası hareket ile resim katmanlarını hizalar. Sonraki hareketler kulak/kuyruk tepkisi, kulaklığı alma ve teslim etme, perde açılması ve sahnede üç aşamalı selamdır. Hareket azaltma açıkken durumlar sabit poz, simge ve kısa metinle aktarılır.</p>
+          </div>
+          <div>
+            <h3>Özgün ses</h3>
+            <p>Kuliste 110 BPM, dört ölçülük özgün bir prova motifi çalar. Üç notalı çağrıda aynı tını üç farklı perdede çalar. Alçak, orta ve yüksek sesler üç ayrı simgeyle eşleşir. Pixel’e iki yumuşak ton, masaya üç notalık karşılık, perdeye kısa yükseliş ve son akor. Kulis menüsündeki ses düğmesi müziği ve efektleri birlikte açıp kapatır. Ses ilk dokunuştan sonra açılır ve oyun arka plana geçtiğinde durur.</p>
+          </div>
+          <div>
+            <h3>Final ve tekrar izleme</h3>
+            <p>Geniş sürüm için 6–10 saniyelik canlı sekans. Perde açılır, oyuncunun hazırladığı ışıklar yanar ve seçilen üye selam verir. “Geç” ve “Yeniden izle” görünür. Üye ve ışık seçimi olay sırasıyla kaydedilir. Albüm açıldığında sahne karesi bu seçimlerden yeniden çizilir. Dört serbest takım vuruşu isteğe bağlı bis süslemesidir.</p>
+          </div>
+        </div>
+        <h3>Mobil tarayıcı için üretim bütçesi</h3>
+        <p class="muted">Aşağıdaki değerler ilk sahne için yaklaşık hedeflerdir. Ağ bütçeleri sıkıştırılmış aktarımı ifade eder. Sonuçlar cihaz ve koşumla birlikte kaydedilir.</p>
+        <dl>
+          <dt>İlk oynanabilir yük · en çok 1 MB</dt>
+          <dd>HTML, CSS ve JS için 180 KB, 1440 × 960 kulis görseli için 400 KB, seçilen karakter atlası için 160 KB, Pixel, eşya ve arayüz için 160 KB, diğer ilk istekler için 100 KB. Diğer üyelerin atlasları seçimle, sahne görselleri kapıya yaklaşınca yüklenir.</dd>
+          <dt>Çizim ve sahne · aşamalı yük</dt>
+          <dd>Kulis görseli 213 KiB olarak üretildi. Kulis WebP sınırı 400 KB, sonraki sahne ve perde katmanları toplam 350 KB, her üye için 512 × 480 atlas sınırı 160 KB. Gölge ve spot hareketleri yeniden kullanılabilir katmanlardır. 3B denemesinde bölge başına geometri ve sıkıştırılmış doku aktarımı toplam 750 KB, aynı bütçenin içinde en çok iki 1024 × 1024 doku hedeflenir.</dd>
+          <dt>Ses · açılışta medya dosyası gerektirmeyen kısa sentez</dt>
+          <dd>Kısa işaretler ve yaklaşık 8,7 saniyelik oda döngüsü Web Audio ile yerelde üretilir. Döngünün mono PCM örnekleri bellekte yaklaşık 770 KB tutar. Ses dosyası eklenen geniş sürümde ilk oda döngüsü en çok 120 KB, bütün efektler toplam 160 KB ve final sesi en çok 240 KB. Parçalar sahneye göre açılır.</dd>
+          <dt>Video · açılışta 0 KB</dt>
+          <dd>İlk final motor içinde oynar. İleride istenirse oyun içi 720p, 6–10 saniyelik, en çok 1 MB’lık isteğe bağlı bir klip hazırlanır. Poster karesi önce gelir. Sesli anlatım kullanılırsa metin karşılığı sunulur.</dd>
+        </dl>
+      </section>
+
+      <section id="motor">
+        <h2>Bağlantıyla açılan oyun, ölçümle seçilen motor</h2>
+        <dl>
+          <dt>TypeScript, Canvas 2D ve HTML · bu bölüm</dt>
+          <dd>Tarayıcıda tek arka plan, yönlere göre sprite, yürüme poligonu, engeller ve etkileşim bölgeleri. Küçük bir kamera karakteri takip eder. Oyun durumuna bağlı HTML kontrolleri görevleri, menüleri, klavye odağını ve ekran okuyucu adlarını taşır. Mevcut TypeScript oyununa uyduğu için ilk bölümde ayrıca bir motor indirilmez.</dd>
+          <dt>Phaser · bölüm sayısı büyüdüğünde</dt>
+          <dd>TypeScript ile Canvas/WebGL, sahne yönetimi, sprite ve animasyon desteği sunar. Birkaç odadan sonra özel motor kodu hızla büyürse aynı küçük bölümü Phaser ile ölç. Başlangıç boyutu, çizim süresi ve HTML erişim kontrolleri aynı örnek üzerinden değerlendirilir. <a href="https://docs.phaser.io/">Phaser belgeleri</a></dd>
+          <dt>Unity Web · 3B sanat ve animasyon denemesi</dt>
+          <dd>Unity sahne ve animasyon araçlarıyla bir modüler kulis kurulabilir. Seçilen Unity sürümünün tarayıcı desteğini kontrol et. Aynı sahnede WebAssembly indirme, ilk hareket, tarayıcı belleği, cihaz ısınması ve arka plandan dönüş ölçülür. Dokunma ve erişilebilir HTML katmanı ayrıca denenir. <a href="https://docs.unity.com/en-us/engine/6000.0/manual/platform-specific/webgl/intro/browsercompatibility">Unity Web tarayıcı desteği</a> · <a href="https://docs.unity.com/en-us/engine/6000.0/manual/platform-specific/webgl/develop/memory">Unity Web bellek yönetimi</a></dd>
+          <dt>C++ ve WebAssembly · ölçülmüş bir darboğaz için</dt>
+          <dd>Emscripten, C++ modülünü WebAssembly’ye derler. Belirli bir hesaplama bütçeyi sürekli aşarsa önce o işlev ve JS–Wasm veri aktarımı birlikte profillenir. Giriş, ses, erişilebilir UI, derleme boyutu ve tarayıcı bakımı ayrı iş kalemleridir. <a href="https://emscripten.org/docs/introducing_emscripten/about_emscripten.html">Emscripten belgeleri</a></dd>
+        </dl>
+        <h3>Telefondan nasıl girilir?</h3>
+        <p>Aileye Safari veya Chrome’da açılan doğrudan bir HTTPS bağlantısı verilir. QR aynı adresi açar. Aile sürümü hesap açmadan ve uygulama yüklemeden oynanacak şekilde hazırlanır. Temiz tarayıcı oturumunda giriş ve tamamlanmış tur doğrulanır. Oyun tercihleri, görev kontrol noktası ve albüm tarayıcıda saklanır. Paylaşılan veya sıfırlanan cihazda kayıt kaybını açıklayan kısa bir metin ve yerel kayıt sıfırlama seçeneği sonraki yayın kabulüne dahildir.</p>
+        <p>Dokunarak yürüme, yön kontrolü ve klavye aynı hedefi seçebilir. Görev satırındaki HTML düğmesi uygun hedefi bulur, oyuncuyu oraya götürür ve ilerlemeyi metinle bildirir. Temel düğme hedefi en az 44 × 44 CSS piksel. Simge, sayı ve metin renge eşlik eder. Odak görünür. Hareket azaltma, sessiz mod ve ekran döndürme turu aynı albüm ödülüne götürür. <a href="https://www.w3.org/TR/WCAG22/">WCAG 2.2</a></p>
+        <p>Oyun içi fotoğraflar ve diyaloglar önceden üretilmiş oyun içeriğidir. Telefon kamerası, mikrofon, konum, açık sohbet ve oyun içi satın alma kullanılmaz. Dağıtım kapsamı genişlediğinde gerçek kişi, marka, görsel ve müzik kullanım hakları yayın öncesinde gözden geçirilir.</p>
+      </section>
+
+      <section id="kabul">
+        <h2>Çocuk ve cihaz kabulü</h2>
+        <ul>
+          <li><strong>İlk deneme gözlemi.</strong> İmkân olursa her dilde iki ayrı ilk deneme. İlk 30 saniyede, dışarıdan yönlendirme almadan, en az bir hareket ve Pixel görevini başlatma gözlenir. Kapanışta “Sahneye çıkmadan önce neye yardım ettin?” sorusuna kendi sözüyle eylem ve sonucunu bağlayabilmesi aranır.</li>
+          <li><strong>Otomasyon.</strong> WebKit iPhone 13 mini profili ve dokunmatik Chromium’da 320 CSS pikselden başlayarak dikey/yatay yerleşim. Türkçe ve Rusça, klavye, safe area, ekran kayması, hızlı tekrar, yanlış seçim, sekmeye dönme, sessiz ve azaltılmış hareket senaryoları. Tarayıcı konsol hatası, 4xx istek, başarısız varlık veya ikinci ödül kaydı olmamalı.</li>
+          <li><strong>Fiziksel cihaz.</strong> En az bir küçük ekranlı iPhone Safari ve bir orta sınıf Android Chrome ile tam tur. Model, işletim sistemi, tarayıcı, ekran yönü ve ağ profili kayda girer. Üç soğuk açılışın ortancası yavaş 4G profilinde ilk hareket için 3 saniye veya daha kısa, ilk aktarımda 1 MB bütçesi hedeflenir. 60 saniyelik aktif oyunda p95 kare aralığı en çok 32 ms. Dokunuş ile ilk görsel tepki için p95 en çok 100 ms hedeflenir.</li>
+          <li><strong>Ses ve askıya alma.</strong> Hoparlör ve sessizde aynı görev dizisi bitirilebilir. Ekran kilidinde ses durur. Geri dönüldüğünde yeni dokunuş sesi yeniden başlatır. Bluetooth gecikmesi ayrı ölçülür. Arka plan ve yeniden yükleme aynı kontrol noktasına döndürür.</li>
+        </ul>
+        <p>Emülasyon çıktılarına tarayıcı profili, fiziksel koşulara cihaz adı yazılır. Çocuk gözlemi ve ağ performansı için ayrı kayıt tutulur. Bu sayfadaki eşikler üretim hedefidir.</p>
+      </section>
+
+      <section id="uretim">
+        <h2>Bir odadan turneye</h2>
+        <dl>
+          <dt>Şimdiki teslim · web bölümü</dt>
+          <dd>Mevcut rol kartları, Seul ve Busan, gardırop, patili dostlar ve bis oyunu üzerinden açılan tek yürünebilir kulis. Dört üye, Pixel, gardırop, hazırlık masası, aynı panelde ışık ve ses çalışması, sahneye geçiş ve üyenin albüm portresi bu bölümün kapsamı. Oynanabilir kapsam ve açık testler yayın sırasında sürümle eşleştirilir.</dd>
+          <dt>Sonraki hafta · gerçek cihaz ve çocuk denemesi</dt>
+          <dd>2–3 çalışma günü. Her iki dilde ilk turu, kayıt dönüşünü ve düşük bant genişliğini ölç. Yerleşim, sprite okunurluğu ve görev satırı çocukların ilk denemesine göre düzeltilir.</dd>
+          <dt>İkinci adım · komşu odalar</dt>
+          <dd>1–2 hafta. Kulisle gardırop veya prova odasını birbirine bağla. Nari ve Hena’nın seçme sahnesi bir kısa yardım, bir diyalog ve bir albüm anısıyla ayrı bölüm olur. Odalar aynı görev ve kayıt şemasını kullanır. Her yeni alan için ilk yük ve düşük cihaz performansı yeniden ölçülür.</dd>
+          <dt>Üçüncü adım · animasyon ve daha büyük dünya</dt>
+          <dd>2–4 hafta. Bir örnek odada katmanlı 2,5B ve modüler düşük poligonlu 3B seçeneklerini aynı cihazlarda karşılaştır. Bir üye için giyilebilir katman, kısa sahne koreografisi, tekrar izleme ve ulaşım bağlantısını tamamla. Sonuç iyi olursa yeni şehir sekansları, kamera açıları ve isteğe bağlı video ele alınır.</dd>
+        </dl>
+        <p>Süreler küçük ekip için iş tahminidir. İleri aşamalar gerçek cihaz ve içerik üretim sonuçlarına göre planlanır.</p>
+      </section>
+
+      <section id="oda">
+        <h2>Altı disiplinin ortak kararı</h2>
+        <div class="tiles">
+          <div><h3>Dünya ve motor</h3><p>Tek 2,5B kulis, yürüme poligonu, engel ve etkileşim bölgeleri. Dokunulan nesneye veya görev düğmesindeki hedefe karakter gerçekten yürür. Sonraki odalar aynı koordinat ve hareket sistemini taşır.</p></div>
+          <div><h3>Oynanış</h3><p>Pixel’in alt raf ipucu, pembe kulaklık, hazırlık masası, aynı panelde iki kısa prova ve sahne kapısı birbirine bağlandı. Dört üyenin prova dizileri değişerek aynı odada ikinci tur açar.</p></div>
+          <div><h3>Sanat ve hareket</h3><p>Tek okunaklı oda perspektifi, üç görünüş sıralı üye atlası ve ayrı Pixel çizimi seçildi. Sonraki sahne karesi, üyenin atlasını ve oyuncunun prova ışığını birleştirir.</p></div>
+          <div><h3>Müzik ve ses</h3><p>Görsel üçlü ışık dizisi ile alçak, orta ve yüksek notalar eşleşir. Özgün müzik temposu oyun girişinin süresini belirlemez. Uzun final vuruşları ileride serbest bir süsleme olarak denenebilir.</p></div>
+          <div><h3>Kalite ve erişim</h3><p>İlk 30 saniyeyi gözlem, iki mobil tarayıcıyı otomasyon, fiziksel performansı cihaz koşusu ölçer. Sessiz mod ve azaltılmış hareket aynı ödülle kapanır.</p></div>
+          <div><h3>Hikâye ve çocuk deneyimi</h3><p>Her anlatı satırı bir sonraki eylemi gösterir. Yanlış seçim yumuşak bir yeni denemeye açılır. Albüm, çocuğun ne yaptığını ve ekibin bundan ne kazandığını birlikte anlatır.</p></div>
+        </div>
+      </section>
+    </main>
+    <footer class="links">
+      <a class="action" href="./#play">Kuliste oyna</a>
+      <a href="./plan.html">Turne tasarımına dön</a>
+    </footer>
+  </div>
+</body>
+</html>
