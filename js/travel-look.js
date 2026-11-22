@@ -1,4 +1,5 @@
 import { studioMemberId, studioTravelSelection } from './studio.js';
+import { drawArticulatedFrame } from './world-engine.js';
 const longBottoms = new Set(['orbit-bottom-3', 'orbit-bottom-4', 'pulse-bottom-4', 'rouge-bottom-3']);
 export function travelLook(memberName) {
     const member = studioMemberId(memberName);
@@ -48,5 +49,38 @@ export function drawTravelLook(context, look, x, y, height, facing = 1) {
     context.drawImage(base, 0, sourceTop, base.naturalWidth, sourceHeight, -width / 2, -height, width, height);
     for (const piece of pieces)
         context.drawImage(piece, -width / 2, -height, width, height);
+    context.restore();
+}
+const walkingLayers = new WeakMap();
+export function drawWalkingTravelLook(context, look, height, direction, gait) {
+    const facing = direction === 'west' ? -1 : 1;
+    if (gait.strength === 0) {
+        drawTravelLook(context, look, 0, 0, height, facing);
+        return;
+    }
+    const { base, pieces, sourceHeight, sourceTop } = look;
+    let image = base;
+    let y = sourceTop;
+    if (pieces.length > 0) {
+        let layers = walkingLayers.get(look);
+        if (!layers) {
+            layers = context.canvas.ownerDocument.createElement('canvas');
+            layers.width = base.naturalWidth;
+            layers.height = sourceHeight;
+            const costume = layers.getContext('2d');
+            if (!costume)
+                throw new Error('The walking costume requires a 2D canvas');
+            costume.drawImage(base, 0, sourceTop, layers.width, sourceHeight, 0, 0, layers.width, sourceHeight);
+            for (const piece of pieces)
+                costume.drawImage(piece, 0, 0, layers.width, sourceHeight);
+            walkingLayers.set(look, layers);
+        }
+        image = layers;
+        y = 0;
+    }
+    const width = height * base.naturalWidth / sourceHeight;
+    context.save();
+    context.scale(facing, 1);
+    drawArticulatedFrame(context, image, { x: 0, y, width: base.naturalWidth, height: sourceHeight }, { x: -width / 2, y: -height, width, height }, gait, direction === 'west' || direction === 'east', 0.67);
     context.restore();
 }

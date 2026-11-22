@@ -445,16 +445,19 @@ export function crewAction(action, role) {
     }
     return !entry.error && entry.action(action.slice(5));
 }
-export function renderCrewGame(lang, role) {
+export function renderCrewGame(lang, role, practiceAtYG = false) {
     const entry = getGame(role);
     const pass = passes[role];
     if (!entry || !pass)
         return '';
-    const content = entry.done ? `<p class="crew-message" role="status">${pass.result[lang]}</p>${button('continue', finishLabel[lang], 'crew-primary')}`
+    const outcome = role === 'manager' ? line('Prova tamam. Dans açılışını ve mikrofon teslim yerini ekiple kararlaştırdın.', 'Репетиция окончена. Команда знает, когда начать танец и где передать микрофон.') : pass.result;
+    const next = practiceAtYG ? line('YG koridoruna dön', 'В коридор YG') : finishLabel;
+    const title = role === 'manager' ? line('Sahne akışı provası', 'Репетиция выхода') : pass.cue;
+    const content = entry.done ? `<p class="crew-message" role="status">${outcome[lang]}</p>${button('continue', next[lang], 'crew-primary')}`
         : entry.error ? `<p class="crew-message" role="status">${entry.error[lang]}</p>${button('retry', retryLabel[lang], 'crew-primary')}`
             : entry.render(lang);
     return `<section class="crew-game" data-crew-role="${role}"><p class="kicker">${pass.job[lang]} · ${pass.name}</p>
-    <h2>${pass.cue[lang]}</h2><p class="intro">${pass.hint[lang]}</p>${content}</section>`;
+    <h2>${title[lang]}</h2><p class="intro">${pass.hint[lang]}</p>${content}</section>`;
 }
 export function crewAlbum(lang) {
     const cover = takes.find(take => take.id === restored('cover'));

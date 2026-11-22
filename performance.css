@@ -85,3 +85,22 @@
 .watch-concert progress{display:block;width:85%;height:5px;margin:16px auto;accent-color:#ffa2ce}
 
 .concert-videos{margin:12px 0;text-align:center}.concert-videos summary,.concert-videos a{padding:12px;min-height:44px;font-weight:650;cursor:pointer}.concert-videos a{display:inline-block;color:inherit}
+
+.manager-stage-mic {
+  position: absolute;
+  left: 62%;
+  top: 44%;
+  width: 4.5%;
+  height: 10%;
+  transform: rotate(-34deg);
+  border-radius: 40%;
+  background: linear-gradient(90deg,#352633,#ffd1e8 55%,#a86386);
+  box-shadow: 0 1px 2px #200e23;
+}
+.manager-stage-mic::before {
+  content: '';
+  position: absolute;
+  inset: -20% -45% 63%;
+  border-radius: 50%;
+  background: radial-gradient(at 35% 23%,#fff4ff,#d789ba 45%,#512d4b 85%);
+}

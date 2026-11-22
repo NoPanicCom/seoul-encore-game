@@ -1,4 +1,4 @@
-import { drawTravelLook, loadTravelLook, travelLook } from './travel-look.js';
+import { drawWalkingTravelLook, loadTravelLook, travelLook } from './travel-look.js';
 import { worldAudio } from './world-audio.js';
 import { createWorldEngine } from './world-engine.js';
 const say = (phrase, lang) => phrase[lang === 'tr' ? 0 : 1];
@@ -534,8 +534,8 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
         void loadTravelLook(selected).then(look => {
             if (listeners.signal.aborted || generation !== appearanceGeneration)
                 return;
-            engine.setAppearance({ ...image, draw: (context, { height }, facing) => {
-                    drawTravelLook(context, look, 0, 0, height, facing === 'west' ? -1 : 1);
+            engine.setAppearance({ ...image, draw: (context, { height }, facing, gait) => {
+                    drawWalkingTravelLook(context, look, height, facing, gait);
                 } });
         }).catch(() => {
             if (!listeners.signal.aborted && generation === appearanceGeneration)

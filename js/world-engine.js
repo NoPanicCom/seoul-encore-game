@@ -3,6 +3,7 @@ const defaultSpeed = 318;
 const defaultRadius = 60;
 const interactionPulseMs = 720;
 const zero = { x: 0, y: 0 };
+const standing = { phase: 0, strength: 0 };
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const cross = (a, b) => a.x * b.y - a.y * b.x;
@@ -268,11 +269,51 @@ function directionOf(movement) {
         return movement.x > 0 ? 'east' : 'west';
     return movement.y > 0 ? 'south' : 'north';
 }
-function drawSheetFrame(ctx, image, sheet, size, row, column, lift = 0) {
+function strideLength(performer) {
+    return Math.max(64, performer.height * 1.28);
+}
+/** A two-step cycle. Distance advances the phase, including under analog input. */
+function advanceGait(gait, traveled, performer, dt) {
+    if (traveled <= epsilon)
+        return gait.strength === 0 ? gait : { phase: gait.phase, strength: 0 };
+    const amount = traveled / strideLength(performer);
+    const speed = traveled / dt / (performer.speed ?? defaultSpeed);
+    const strength = gait.strength + (clamp(speed * 1.75, 0, 1) - gait.strength) * (1 - Math.exp(-23 * dt));
+    return { phase: (gait.phase + amount) % 1, strength };
+}
+/** Bend the legs below the knee while keeping clothing above the joint attached. */
+export function drawArticulatedFrame(ctx, image, source, target, gait, profile, kneeRatio) {
+    const knee = Math.floor(source.height * kneeRatio);
+    const legHeight = target.height * (source.height - knee) / source.height;
+    const jointY = target.y + target.height - legHeight;
+    const swing = Math.sin(gait.phase * Math.PI * 2) * gait.strength;
+    ctx.drawImage(image, source.x, source.y, source.width, knee, target.x, target.y, target.width, jointY - target.y);
+    // Draw the lifted leg first so the planted foot has priority where they cross in profile.
+    const first = swing >= 0 ? -1 : 1;
+    for (const side of [first, -first]) {
+        const step = -side * swing;
+        const lift = Math.max(0, step) * 0.24;
+        const width = target.width / 2;
+        const sourceWidth = source.width / 2;
+        const offset = side === -1 ? 0 : 1;
+        ctx.save();
+        ctx.translate(target.x + width * offset, jointY);
+        ctx.transform(1, 0, step * (profile ? 0.26 : 0.06), 1 - lift, 0, 0);
+        ctx.drawImage(image, source.x + sourceWidth * offset, source.y + knee, sourceWidth, source.height - knee, 0, 0, width, legHeight);
+        ctx.restore();
+    }
+}
+function sheetViewport(sheet, size, row, column, lift) {
     const { frameWidth, frameHeight, anchor } = sheet;
-    const anchorX = anchor ? anchor.x / frameWidth : 0.5;
-    const anchorY = anchor ? anchor.y / frameHeight : 1;
-    ctx.drawImage(image, column * frameWidth, row * frameHeight, frameWidth, frameHeight, -size.width * anchorX, -size.height * anchorY - lift, size.width, size.height);
+    return {
+        source: { x: column * frameWidth, y: row * frameHeight, width: frameWidth, height: frameHeight },
+        target: { ...size, x: -size.width * (anchor ? anchor.x / frameWidth : 0.5),
+            y: -size.height * (anchor ? anchor.y / frameHeight : 1) - lift },
+    };
+}
+function drawSheetFrame(ctx, image, sheet, size, row, column, lift = 0) {
+    const { source, target } = sheetViewport(sheet, size, row, column, lift);
+    ctx.drawImage(image, source.x, source.y, source.width, source.height, target.x, target.y, target.width, target.height);
 }
 function drawShadow(ctx, point, width) {
     ctx.fillStyle = '#100b24';
@@ -280,6 +321,24 @@ function drawShadow(ctx, point, width) {
     ctx.ellipse(point.x, point.y + 2, width * 0.31, width * 0.09, 0, 0, Math.PI * 2);
     ctx.globalAlpha = 0.32;
     ctx.fill();
+    ctx.globalAlpha = 1;
+}
+function drawWalkingShadow(ctx, width, facing, swing, contact) {
+    const profile = facing === 'east' || facing === 'west';
+    const forward = facing === 'west' ? -1 : 1;
+    ctx.fillStyle = '#100b24';
+    ctx.globalAlpha = 0.19 + contact * 0.08;
+    ctx.beginPath();
+    ctx.ellipse(0, 3, width * (profile ? 0.29 : 0.23), width * 0.075, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const side of [-1, 1]) {
+        const footX = width * (profile ? side * (0.05 + contact * 0.06) * forward : side * 0.074);
+        const footY = 2 + (profile ? side * 0.5 : side * swing * width * 0.035);
+        ctx.globalAlpha = 0.25 - Math.max(0, -side * swing) * 0.16;
+        ctx.beginPath();
+        ctx.ellipse(footX, footY, width * 0.082, width * 0.033, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
     ctx.globalAlpha = 1;
 }
 function drawSparkle(ctx, point, radius, pulse) {
@@ -365,13 +424,10 @@ export function createWorldEngine(options) {
     let paused = false;
     let player = options.player;
     let facing = 'south';
-    let moving = false;
-    let stride = 0;
-    let stepDistance = 0;
+    let gait = standing;
     let companionPosition = companion?.spawn ?? scene.spawn;
     let companionFacing = 'south';
-    let companionStride = 0;
-    let companionMoving = false;
+    let companionGait = standing;
     let companionRoute = [];
     let companionTarget = scene.spawn;
     let route = [];
@@ -438,8 +494,8 @@ export function createWorldEngine(options) {
         pressed.clear();
         tap = null;
         clearJoystick();
-        moving = false;
-        companionMoving = false;
+        gait = standing;
+        companionGait = standing;
     }
     function available() {
         return !destroyed && !paused && !doc.hidden;
@@ -483,21 +539,24 @@ export function createWorldEngine(options) {
         return { x: x / magnitude, y: y / magnitude };
     }
     function advanceRoute(budget) {
+        let traveled = 0;
         while (budget > 0) {
             const waypoint = route[0];
             if (!waypoint)
-                return;
+                break;
             const length = distance(position, waypoint);
             if (length > epsilon)
                 facing = directionOf(difference(waypoint, position));
             if (length > budget) {
                 position = interpolate(position, waypoint, budget / length);
-                return;
+                return traveled + budget;
             }
             position = waypoint;
             route.shift();
             budget -= length;
+            traveled += length;
         }
+        return traveled;
     }
     function walkManually(direction, amount) {
         cancelRoute();
@@ -505,12 +564,14 @@ export function createWorldEngine(options) {
         const y = position.y + direction.y * amount;
         const candidates = [{ x, y }, { x, y: position.y }, { x: position.x, y }];
         for (const point of candidates) {
-            if (distance(position, point) > epsilon && navigation.canTravel(position, point)) {
+            const traveled = distance(position, point);
+            if (traveled > epsilon && navigation.canTravel(position, point)) {
                 facing = directionOf(difference(point, position));
                 position = point;
-                break;
+                return traveled;
             }
         }
+        return 0;
     }
     function updateCompanion(dt) {
         if (!companion)
@@ -532,36 +593,25 @@ export function createWorldEngine(options) {
             remaining = waypoint ? distance(companionPosition, waypoint) : 0;
         }
         const travel = Math.min(remaining, (companion.speed ?? defaultSpeed) * dt);
-        companionMoving = travel > epsilon;
-        if (!waypoint || !companionMoving)
+        companionGait = advanceGait(companionGait, travel, companion, dt);
+        if (!waypoint || travel <= epsilon)
             return;
         const length = distance(companionPosition, waypoint);
         companionFacing = directionOf(difference(waypoint, companionPosition));
         companionPosition = interpolate(companionPosition, waypoint, travel / length);
-        companionStride += travel;
         if (travel >= length - epsilon)
             companionRoute.shift();
     }
     function update(dt) {
-        const before = position;
         const direction = manualDirection();
         const budget = (player.speed ?? defaultSpeed) * dt;
-        if (Math.hypot(direction.x, direction.y) > epsilon)
-            walkManually(direction, budget);
-        else
-            advanceRoute(budget);
-        const traveled = distance(before, position);
-        moving = traveled > epsilon;
-        stride += traveled;
-        if (moving) {
-            stepDistance += traveled;
-            if (stepDistance >= 82) {
-                stepDistance %= 82;
-                options.onStep?.();
-            }
-        }
-        else {
-            stepDistance = 0;
+        const traveled = Math.hypot(direction.x, direction.y) > epsilon
+            ? walkManually(direction, budget) : advanceRoute(budget);
+        const previousPhase = gait.phase;
+        gait = advanceGait(gait, traveled, player, dt);
+        const nextContact = (previousPhase + traveled / strideLength(player)) * 2;
+        if (Math.floor(nextContact) > Math.floor(previousPhase * 2)) {
+            options.onStep?.();
         }
         updateCompanion(dt);
         updateProximity();
@@ -580,42 +630,54 @@ export function createWorldEngine(options) {
             y: camera.y + (target.y - camera.y) * weight,
         };
     }
-    function drawPerformer(context, performer, image, point, direction, walking, steps) {
+    function drawPerformer(context, performer, image, point, direction, motion) {
         const { sheet, draw } = performer;
         const depth = 0.86 + point.y / scene.height * 0.22;
         const width = performer.width * depth;
         const height = performer.height * depth;
-        const animate = walking && !reducedMotion.matches;
-        drawShadow(context, point, width);
+        const pose = reducedMotion.matches ? standing : motion;
+        const animate = pose.strength > 0;
         if (!draw && (!image.complete || image.naturalWidth === 0))
             return;
+        const profile = direction === 'west' || direction === 'east';
+        const lean = direction === 'west' ? -1 : direction === 'east' ? 1 : 0;
         context.save();
         context.translate(point.x, point.y);
+        const angle = pose.phase * Math.PI * 2;
+        const swing = Math.sin(angle) * pose.strength;
+        const sway = Math.cos(angle) * pose.strength;
+        const contact = 1 - Math.abs(swing);
+        drawWalkingShadow(context, width, direction, swing, contact);
+        if (animate) {
+            context.translate(height * (sway * 0.009 + lean * 0.003), -height * Math.abs(swing) * 0.02);
+            context.rotate(sway * 0.016 + lean * pose.strength * 0.018);
+            context.scale(1 + pose.strength * 0.008 * contact, 1 - pose.strength * 0.012 * contact);
+        }
+        const size = { width, height };
         if (draw) {
-            if (animate) {
-                context.rotate(Math.sin(steps / 17) * 0.028);
-                context.translate(0, -Math.abs(Math.sin(steps / 17)) * 4);
-            }
-            draw(context, { width, height }, direction);
+            draw(context, size, direction, pose);
         }
         else if (sheet) {
             const mirrorFrom = direction === 'east' ? 'west' : direction === 'west' ? 'east' : null;
             const ownRow = sheet.rows[direction];
             const mirroredRow = mirrorFrom ? sheet.rows[mirrorFrom] : undefined;
             const row = ownRow ?? mirroredRow ?? sheet.rows.south ?? 0;
-            if (ownRow === undefined && mirroredRow !== undefined)
+            if (ownRow === undefined && (mirroredRow !== undefined || direction === 'east'))
                 context.scale(-1, 1);
-            const step = animate ? sheet.walkColumns[Math.floor(steps / 28) % sheet.walkColumns.length] : undefined;
+            const step = animate ? sheet.walkColumns[Math.floor(pose.phase * sheet.walkColumns.length)] : undefined;
             const column = step ?? sheet.idleColumn;
-            drawSheetFrame(context, image, sheet, { width, height }, row, column);
+            if (animate && sheet.articulated && direction !== 'south') {
+                const { source, target } = sheetViewport(sheet, size, row, column, 0);
+                drawArticulatedFrame(context, image, source, target, pose, profile, 0.72);
+            }
+            else {
+                drawSheetFrame(context, image, sheet, size, row, column);
+            }
         }
         else {
             if (direction === 'west')
                 context.scale(-1, 1);
-            if (animate)
-                context.rotate(Math.sin(steps / 17) * 0.035);
-            const lift = animate ? Math.abs(Math.sin(steps / 17)) * 4 : 0;
-            context.drawImage(image, -width / 2, -height - lift, width, height);
+            context.drawImage(image, -width / 2, -height, width, height);
         }
         context.restore();
     }
@@ -668,17 +730,17 @@ export function createWorldEngine(options) {
             context.stroke();
         }
         const actors = [{
-                performer: player, image: playerImage, point: position, direction: facing, walking: moving, steps: stride,
+                performer: player, image: playerImage, point: position, direction: facing, motion: gait,
             }];
         if (companion && companionImage) {
             actors.push({
                 performer: companion, image: companionImage, point: companionPosition, direction: companionFacing,
-                walking: companionMoving, steps: companionStride,
+                motion: companionGait,
             });
             actors.sort((a, b) => a.point.y - b.point.y);
         }
         function drawActor(actor) {
-            drawPerformer(context, actor.performer, actor.image, actor.point, actor.direction, actor.walking, actor.steps);
+            drawPerformer(context, actor.performer, actor.image, actor.point, actor.direction, actor.motion);
         }
         let actor = actors.shift();
         for (const hotspot of hotspots) {

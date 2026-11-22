@@ -1,5 +1,5 @@
 import { studioTravelSelection } from './studio.js';
-import { drawTravelLook, loadTravelLook, travelLook } from './travel-look.js';
+import { drawWalkingTravelLook, loadTravelLook, travelLook } from './travel-look.js';
 import { worldAudio } from './world-audio.js';
 import { createWorldEngine } from './world-engine.js';
 const say = (phrase, lang) => phrase[lang === 'tr' ? 0 : 1];
@@ -190,7 +190,7 @@ export function mountHongdae(lang, member, onAction) {
                 return;
             engine.setAppearance({
                 ...player,
-                draw: (context, { height }, direction) => drawTravelLook(context, loaded, 0, 0, height, direction === 'west' ? -1 : 1),
+                draw: (context, { height }, direction, gait) => drawWalkingTravelLook(context, loaded, height, direction, gait),
             });
         }).catch(() => { if (active)
             warning.hidden = false; });
