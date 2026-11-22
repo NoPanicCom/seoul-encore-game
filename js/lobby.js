@@ -55,11 +55,12 @@ export function renderLobby(lang, count, total, hasReplay, resumeLabel = '', pho
       <span class="el-glint el-glint--right" aria-hidden="true"></span>
       <h1 class="el-title" id="encore-title"><span>Seoul</span> <strong>Encore</strong></h1>
     </section>
-    <button type="button" class="el-start" data-act="world">
+    <button type="button" class="el-start" data-act="walk">
       <span class="el-play" aria-hidden="true"></span>
-      <strong>${label.world}</strong>
+      <strong>${lang === 'ru' ? 'Гулять по Сеулу за Софию' : 'Sofia ile Seul’de yürü'}</strong>
       <i class="el-arrow" aria-hidden="true"></i>
     </button>
+    <button type="button" class="el-role-select secondary" data-act="world">${label.world}</button>
     <button type="button" class="el-role-select secondary" data-act="start">${label.start}</button>
     ${resumeLabel ? `<button class="resume" data-act="resume">${resumeLabel}</button>` : ''}
     <nav class="el-shortcuts" aria-labelledby="encore-explore">

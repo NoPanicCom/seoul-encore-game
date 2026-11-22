@@ -1,5 +1,5 @@
 import { renderHeldStick, renderArena } from './lightstick.js';
-export function renderPerformance(member, lang, playing, lights, stick = null, secret = false, watching = false) {
+export function renderPerformance(member, lang, playing, lights, stick = null, secret = false, watching = false, sofia = false) {
     const cue = lang === 'ru' ? 'Поймай звезду у круга' : 'Yıldız halkaya gelince dokun';
     const palette = ['#ff80c2', '#bca2ff', '#ffe29e'];
     const colors = lights.map((key, index) => '--cue-' + index + ':' + palette[key]).join(';');
@@ -7,6 +7,7 @@ export function renderPerformance(member, lang, playing, lights, stick = null, s
     <div class="live-light" aria-hidden="true"></div><div class="live-dancer" aria-hidden="true"><div style="background-image:url('art/world/${member}.webp')"></div></div>
     ${stick && secret ? renderArena(stick) : ''}
     ${stick ? renderHeldStick(stick, lang, playing, watching) : ''}
+    ${sofia ? '<div class="sofia-crowd" aria-hidden="true"></div>' : ''}
     <span class="live-bug">${secret ? 'LISA • ENCORE' : 'SEOUL • LIVE'}</span>
   </div>`;
     if (watching)

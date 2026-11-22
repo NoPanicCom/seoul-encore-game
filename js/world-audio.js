@@ -204,7 +204,7 @@ function brush(mixer, start, length, peak) {
     voice(mixer, source, envelope(mixer, start, length, peak), start, length);
 }
 const repeatDelay = {
-    step: .16, pixel: .26, delivery: .37, spotlight: .28, curtain: 1.05, note: .074,
+    step: .16, pixel: .26, delivery: .37, spotlight: .28, curtain: 1.05, note: .074, groove: .18,
 };
 function useCue(key, play) {
     const mixer = mix;
@@ -254,7 +254,19 @@ function note(index) {
         ring(mixer, start + .014, pitch * 2, .09, .038);
     });
 }
+function groove(beat) {
+    useCue('groove', (mixer, time) => {
+        const bass = [130.81, 130.81, 103.83, 116.54][Math.floor(beat / 2) % 4] ?? 130.81;
+        ring(mixer, time, bass / 2, .27, .14, 'triangle');
+        if (beat % 2 === 0)
+            ring(mixer, time, 145, .15, .2, 'sine', 43);
+        else
+            brush(mixer, time, .1, .15);
+        brush(mixer, time + .26, .04, .065);
+    });
+}
 export const worldAudio = {
+    groove,
     // Call directly from a user gesture. Idempotent during an active room visit.
     enter,
     exit,
