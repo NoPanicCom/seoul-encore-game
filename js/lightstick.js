@@ -33,14 +33,30 @@ export function lightBeat(area, beat) {
     area.dataset.lightHit = String(beat);
     area.dataset.pulse = beat % 2 === 0 ? 'even' : 'odd';
 }
+export function renderBlackout(lang) {
+    const tr = lang === 'tr';
+    return `<section class="encore-blackout" aria-live="polite">
+    <div class="dark-arena" aria-hidden="true"><i></i><i></i><i></i></div>
+    <h2>${tr ? 'Seul, iyi geceler…' : 'Спокойной ночи, Сеул…'}</h2>
+    <p>${tr ? 'Son akor sustu. Sahnede tek bir mikrofon kaldı.' : 'Последний аккорд стих. На сцене остался один микрофон.'}</p></section>`;
+}
+export function renderArena(id) {
+    const rows = Array.from({ length: 5 }, (_, row) => `<div style="--row:${row}">${'<i></i>'.repeat(22)}</div>`).join('');
+    return `<div class="encore-arena" aria-hidden="true" style="--stick:${sticks[id].color}">${rows}</div>`;
+}
+export function secretPhotocard(lang, id) {
+    const title = lang === 'tr' ? 'Lisa’nın gizli bisi' : 'Секретный бис Лисы';
+    return `<figure class="lisa-foil" data-encore-card="${id}" style="--stick:${sticks[id].color}">
+    <img src="art/lisa-secret-encore.webp" alt="${lang === 'tr' ? 'Lisa sahnede parmaklarıyla kalp yapıyor' : 'Лиса показывает сердечко со сцены'}">
+    <figcaption><b>${title}</b><small>${sticks[id][lang]}</small></figcaption></figure>`;
+}
 export function renderLightResult(lang, id, score, total) {
     const tr = lang === 'tr';
-    const message = score === 0 ? (tr ? 'Şarkıyı dinledin. Yeni turda yıldız halkaya gelince dokun.' : 'Ты послушала песню. В следующем туре нажми, когда звезда коснётся кольца.') :
-        tr ? 'Senin işaretinle tribünde bir ışık dalgası yükseldi.' : 'По твоему сигналу по трибунам прошла световая волна.';
-    return `<section class="stick-finale" style="--stick:${sticks[id].color}"><div class="stadium-finish">${wand(id)}</div>
-    <h2>${tr ? 'Konserin son akoru' : 'Последний аккорд'}</h2><p>${message}</p>
+    return `<section class="stick-finale" style="--stick:${sticks[id].color}">
+    ${secretPhotocard(lang, id)}
+    <h2>${tr ? 'Bis kartın albümünde!' : 'Карточка с биса уже в альбоме!'}</h2>
     <p class="show-score"><strong>${score} / ${total}</strong> ${tr ? 'ritimde yakış' : 'попаданий в такт'} · ${sticks[id][lang]}</p>
-    <button class="shop-go" data-act="stick-concert">${tr ? 'Şarkıyı tekrar çal' : 'Сыграть ещё раз'}</button>
-    <button class="secondary" data-act="back-shop">${tr ? 'Minho’ya dön' : 'Вернуться к Минхо'}</button>
-    <button class="secondary" data-act="trip-street">${tr ? 'Hongdae’ye dön' : 'Вернуться в Хондэ'}</button></section>`;
+    <button class="shop-go" data-act="fan-album">${tr ? 'Albümümü aç' : 'Открыть мой альбом'}</button>
+    <button class="secondary" data-act="stick-concert">${tr ? 'Konseri tekrar oyna' : 'Сыграть концерт ещё раз'}</button>
+    <button class="secondary" data-act="back-shop">${tr ? 'Minho’ya dön' : 'Вернуться к Минхо'}</button></section>`;
 }

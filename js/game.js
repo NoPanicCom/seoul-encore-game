@@ -4,7 +4,7 @@ import { melody, previewIntro, silence } from './sound.js';
 import { renderWorld, mountWorld, worldAlbum, worldChallenge, selectBackstageMember } from './world.js';
 import { renderHongdae, mountHongdae } from './hongdae.js';
 import { renderBooth, mountBooth, boothAlbum, boothPhotoCount } from './booth.js';
-import { stickId, renderMinho, renderLightResult, lightBeat } from './lightstick.js';
+import { stickId, renderMinho, renderLightResult, renderBlackout, secretPhotocard, lightBeat } from './lightstick.js';
 import { renderPerformance } from './performance.js';
 import { renderLobby } from './lobby.js';
 import { renderPets, petAction, petAlbum, petTourNote, openPet, openPetLobby } from './pets.js';
@@ -68,6 +68,9 @@ function memoryLook(id) {
 let sound = read('sound') !== 'off';
 let album = cardIds(read('album'));
 let lightstick = stickId(read('lightstick'));
+const fanCards = () => ['heart', 'moon', 'star'].filter(id => read('secret-card.' + id) === '1');
+let tourEncore = false;
+let firstSongScore = 0;
 let playing = false;
 let epoch = 0;
 let start = 0;
@@ -98,6 +101,8 @@ function checkpoint(next) {
     saveCityCheckpoint();
 }
 function go(next) {
+    if (next !== 'blackout' && next !== 'secret')
+        tourEncore = false;
     const hash = sceneHash(next);
     if (location.hash !== hash)
         history.replaceState(null, '', location.pathname + location.search + hash);
@@ -112,8 +117,10 @@ function isTravelWardrobe() { return studioBack === 'world' || studioBack === 'h
 function sceneHash(next) {
     if (next === 'world')
         return '#play';
-    if (next === 'light-result')
-        return '#lightshow/' + tripMember;
+    if (next === 'light-result' || (next === 'album' && albumSection === 'concert'))
+        return '#concert-album/' + tripMember;
+    if (next === 'blackout' || next === 'secret')
+        return '#secret/' + tripMember;
     if (next === 'minho' || next === 'lightshow' || next === 'hongdae' || next === 'booth')
         return '#' + next + '/' + tripMember;
     if (next === 'album' && albumSection === 'hongdae')
@@ -131,6 +138,12 @@ function restoreScene() {
     if (!member)
         return 'home';
     tripMember = member;
+    if (place === 'concert-album') {
+        albumSection = 'concert';
+        return 'album';
+    }
+    if (place === 'secret')
+        return lightstick ? 'secret' : 'minho';
     if (place === 'lightshow')
         return lightstick ? 'lightshow' : 'minho';
     if (place === 'minho' || place === 'hongdae' || place === 'booth')
@@ -159,7 +172,7 @@ function home() {
     const progress = resumePoint();
     const p = progress ? passes[progress.role] : null;
     const resumeLabel = p ? t('Turneme dön', 'Продолжить тур') + ' · ' + p.job[lang] : '';
-    return renderLobby(lang, album.length, Object.keys(passes).length, hasEncoreReplay(), resumeLabel, boothPhotoCount());
+    return renderLobby(lang, album.length, Object.keys(passes).length, hasEncoreReplay(), resumeLabel, boothPhotoCount() + fanCards().length);
 }
 const memberRoles = ['lisa', 'jisoo', 'jennie', 'rose'];
 const stylistRoles = ['ari', 'mina', 'soyeon', 'yuna'];
@@ -213,11 +226,12 @@ function cuePage() {
 }
 function stage() {
     const p = pass();
-    const fromShop = page === 'lightshow';
-    const performer = fromShop ? tripMember : (memberIds[p.person] ?? 'lisa');
-    const title = fromShop ? t('Tribünün ışığı sende', 'Зажги трибуны') : p.cue[lang];
-    const description = fromShop ? t('Yıldız halkaya gelince çubuğuna dokun.', 'Когда звезда дойдёт до кольца, коснись лайтстика.') : p.result[lang];
-    return `<div class="stage live-stage" data-playing="${playing}">${renderPerformance(performer, lang, playing, worldChallenge(performer, 'light'), lightstick)}${!fromShop && stageLook(p.person, 'rehearsal') ? photo(stageLook(p.person, 'rehearsal') ?? p.card, p.person, 'rhythm-look') : ''}<span class="kicker">SEOUL LIVE</span><h2>${title}</h2><p>${description}</p><div class="dots" aria-hidden="true">${'<i class="dot"></i>'.repeat(beatCount)}</div>
+    const secret = page === 'secret';
+    const fromShop = page === 'lightshow' || secret;
+    const performer = secret ? 'lisa' : fromShop ? tripMember : (memberIds[p.person] ?? 'lisa');
+    const title = secret ? t('Lisa’nın gizli bisi', 'Секретный бис Лисы') : fromShop ? t('Tribünün ışığı sende', 'Зажги трибуны') : p.cue[lang];
+    const description = secret ? t('Lisa geri döndü! Yıldız halkaya ulaşınca dokun, bütün salon senin renginde yansın.', 'Лиса вернулась! Коснись лайтстика, когда звезда дойдёт до кольца, и весь зал засияет твоим цветом.') : fromShop ? t('Yıldız halkaya gelince çubuğuna dokun.', 'Когда звезда дойдёт до кольца, коснись лайтстика.') : p.result[lang];
+    return `<div class="stage live-stage" data-playing="${playing}">${renderPerformance(performer, lang, playing, worldChallenge(performer, 'light'), lightstick, secret)}${!fromShop && stageLook(p.person, 'rehearsal') ? photo(stageLook(p.person, 'rehearsal') ?? p.card, p.person, 'rhythm-look') : ''}<span class="kicker">SEOUL LIVE</span><h2>${title}</h2><p>${description}</p><div class="dots" aria-hidden="true">${'<i class="dot"></i>'.repeat(beatCount)}</div>
   <button id="pad" class="disc" data-act="${playing ? 'tap' : 'play'}">${playing ? t('Dokun', 'Нажми') : t('Başlat ▶', 'Старт ▶')}</button>
   <p id="count" class="mono">0 / ${beatCount}</p>${lightstick ? '<p class="light-feedback" id="light-feedback" role="status"></p>' : ''}</div>
   ${fromShop ? '' : '<p class="intro">' + t('İç halka büyüyüp kenara vardığında dokun. Kaçırırsan sıradaki vuruştan devam et.', 'Нажимай, когда кольцо дорастёт до края. Если пропустишь, лови следующий удар.') + '</p>'}
@@ -256,12 +270,13 @@ function ending() {
 }
 function albumPage() {
     const tabs = [['concert', t('Konser', 'Концерт')], ['pets', t('Patiler', 'Питомцы')], ['city', t('Şehir', 'Город')], ['hongdae', t('Fotokabin', 'Фотобудка')], ['studio', t('Stil', 'Стиль')], ['crew', t('Ekip', 'Команда')], ['world', t('Kulis', 'Гримёрка')]];
-    const concertCards = `<div class="album">${album.map(id => {
+    const special = fanCards();
+    const concertCards = `${special.length ? '<div class="foil-album">' + special.map(id => secretPhotocard(lang, id)).join('') + '</div>' : ''}<div class="album">${album.map(id => {
         const p = passes[id];
         if (!p)
             throw new Error(id);
         return action('card-' + id, `${photo(memoryLook(id))}<span>${p.person} · ${p.job[lang]}</span>`, 'collect');
-    }).join('')}</div>${album.length ? '' : `<p class="intro">${t('İlk konserini bitirince fotoğraf kartın buraya gelecek.', 'Заверши концерт, чтобы получить первую фотокарточку.')}</p>`}${hasEncoreReplay() ? action('replay', t('Son konseri yeniden izle', 'Посмотреть запись концерта'), 'secondary') : ''}${action('start', t('Kulis kartı seç', 'Выбрать пропуск'))}`;
+    }).join('')}</div>${album.length || special.length ? '' : `<p class="intro">${t('İlk konserini bitirince fotoğraf kartın buraya gelecek.', 'Заверши концерт, чтобы получить первую фотокарточку.')}</p>`}${hasEncoreReplay() ? action('replay', t('Son konseri yeniden izle', 'Посмотреть запись концерта'), 'secondary') : ''}${action('start', t('Kulis kartı seç', 'Выбрать пропуск'))}`;
     const sections = { hongdae: () => boothAlbum(lang) + action('trip-street', t('Hongdae’ye dön', 'Вернуться в Хондэ'), 'trip-exit'), concert: () => concertCards, pets: () => petAlbum(lang), studio: () => studioAlbum(lang), city: () => cityAlbum(lang), crew: () => crewAlbum(lang), world: () => {
             const cards = worldAlbum(lang);
             return (cards.length ? '<div class="world-album">' + cards.map(card => `<figure class="world-album-card"><img src="${card.image}" alt=""><figcaption><strong>${card.title}</strong><small>${card.subtitle}</small></figcaption></figure>`).join('') + '</div>' : '<p>' + t('Kulis provasını tamamlayınca ilk hatıran buraya gelir.', 'Закончи репетицию за кулисами, и здесь появится твоя карточка.') + '</p>') + action('world', t('Kulise gir', 'Войти за кулисы'));
@@ -273,7 +288,7 @@ function back() {
         return 'hongdae';
     if (page === 'minho' || page === 'light-result')
         return 'hongdae';
-    if (page === 'lightshow')
+    if (page === 'lightshow' || page === 'blackout' || page === 'secret')
         return 'minho';
     if (page === 'hongdae')
         return 'world';
@@ -300,10 +315,16 @@ function draw() {
     unmountScene = undefined;
     app.dataset.page = page;
     document.documentElement.lang = lang;
-    const screens = { home, world: () => renderWorld(lang), minho: () => renderMinho(lang, lightstick), lightshow: stage, 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick), hongdae: () => renderHongdae(lang, tripMember), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
-    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'world', 'hongdae', 'booth', 'minho', 'light-result'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${page === 'lightshow' ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
+    const screens = { home, world: () => renderWorld(lang), minho: () => renderMinho(lang, lightstick), lightshow: stage, secret: stage, blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick), hongdae: () => renderHongdae(lang, tripMember), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
+    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(page === 'lightshow' || page === 'secret') ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
     element('feedback').textContent = feedback;
-    if (page === 'world') {
+    if (page === 'blackout') {
+        if (!document.hidden) {
+            const timer = window.setTimeout(() => { go('secret'); void play(); }, 2800);
+            unmountScene = () => window.clearTimeout(timer);
+        }
+    }
+    else if (page === 'world') {
         unmountScene = mountWorld(lang, (id, member) => {
             tripMember = member;
             if (id === 'world-exit-city') {
@@ -363,8 +384,22 @@ function chooseFinale() {
     return 'solo';
 }
 function finish(free) {
-    if (page === 'lightshow') {
+    if (page === 'secret' && lightstick) {
+        save('secret-card.' + lightstick, '1');
+        save('lastAlbum', 'concert');
+        if (tourEncore) {
+            forecast = 'solo';
+            lastFree = false;
+            collectCard(false, firstSongScore);
+        }
         go('light-result');
+        return;
+    }
+    if (lightstick && !free && (page === 'lightshow' || page === 'stage')) {
+        tourEncore = page === 'stage';
+        firstSongScore = hits.size;
+        hits.clear();
+        go('blackout');
         return;
     }
     forecast = chooseFinale();
@@ -379,20 +414,21 @@ function finish(free) {
     viewing = false;
     go('show');
 }
-function collectCard() {
+function collectCard(openEnding = true, score = hits.size) {
     save('lastAlbum', 'concert');
     album = cardIds([...(cardIds(read('album'))), ...album, role].join(','));
     save('album', album.join(','));
     save('signal.' + role, forecast);
     save('look.' + role, stageLook(actor) ?? 'studio/' + memberIds[actor] + '-spotlight');
-    save('score.' + role, lastFree ? 'free' : String(hits.size));
+    save('score.' + role, lastFree ? 'free' : String(score));
     save('note.' + role + '.tr', noteFor('tr'));
     save('note.' + role + '.ru', noteFor('ru'));
     save('checkpoint', '');
     albumSection = 'concert';
     cityMode = 'after';
     cityDay(1);
-    go('ending');
+    if (openEnding)
+        go('ending');
 }
 function tick(now) {
     if (!playing)
@@ -422,7 +458,7 @@ async function play() {
         button.disabled = true;
     if (sound) {
         try {
-            await melody(cityProgress().intro, page === 'lightshow');
+            await melody(page === 'secret' ? null : cityProgress().intro, page === 'lightshow' || page === 'secret', page === 'secret');
         }
         catch {
             if (token === epoch) {
@@ -450,6 +486,31 @@ function rolePick(id) {
     resetCrewGame(role);
     go('time');
 }
+function tapRhythm(now) {
+    const i = beatAt(now - start);
+    if (playing && i !== null && !hits.has(i)) {
+        hits.add(i);
+        const set = app.querySelector('.live-set');
+        if (set && lightstick) {
+            lightBeat(set, hits.size);
+            window.clearTimeout(glowTimer);
+            glowTimer = window.setTimeout(() => { delete set.dataset.pulse; }, 530);
+            if (page === 'secret')
+                set.dataset.arenaLit = 'true';
+            element('light-feedback').textContent = page === 'secret' && hits.size === 1 ? t('Bütün salon senin renginde!', 'Весь зал сияет твоим цветом!') : t('Tam ritminde!', 'Точно в такт!');
+        }
+        element('note-rail').dataset.hit = String(i % 2);
+        element('count').textContent = hits.size + ' / ' + beatCount;
+    }
+    else if (playing && i === null && lightstick) {
+        element('light-feedback').textContent = t('Sıradaki yıldızı yakala.', 'Поймай следующую звезду.');
+    }
+}
+app.addEventListener('pointerdown', event => {
+    if (event.isPrimary && event.button === 0 && event.target instanceof Element && event.target.closest('button[data-act="tap"]')) {
+        tapRhythm(performance.now());
+    }
+});
 app.addEventListener('click', e => {
     const target = e.target;
     if (!(target instanceof Element))
@@ -468,6 +529,11 @@ app.addEventListener('click', e => {
     if (act === 'stick-concert' && lightstick && (page === 'minho' || page === 'light-result')) {
         hits.clear();
         go('lightshow');
+        return;
+    }
+    if (act === 'fan-album') {
+        albumSection = 'concert';
+        go('album');
         return;
     }
     if (act === 'back-shop') {
@@ -700,22 +766,8 @@ app.addEventListener('click', e => {
         return;
     }
     if (act === 'tap') {
-        const i = beatAt(performance.now() - start);
-        if (playing && i !== null && !hits.has(i)) {
-            hits.add(i);
-            const set = app.querySelector('.live-set');
-            if (set && lightstick) {
-                lightBeat(set, hits.size);
-                window.clearTimeout(glowTimer);
-                glowTimer = window.setTimeout(() => { delete set.dataset.pulse; }, 530);
-                element('light-feedback').textContent = t('Tam ritminde!', 'Точно в такт!');
-            }
-            element('note-rail').dataset.hit = String(i % 2);
-            element('count').textContent = hits.size + ' / ' + beatCount;
-        }
-        else if (playing && i === null && lightstick) {
-            element('light-feedback').textContent = t('Sıradaki yıldızı yakala.', 'Поймай следующую звезду.');
-        }
+        if (e.detail === 0)
+            tapRhythm(performance.now());
         return;
     }
     if (act === 'pause') {
@@ -739,10 +791,16 @@ app.addEventListener('click', e => {
         go('ending');
     }
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && (page === 'stage' || page === 'lightshow')) {
-    stop();
-    draw();
-} });
+document.addEventListener('visibilitychange', () => {
+    if (page === 'blackout') {
+        draw();
+        return;
+    }
+    if (document.hidden && (page === 'stage' || page === 'lightshow' || page === 'secret')) {
+        stop();
+        draw();
+    }
+});
 window.addEventListener('encore:photo-saved', () => {
     save('lastAlbum', 'hongdae');
     save('lastPhotoMember', tripMember);

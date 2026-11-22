@@ -54,17 +54,17 @@ export async function previewIntro(intro) {
             feedback.textContent = document.documentElement.lang === 'ru' ? 'Звуковой предпросмотр недоступен.' : 'Ses önizlemesi açılamadı.';
     }
 }
-export async function melody(intro, fanMix = false) {
+export async function melody(intro, fanMix = false, secret = false) {
     const note = await instrument();
     if (!note)
         return;
-    const pitches = [293.66, 349.23, 440, 392, 349.23, 523.25, 440, 392, 293.66, 349.23, 392, 293.66];
+    const pitches = secret ? [392, 493.88, 587.33, 659.25, 523.25, 659.25, 783.99, 659.25, 440, 523.25, 587.33, 783.99] : [293.66, 349.23, 440, 392, 349.23, 523.25, 440, 392, 293.66, 349.23, 392, 293.66];
     if (intro === 'whisper')
         note(587.32, 0, .58, 'sine', .26);
     if (intro === 'drums')
         for (let i = 0; i < 3; i++)
             note(150, i * .18, .14, 'sine', .64, .33);
-    const chords = [[146.83, 174.61, 220], [116.54, 146.83, 174.61], [130.81, 164.81, 196]];
+    const chords = secret ? [[196, 246.94, 293.66], [130.81, 164.81, 196], [146.83, 185, 220]] : [[146.83, 174.61, 220], [116.54, 146.83, 174.61], [130.81, 164.81, 196]];
     for (const [i, pitch] of pitches.slice(0, beatCount).entries()) {
         const time = (i + 1) * beatMs / 1000;
         note(pitch, time, .34, 'triangle', .54);
