@@ -1,4 +1,5 @@
 import { beatCount } from './rules.js';
+import { isYunaCue } from './yuna-light.js';
 import { line, passes } from './story.js';
 const memberArt = { Lisa: 'lisa', Jisoo: 'jisoo', Jennie: 'jennie', 'Rosé': 'rose' };
 const lineup = ['Jisoo', 'Jennie', 'Rosé', 'Lisa'];
@@ -8,7 +9,7 @@ const cueByRole = {
     ari: line('Kostüm kılıfını aç', 'Открыть чехол с костюмом'),
     mina: line('Ceket için işaret ver', 'Дать сигнал для смены жакета'),
     soyeon: line('Eteğin klipsini aç', 'Расстегнуть застёжку на шлейфе'),
-    yuna: line('Yan spotu hazırla', 'Подготовить боковой луч'),
+    yuna: line('Prova spotunu aç', 'Включить свет с репетиции'),
     lisa: line('Perdeyi aralayıp sahneye çık', 'Шагнуть из-за кулисы'),
     jisoo: line('Giriş çizgisine adım at', 'Шагнуть к метке выхода'),
     jennie: line('Giriş vuruşunu say', 'Отсчитать вступление'),
@@ -68,7 +69,10 @@ function decodeInput(value) {
             return null;
         validatedLooks[name] = art;
     }
-    return { role, member, score, signal, looks: validatedLooks, cityNote: { tr: cityNote.tr, ru: cityNote.ru } };
+    const spot = value.roseCue;
+    if (spot !== undefined && (role !== 'yuna' || typeof spot !== 'string' || !isYunaCue(spot)))
+        return null;
+    return { role, member, score, signal, ...(typeof spot === 'string' ? { roseCue: spot } : {}), looks: validatedLooks, cityNote: { tr: cityNote.tr, ru: cityNote.ru } };
 }
 function loadRecording() {
     if (storageIssue)
@@ -153,13 +157,13 @@ function crowd() {
 function film(performance, lang) {
     const { input, phase, light, replay } = performance;
     const artists = input.signal === 'solo' ? ['Lisa'] : lineup;
-    const members = artists.map((name, index) => `<figure class="encore-artist${input.member === name ? ' encore-featured' : ''}" style="--enter:${index}">
+    const members = artists.map((name, index) => `<figure data-artist="${memberArt[name]}" class="encore-artist${input.member === name ? ' encore-featured' : ''}" style="--enter:${index}">
     <img src="${art(input, name)}" alt="" width="280" height="420">
     <figcaption>${name}</figcaption>
   </figure>`).join('');
     const started = phase !== 'standby';
     const overline = replay ? line('KONSER KAYDI', 'ЗАПИСЬ КОНЦЕРТА') : line('SEOUL · CANLI', 'СЕУЛ · СЦЕНА');
-    return `<div class="encore-film encore-${input.signal} encore-${phase} encore-light-${phase === 'bow' ? light : 'neutral'}">
+    return `<div ${input.roseCue ? 'data-yuna-cue="' + input.roseCue + '"' : ''} class="encore-film encore-${input.signal} encore-${phase} encore-light-${phase === 'bow' ? light : 'neutral'}">
     <div class="encore-scanline" aria-hidden="true"></div>
     <div class="encore-rig" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <div class="encore-lights" aria-hidden="true"><i></i><i></i><i></i><i></i></div>

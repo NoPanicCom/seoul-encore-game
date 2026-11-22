@@ -33,7 +33,7 @@ export const passes = {
         choices: [line('Sahneyi karart', 'Погасить весь свет'), line('Yan spotu dene', 'Проверить боковой луч')], correct: 1,
         hint: line('Işıkçıyla birlikte çizmelerdeki yıldızları görünür yap.', 'Помоги художнику по свету показать звёзды на сапогах.'),
         result: line('Yan spot hazır. Rosé döndükçe gümüş yıldızlar görünüyor.', 'Боковой свет готов. При каждом повороте звёзды мерцают.'),
-        cue: line('Gümüş adımlar', 'Серебряные шаги'), finale: line('Rosé ilk adımını attı. Yuna’nın seçtiği gümüş çizmeler yan spotta yıldız gibi parladı.', 'Розэ сделала первый шаг. Серебряные сапоги, выбранные Юной, засверкали в боковом свете.') },
+        cue: line('Gümüş adımlar', 'Серебряные шаги'), finale: line('Rosé ilk adımını attı. Gümüş çizmeler Yuna’nın seçtiği ışıkta yıldız gibi parladı.', 'Розэ сделала первый шаг. Серебряные сапоги засверкали в свете, который выбрала Юна.') },
     lisa: { name: 'Lisa', person: 'Lisa', photo: 'lisa', card: 'lisa', job: stage,
         intro: line('Kulaklığında Jun’un sesi var. “Lisa, sıradaki sensin!” Mikrofon henüz gelmedi. Nasıl açılış yaparsın?', 'В наушнике голос Джуна. «Лиса, твой выход!» Микрофон ещё в пути. Как начнёшь?'),
         choices: [line('Dansla başla', 'Начать с танца'), line('Boş mikrofona seslen', 'Спеть без микрофона')], correct: 0,

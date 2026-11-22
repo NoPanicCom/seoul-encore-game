@@ -2,6 +2,7 @@ import { createWorldEngine } from './world-engine.js';
 import { mountNariDuet } from './nari-duet.js';
 import { worldAudio } from './world-audio.js';
 import { stickName, merchButtons, couponLabel, isShopStick } from './lightstick.js';
+import { yunaDressed, yunaCue } from './yuna-light.js';
 import { passes } from './story.js';
 import { studioMemberId, studioTravelSelection } from './studio.js';
 const titles = {
@@ -111,9 +112,12 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
             }
             spots.push(entrance);
         }
+        if (cast?.id === 'yuna' && room === 'dance') {
+            spots.push(door('light-desk', ['Пульт света', 'Spot masası'], 1030, 545, 375));
+        }
         const scene = { width: 1200, height: 800, background: 'art/walk/' + (room === 'dance' ? 'mirrored-studio' : room) + '.webp', spawn: { x: state.x, y: state.y }, walkable: { x: 25, y: 510, width: 1150, height: 245 }, obstacles: [], hotspots: spots };
         const day = () => state.days === 0 ? say(['Сегодня концерт', 'Bugün konser var']) : state.days === 1 ? say(['Концерт завтра', 'Konser yarın']) : say(['До концерта 2 дня', 'Konsere 2 gün var']);
-        const roleTip = costumeRoom && part ? (dressed ? say(['Костюм для ' + ruMember + ' готов. Встретимся на арене!', 'Konser kıyafeti hazır. ' + part.person + ' seni arenada bekliyor!']) : room === 'hall' ? say(['Подойди к гримёрке, чтобы выбрать костюм для ' + ruMember + '.', part.person + ' için kostüm seçmek üzere giyinme odasına yürü.']) : say(['Войди в YG и приготовь костюм для ' + ruMember + '.', 'YG’ye gir ve ' + part.person + ' için konser kıyafetini seç.'])) : say(['В холле YG тебя ждёт задание.', 'Görevin YG koridorunda seni bekliyor.']);
+        const roleTip = cast?.id === 'yuna' && yunaDressed() ? (yunaCue() ? say(['Свет для Розэ готов. Иди через площадь к арене!', 'Rosé’nin ışığı hazır. Meydandan geçip arenaya yürü!']) : say(['Зайди в танцзал YG и подойди к пульту света.', 'YG dans odasına gir ve spot masasına yürü.'])) : costumeRoom && part ? (dressed ? say(['Костюм для ' + ruMember + ' готов. Встретимся на арене!', 'Konser kıyafeti hazır. ' + part.person + ' seni arenada bekliyor!']) : room === 'hall' ? say(['Подойди к гримёрке, чтобы выбрать костюм для ' + ruMember + '.', part.person + ' için kostüm seçmek üzere giyinme odasına yürü.']) : say(['Войди в YG и приготовь костюм для ' + ruMember + '.', 'YG’ye gir ve ' + part.person + ' için konser kıyafetini seç.'])) : say(['В холле YG тебя ждёт задание.', 'Görevin YG koridorunda seni bekliyor.']);
         const tip = () => together ? say(directions[room]) : cast && (room === 'street' || room === 'hall') ? roleTip : room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
             room === 'hall' ? say(['Дверь танцзала слева, студия справа.', 'Dans odası solda, ses stüdyosu sağda.']) :
                 room === 'street' ? say(['Тяни джойстик или коснись тротуара. Вход в YG под вывеской.', 'Yön kolunu sürükle veya kaldırıma dokun. YG girişi tabelanın altında.']) :
@@ -285,6 +289,10 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
                     cast.mission();
                 return;
             }
+            if (id === 'light-desk' && cast?.id === 'yuna') {
+                cast.lightDesk();
+                return;
+            }
             if (id === 'nari') {
                 meetNari();
                 return;
@@ -381,7 +389,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
                     pin.style.top = Math.max(26, Math.min(canvas.clientHeight - 35, py)) + 'px';
                     pin.dataset.side = off ? (screen.x < 22 ? 'left' : 'right') : '';
                 }
-                const doorway = spots.find(s => (roomKey(s.id) || s.id === 'gate' || s.id === 'role-room') && Math.hypot(s.approach.x - p.x, s.approach.y - p.y) < 25 && Math.hypot(s.approach.x - previous.x, s.approach.y - previous.y) >= 25);
+                const doorway = spots.find(s => (roomKey(s.id) || s.id === 'gate' || s.id === 'role-room' || s.id === 'light-desk') && Math.hypot(s.approach.x - p.x, s.approach.y - p.y) < 25 && Math.hypot(s.approach.x - previous.x, s.approach.y - previous.y) >= 25);
                 if (doorway && !open) {
                     arrive(doorway.id);
                     return;

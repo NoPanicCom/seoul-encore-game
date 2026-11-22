@@ -1,0 +1,312 @@
+.yuna-room {
+  --yuna-border: #765b87;
+  --yuna-paper: #fff3f8;
+  overflow: hidden;
+  margin-block-end: 16px;
+  border: 1px solid var(--yuna-border);
+  border-radius: 18px;
+  background: #252033;
+  color: var(--yuna-paper);
+}
+
+.yuna-room h2 {
+  margin: 0;
+  padding: 14px 14px 12px;
+  color: #fff0fa;
+  font-size: clamp(23px, 6.1vw, 32px);
+  letter-spacing: -.045em;
+}
+
+.yuna-fit-world, .yuna-preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: clamp(238px, 37svh, 360px);
+  border-block: 1px solid var(--yuna-border);
+}
+
+.yuna-fit-world {
+  background:
+    radial-gradient(ellipse at 53% 69%, #f2bdff47, transparent 63%),
+    linear-gradient(#23172326, #24172d5e),
+    url("art/world/backstage.webp") center 58% / cover;
+}
+
+.yuna-model {
+  position: absolute;
+  inset: 4% 21% 5% 21%;
+  filter: drop-shadow(0 8px 5px #17101cc9);
+  animation: yuna-fitting-arrival .34s ease-out;
+}
+
+.yuna-figure img { display: block; }
+
+.yuna-assistant, .yuna-operator {
+  position: absolute;
+  inset: auto 4% 6% auto;
+  width: clamp(68px, 23%, 106px);
+  margin: 0;
+  text-align: center;
+}
+
+.yuna-cast {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: url("art/walk/cast-yuna.webp") 0 0 / 400% 300% no-repeat;
+  filter: drop-shadow(0 5px 4px #150f1bb5);
+}
+
+.yuna-assistant figcaption, .yuna-operator figcaption {
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1px solid #967d9c;
+  border-radius: 5px;
+  background: #241a30;
+  font-size: 12px;
+  font-weight: 730;
+}
+
+.yuna-status, .yuna-dialogue, .yuna-light-note {
+  margin: 10px 12px;
+  font-size: 14px;
+  line-height: 1.42;
+}
+
+.yuna-dress-actions, .yuna-options > div {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.yuna-dress-actions { margin: 0 12px; }
+
+.yuna-dress-actions button, .yuna-options button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 6px;
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid #7e6791;
+  border-radius: 7px;
+  background: #3b2b51;
+  font-size: 13px;
+  font-weight: 730;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.yuna-dress-actions button:not(:disabled) { background: #625081; border-color: #ddc4ff; }
+.yuna-dress-actions button:disabled, .yuna-room .yuna-primary:disabled {
+  cursor: default;
+  color: #e2d4e8;
+  border: 1px solid #6b5778;
+  background: #352b42;
+}
+.yuna-dress-actions button img { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 4px; }
+.yuna-dress-actions button span { color: #ead6ff; font-size: 18px; }
+.yuna-room .yuna-primary { width: calc(100% - 24px); margin: 10px 12px 12px; }
+
+.yuna-rehearsal[data-yuna-cue="pearl"], .yuna-options [data-yuna-swatch="pearl"],
+:is(.live-set,.encore-film)[data-yuna-cue^="pearl-"] {
+  --yuna-light: 253 235 255;
+  --yuna-spread: 31%;
+}
+
+.yuna-rehearsal[data-yuna-cue="cyan"], .yuna-options [data-yuna-swatch="cyan"],
+:is(.live-set,.encore-film)[data-yuna-cue^="cyan-"] {
+  --yuna-light: 104 227 255;
+  --yuna-spread: 23%;
+}
+
+.yuna-rehearsal[data-yuna-cue="rose"], .yuna-options [data-yuna-swatch="rose"],
+:is(.live-set,.encore-film)[data-yuna-cue^="rose-"] {
+  --yuna-light: 255 107 188;
+  --yuna-spread: 45%;
+}
+
+.yuna-rehearsal[data-yuna-aim="left"], :is(.live-set,.encore-film)[data-yuna-cue$="-left"] {
+  --yuna-origin: 9%;
+  --yuna-glow-x: -3px;
+}
+
+.yuna-rehearsal[data-yuna-aim="center"], :is(.live-set,.encore-film)[data-yuna-cue$="-center"] {
+  --yuna-origin: 50%;
+  --yuna-glow-x: 0px;
+}
+
+.yuna-rehearsal[data-yuna-aim="right"], :is(.live-set,.encore-film)[data-yuna-cue$="-right"] {
+  --yuna-origin: 91%;
+  --yuna-glow-x: 3px;
+}
+
+.yuna-preview {
+  height: clamp(231px, 34svh, 330px);
+  cursor: ew-resize;
+  touch-action: pan-y pinch-zoom;
+  background:
+    linear-gradient(#1710259c, #1c132666 70%, #110c1c92),
+    url("art/walk/mirrored-studio.webp") center 63% / cover;
+}
+
+.yuna-spotlight {
+  position: absolute;
+  inset: 0 22% 6% 7%;
+}
+
+.yuna-spotlight .yuna-figure {
+  position: absolute;
+  inset: 5% 0 0;
+  width: 100%;
+  height: 95%;
+}
+
+.yuna-beam,
+.live-set[data-yuna-cue] .live-dancer[data-artist="rose"]::before,
+.encore-film[data-yuna-cue] .encore-artist[data-artist="rose"]::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgb(var(--yuna-light) / .94) 0%,
+    rgb(var(--yuna-light) / .61) 23%,
+    rgb(var(--yuna-light) / .37) 72%,
+    rgb(var(--yuna-light) / .56) 100%
+  );
+  clip-path: polygon(
+    calc(var(--yuna-origin) - 3%) 0,
+    calc(var(--yuna-origin) + 3%) 0,
+    calc(50% + var(--yuna-spread)) 100%,
+    calc(50% - var(--yuna-spread)) 100%
+  );
+}
+
+.yuna-beam {
+  inset: 0 4% 2%;
+  animation: yuna-lamp-up .32s ease-out;
+}
+
+.yuna-pool,
+.live-set[data-yuna-cue] .live-dancer[data-artist="rose"]::after {
+  content: "";
+  position: absolute;
+  bottom: -3%;
+  left: calc(50% - var(--yuna-spread));
+  width: calc(2 * var(--yuna-spread));
+  height: 10%;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgb(var(--yuna-light) / .88), rgb(var(--yuna-light) / .33) 50%, transparent 72%);
+}
+
+.yuna-spotlight .yuna-figure,
+.live-set[data-yuna-cue] .live-dancer[data-artist="rose"] .yuna-figure {
+  z-index: 1;
+  filter: drop-shadow(var(--yuna-glow-x) -1px 6px rgb(var(--yuna-light) / .85));
+}
+
+.yuna-operator { bottom: 5%; }
+.yuna-operator .yuna-cast { background-image: url("art/walk/cast-light.webp"); }
+.yuna-gesture-tip {
+  margin: 7px 12px 0;
+  color: #e7d8ee;
+  font-size: 12px;
+}
+.yuna-gesture-tip span { margin-inline-end: 3px; color: rgb(var(--yuna-light)); }
+.yuna-dialogue {
+  padding: 8px 10px;
+  border-inline-start: 2px solid rgb(var(--yuna-light));
+  border-radius: 0 6px 6px 0;
+  background: #362a44;
+}
+
+.yuna-options {
+  margin: 8px 12px 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.yuna-options legend {
+  padding: 0 0 5px;
+  color: #efe1fa;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.yuna-options > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.yuna-options button {
+  flex-direction: column;
+  gap: 3px;
+  min-height: 65px;
+  background: #2e263d;
+}
+
+.yuna-options button[aria-pressed="true"] {
+  border-color: rgb(var(--yuna-light));
+  box-shadow: inset 0 0 0 1px rgb(var(--yuna-light));
+  background: #494060;
+}
+
+.yuna-swatch {
+  width: 19px;
+  height: 8px;
+  border-radius: 5px;
+  background: rgb(var(--yuna-light));
+}
+
+.yuna-options button small { font-size: 11px; color: #f3dfed; font-weight: 550; }
+.yuna-options.yuna-directions button { min-height: 44px; flex-direction: row; }
+.yuna-options.yuna-directions span { font-size: 17px; color: #f7daf5; }
+.yuna-light-note { color: #e3d5ef; }
+.yuna-room .yuna-primary + .yuna-primary { margin-top: -5px; }
+
+.live-set[data-yuna-cue] .live-dancer[data-artist="rose"]::before { inset: -15% -1% 0; }
+.live-set[data-yuna-cue] .live-dancer[data-artist="rose"] b { z-index: 2; }
+.live-set[data-yuna-cue] .live-dancer[data-artist="rose"] .yuna-figure {
+  position: absolute;
+  inset: auto auto 0 50%;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 248 / 400;
+  transform: translateX(-50%);
+}
+
+.encore-film[data-yuna-cue] .encore-artist[data-artist="rose"]::before {
+  inset: 0 0 14%;
+  opacity: .75;
+  mix-blend-mode: screen;
+}
+
+.encore-film[data-yuna-cue] .encore-artist[data-artist="rose"] {
+  border-color: rgb(var(--yuna-light));
+  box-shadow: 0 0 14px rgb(var(--yuna-light) / .56);
+}
+
+.encore-film[data-yuna-cue] .encore-artist[data-artist="rose"] img {
+  object-fit: contain;
+  object-position: center;
+}
+
+@keyframes yuna-fitting-arrival {
+  from { opacity: .7; transform: translateY(4px); }
+}
+
+@keyframes yuna-lamp-up {
+  from { opacity: .45; }
+}
+
+@media (max-width: 360px) {
+  .yuna-room h2 { padding-inline: 10px; }
+  .yuna-dress-actions, .yuna-options { margin-inline: 9px; }
+  .yuna-status, .yuna-dialogue, .yuna-light-note { margin-inline: 9px; }
+  .yuna-room .yuna-primary { width: calc(100% - 18px); margin-inline: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yuna-model, .yuna-beam { animation: none; }
+}
