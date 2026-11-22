@@ -35,3 +35,31 @@
 @keyframes sofia-sway{from{transform:translateY(0) rotate(-4deg)}to{transform:translateY(-5px) rotate(5deg)}}
 @media(prefers-reduced-motion:reduce){.live-stage[data-playing=true] .sofia-crowd{animation:none}}
 .walk-bow{text-align:center}.walk-bow img{width:100%;max-height:32svh;object-fit:cover;border-radius:15px}
+
+/* The lesson stays on the studio floor, framed closer so both dancers are legible. */
+.walk-panel.duet-stage{inset:0;overflow:hidden;display:flex;flex-direction:column;border:0;border-radius:inherit;padding:0;background:linear-gradient(0deg,#241728 3%,transparent 53%,#1f172849),url("art/walk/dance.webp") center/cover;box-shadow:none}
+.duet-top{display:flex;justify-content:space-between;align-items:center;padding:8px 13px;color:#fff4e0;font-weight:700;text-shadow:0 2px 3px #210f27}
+.duet-exit{border:1px solid #ffffff80;background:#281a32cc;border-radius:50%;width:43px;height:43px;font-size:21px}
+.duet-floor{display:flex;align-items:flex-end;justify-content:center;min-height:0;flex:1;touch-action:none;padding:0 3% 9px}
+.duet-performer{position:relative;display:flex;flex-direction:column;align-items:center;width:49%;max-width:250px;height:100%;justify-content:flex-end}
+.duet-performer:before{content:"";position:absolute;bottom:19px;width:45%;height:7px;border-radius:50%;background:#37203f65;filter:blur(3px)}
+.duet-performer>span{z-index:1;background:#211727de;border:1px solid #fbd8df8a;padding:2px 9px;border-radius:22px;font:700 12px system-ui;color:#fff2ef}
+.duet-body{display:block;position:relative;width:min(100%,31svh);max-height:calc(100% - 25px);aspect-ratio:1;background-repeat:no-repeat;transform-origin:50% 100%}
+.nari-body{background-image:url("art/walk/nari.webp");background-size:200% 200%;background-position:0 0}
+.nari-body[data-pose="0"]{background-position:100% 0}.nari-body[data-pose="1"]{background-position:0 100%}.nari-body[data-pose="2"]{background-position:100% 100%}
+.sofia-body{background-image:url("art/walk/sofia.webp");background-size:300% 200%;background-position:0 0}
+.sofia-body[data-pose="0"]{background-position:0 100%}.sofia-body[data-pose="1"]{background-position:50% 100%}.sofia-body[data-pose="2"]{background-position:100% 100%}
+.duet-stage[data-phase="demo"] .nari-body:not([data-pose="idle"]),.duet-stage[data-phase="match"] .duet-body,.duet-stage[data-phase="finale"] .duet-body{animation:duet-bounce .52s ease-in-out infinite}
+@keyframes duet-bounce{0%,100%{transform:translateY(0) rotate(-1.5deg)}55%{transform:translateY(-6px) rotate(1.5deg)}}
+.duet-console{background:#231a2ae8;padding:10px 12px 12px;text-align:center;min-height:130px}
+.duet-track{display:flex;justify-content:center;gap:6px}.duet-track i{display:grid;place-items:center;width:24px;height:20px;font-style:normal;font-size:14px;border-radius:8px;color:#beadbb;background:#483749}.duet-track .current{background:#ffe2a3;color:#412b43}.duet-track .learned{background:#b6e7d3;color:#233e39}
+.duet-console .duet-message{font-weight:700;line-height:1.25;font-size:15px;margin:7px 0;color:#fff0dd;min-height:1.3em}
+.duet-moves{display:flex;justify-content:center;gap:6px}.duet-moves button{display:grid;justify-items:center;align-content:center;flex:1;max-width:120px;min-height:44px;background:#ffd4e3;color:#48233a;border-radius:9px;font-weight:700;font-size:12px}.duet-moves b{font-size:18px;line-height:1}.duet-moves button:disabled{background:#4c3b50;color:#c4b6c6}
+.duet-again{background:transparent;color:#f1d3e7;min-height:40px;font-weight:650}
+@media(prefers-reduced-motion:reduce){.duet-body{animation:none!important}}
+@media(orientation:landscape) and (max-height:490px){.walk-panel.duet-stage{display:grid;grid-template:40px 1fr / minmax(0,1.6fr) minmax(180px,1fr)}.duet-top{grid-column:1/-1;padding-block:0}.duet-floor{align-self:stretch;padding-bottom:4px}.duet-body{width:min(100%,43svh)}.duet-console{align-self:center;border-radius:14px;margin:0 6px;padding:6px}.duet-again{min-height:32px}}
+
+.in-duet .walk-pins,.in-duet .walk-bottom,.in-duet .walk-trail,.in-duet .walk-tip,.in-duet .dance-steps{display:none}
+.walk-panel.duet-stage{z-index:3}.duet-gesture{display:none}
+.duet-stage[data-phase="echo"] .duet-gesture{display:block;color:#eacee2;font-size:11px;line-height:1.3;margin-top:6px}
+@media(orientation:landscape) and (max-height:490px){.duet-stage[data-phase="echo"] .duet-gesture{display:none}}

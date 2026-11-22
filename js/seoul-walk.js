@@ -1,4 +1,5 @@
 import { createWorldEngine } from './world-engine.js';
+import { mountNariDuet } from './nari-duet.js';
 import { worldAudio } from './world-audio.js';
 import { stickName } from './lightstick.js';
 const titles = {
@@ -14,17 +15,22 @@ function tile(id, label, x, y) {
 }
 const street = ['На улицу', 'Sokağa çık'];
 const hall = ['В холл', 'Koridora çık'];
+const nari = {
+    ...door('nari', ['Нари', 'Nari'], 267, 546, 356),
+    approach: { x: 378, y: 551 }, radius: 24, image: 'art/walk/nari.webp', size: { width: 164, height: 164 },
+    sheet: { frameWidth: 224, frameHeight: 224, rows: { south: 0 }, idleColumn: 0, walkColumns: [0] },
+};
 const rooms = {
     street: [door('hotel', ['Отель', 'Otel'], 150), door('hall', ['YG Entertainment', 'YG Entertainment'], 620), door('plaza', ['К арене →', 'Arena yolu →'], 1110, 610, 470)],
     hall: [door('street', street, 90, 623, 485), door('dance', titles.dance, 365), door('studio', titles.studio, 925)],
-    dance: [door('hall', hall, 55, 565, 420), tile('pad0', ['←', '←'], 425, 625), tile('pad1', ['★', '★'], 640, 560), tile('pad2', ['→', '→'], 850, 650)],
+    dance: [door('hall', hall, 55, 565, 420), tile('pad0', ['←', '←'], 425, 625), tile('pad1', ['★', '★'], 640, 560), tile('pad2', ['→', '→'], 850, 650), nari],
     studio: [door('hall', hall, 108, 580, 430), door('mix', ['Синтезатор', 'Synth çal'], 810, 555, 438)],
     plaza: [door('street', street, 100, 620, 480), { ...door('merch', ['Лайтстики', 'Lightstick standı'], 445, 585, 376), image: 'art/walk/stand.webp', size: { width: 208, height: 213 } }, door('gate', ['Вход на концерт', 'Konser girişi'], 1010, 530, 345)],
     hotel: [door('street', street, 66, 560, 409), door('rest', ['Отдохнуть', 'Dinlen'], 894, 590, 449)],
 };
 const route = [0, 2, 1, 0, 2, 1];
 const roomKey = (value) => Object.prototype.hasOwnProperty.call(titles, value);
-const fresh = () => ({ room: 'street', days: 2, arrival: true, danced: false, step: 0, x: 505, y: 646 });
+const fresh = () => ({ room: 'street', days: 2, arrival: true, danced: false, step: 0, duo: 0, x: 505, y: 646 });
 const key = 'encore1.sofia-walk.v1';
 let memory;
 function load() {
@@ -37,16 +43,16 @@ function load() {
     }
     if (!raw)
         return memory ?? fresh();
-    const [place, days, arrival, danced, step, x, y] = raw.split('|');
+    const [place, days, arrival, danced, step, x, y, duo] = raw.split('|');
     if (!place || !roomKey(place) || !['0', '1', '2'].includes(days ?? '') || !['0', '1'].includes(arrival ?? '') || !['0', '1'].includes(danced ?? '') ||
         !/^[0-6]$/.test(step ?? '') || !x || !y || !Number.isFinite(Number(x)) || !Number.isFinite(Number(y)))
         return fresh();
-    return { room: place, days: Number(days), arrival: arrival === '1', danced: danced === '1', step: Number(step), x: Math.max(26, Math.min(1174, Number(x))), y: Math.max(510, Math.min(754, Number(y))) };
+    return { room: place, days: Number(days), arrival: arrival === '1', danced: danced === '1', step: Number(step), duo: duo && /^[0-3]$/.test(duo) ? Number(duo) : 0, x: Math.max(26, Math.min(1174, Number(x))), y: Math.max(510, Math.min(754, Number(y))) };
 }
 function save(s) {
     memory = { ...s };
     try {
-        localStorage.setItem(key, [s.room, s.days, +s.arrival, +s.danced, s.step, Math.round(s.x), Math.round(s.y)].join('|'));
+        localStorage.setItem(key, [s.room, s.days, +s.arrival, +s.danced, s.step, Math.round(s.x), Math.round(s.y), s.duo].join('|'));
     }
     catch { /* Keep progress in this tab. */ }
 }
@@ -69,7 +75,7 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
         const spots = rooms[room];
         const scene = { width: 1200, height: 800, background: 'art/walk/' + room + '.webp', spawn: { x: state.x, y: state.y }, walkable: { x: 25, y: 510, width: 1150, height: 245 }, obstacles: [], hotspots: spots };
         const day = () => state.days === 0 ? say(['Сегодня концерт', 'Bugün konser var']) : state.days === 1 ? say(['Концерт завтра', 'Konser yarın']) : say(['До концерта 2 дня', 'Konsere 2 gün var']);
-        const tip = () => room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Наступай на сияющие метки', 'Parlayan işaretlere bas'])) :
+        const tip = () => room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
             room === 'hall' ? say(['Дверь танцзала слева, студия справа.', 'Dans odası solda, ses stüdyosu sağda.']) :
                 room === 'street' ? say(['Тяни джойстик или коснись тротуара. Вход в YG под вывеской.', 'Yön kolunu sürükle veya kaldırıma dokun. YG girişi tabelanın altında.']) :
                     room === 'plaza' ? say(['Подойди к воротам, чтобы попасть на концерт.', 'Konsere girmek için kapıya yürü.']) :
@@ -100,6 +106,36 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
         let lastSave = performance.now();
         let open = false;
         let curtainTimer = 0;
+        let endDuet;
+        let nearNari = false;
+        function startDuet() {
+            if (open)
+                return;
+            open = true;
+            engine.setPaused(true);
+            host.classList.add('in-duet');
+            panel.classList.add('duet-stage');
+            panel.hidden = false;
+            endDuet = mountNariDuet(panel, lang, state.duo, count => { state.duo = count; save(state); }, () => {
+                if (!state.danced && state.days > 0)
+                    --state.days;
+                state.duo = 0;
+                state.step = route.length;
+                state.danced = true;
+                notice = say(['Дуэт с Нари готов! Можно идти на арену.', 'Nari ile düet tamam! Artık arenaya yürüyebilirsin.']);
+                board.dataset.danceStep = String(state.step);
+                save(state);
+                refresh();
+            }, () => {
+                endDuet?.();
+                endDuet = undefined;
+                host.classList.remove('in-duet');
+                panel.classList.remove('duet-stage');
+                panel.replaceChildren();
+                nearNari = true;
+                panelClose();
+            });
+        }
         function refresh() {
             board.dataset.days = String(state.days);
             dayLabel.textContent = day();
@@ -173,6 +209,10 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                 return;
             if (roomKey(id)) {
                 destination(id);
+                return;
+            }
+            if (id === 'nari') {
+                startDuet();
                 return;
             }
             if (id.startsWith('pad')) {
@@ -256,6 +296,15 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                     arrive(doorway.id);
                     return;
                 }
+                if (room === 'dance' && !open) {
+                    const close = Math.hypot(nari.position.x - p.x, nari.position.y - p.y) < 82 || Math.hypot(nari.approach.x - p.x, nari.approach.y - p.y) < 28;
+                    if (close && !nearNari && !engine.getTargetHotspot()) {
+                        nearNari = true;
+                        startDuet();
+                        return;
+                    }
+                    nearNari = close;
+                }
                 if (room === 'dance' && !open && now >= nextBeat) {
                     worldAudio.groove(beat++);
                     nextBeat = now + 520;
@@ -322,7 +371,7 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
         }, listen);
         window.addEventListener('pagehide', () => save(state), listen);
         canvas.focus({ preventScroll: true });
-        leaveRoom = () => { window.clearTimeout(curtainTimer); window.clearTimeout(poseTimer); const p = engine.getPosition(); state.x = p.x; state.y = p.y; save(state); engine.destroy(); controller.abort(); };
+        leaveRoom = () => { endDuet?.(); host.classList.remove('in-duet'); window.clearTimeout(curtainTimer); window.clearTimeout(poseTimer); const p = engine.getPosition(); state.x = p.x; state.y = p.y; save(state); engine.destroy(); controller.abort(); };
     }
     worldAudio.setEnabled(sound);
     renderRoom();

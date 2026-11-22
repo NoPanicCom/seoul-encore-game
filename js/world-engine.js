@@ -907,6 +907,7 @@ export function createWorldEngine(options) {
             const hotspot = hotspotById.get(id);
             return hotspot ? worldToCamera(hotspot.marker ?? { x: hotspot.position.x, y: hotspot.hitbox.y }, camera) : null;
         },
+        getTargetHotspot: () => activeHotspot,
         getPosition: () => ({ ...position }),
         getCompanionPosition: () => companion ? { ...companionPosition } : null,
         getCamera: () => ({ ...camera }),
