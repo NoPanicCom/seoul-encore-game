@@ -60,11 +60,11 @@ export async function previewIntro(intro) {
             feedback.textContent = document.documentElement.lang === 'ru' ? 'Звуковой предпросмотр недоступен.' : 'Ses önizlemesi açılamadı.';
     }
 }
-export async function melody(intro, fanMix = false, secret = false) {
+export async function melody(intro, fanMix = false, secret = false, finale = false) {
     const note = await instrument();
     if (!note)
         return;
-    const pitches = secret ? [392, 493.88, 587.33, 659.25, 523.25, 659.25, 783.99, 659.25, 440, 523.25, 587.33, 783.99] : [293.66, 349.23, 440, 392, 349.23, 523.25, 440, 392, 293.66, 349.23, 392, 293.66];
+    const pitches = finale ? [349.23, 440, 523.25, 587.33, 523.25, 440, 392, 523.25, 587.33, 698.46, 659.25, 587.33] : secret ? [392, 493.88, 587.33, 659.25, 523.25, 659.25, 783.99, 659.25, 440, 523.25, 587.33, 783.99] : [293.66, 349.23, 440, 392, 349.23, 523.25, 440, 392, 293.66, 349.23, 392, 293.66];
     if (intro === 'whisper')
         note(587.32, 0, .58, 'sine', .26);
     if (intro === 'drums')

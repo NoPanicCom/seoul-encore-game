@@ -5,6 +5,9 @@ export function travelLook(memberName) {
     if (!member)
         return null;
     const selection = studioTravelSelection(member);
+    return resolveLook(member, selection);
+}
+export function resolveLook(member, selection) {
     if (!selection)
         return { asset: `world/hero-${member}`, pieces: [] };
     if (selection.kind === 'mix') {
@@ -18,7 +21,10 @@ export function concertCostume(member) {
     const look = travelLook(member);
     if (!look || look.asset.startsWith('world/'))
         return '';
-    return `<span class="worn-look" data-costume="${look.asset}">${[look.asset, ...look.pieces].map(asset => `<img src="art/${asset}.webp" alt="">`).join('')}</span>`;
+    return dressedFigure(look);
+}
+export function dressedFigure(look, outer = '') {
+    return `<span class="worn-look" data-costume="${look.asset}">${[look.asset, ...look.pieces].map(asset => `<img src="art/${asset}.webp" alt="">`).join('')}${outer}</span>`;
 }
 async function loadLayer(asset) {
     const image = new Image();

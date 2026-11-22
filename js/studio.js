@@ -188,8 +188,7 @@ export function stageLook(memberName, phase) {
     const selected = phase ? chosenLook(member, phase) : chosenLook(member, 'final') ?? chosenLook(member, 'rehearsal');
     return selected ? `studio/${member}-${selected.id}` : null;
 }
-export function studioTravelSelection(member) {
-    const saved = read(`travel.${member}`);
+export function decodeStudioSelection(member, saved) {
     if (saved) {
         const [kind, id, ...extra] = saved.split(',');
         if (kind === 'look' && id !== undefined && extra.length === 0 && looks.some(look => look.id === id)) {
@@ -201,6 +200,12 @@ export function studioTravelSelection(member) {
         if (card?.kind === 'mix')
             return { kind: 'mix', pieces: card.items.map(item => item.id) };
     }
+    return null;
+}
+export function studioTravelSelection(member) {
+    const selected = decodeStudioSelection(member, read(`travel.${member}`));
+    if (selected)
+        return selected;
     const previous = chosenLook(member, 'final') ?? chosenLook(member, 'rehearsal');
     return previous ? { kind: 'look', id: previous.id } : null;
 }
@@ -365,7 +370,7 @@ function storageNotice(lang) {
         'Браузер не разрешает сохранение. Твой выбор сохранится до конца сеанса.',
     ])}</p>` : '';
 }
-export function renderStudio(lang, memberName) {
+export function renderStudio(lang, memberName, fittingAction = '') {
     const member = studioMemberId(memberName);
     if (!member)
         return `<p role="status">${copy(lang, ['Gardırop için bir üye seç.', 'Выбери участницу для примерки.'])}</p>`;
@@ -378,6 +383,7 @@ export function renderStudio(lang, memberName) {
     </div>
     ${content}
     ${storageNotice(lang)}
+    ${fittingAction}
     ${control('continue', copy(lang, ['Gardıroptan çık →', 'Выйти из гардероба →']), 'primary studio-continue')}
   </section>`;
 }
