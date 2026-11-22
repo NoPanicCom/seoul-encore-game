@@ -1,27 +1,41 @@
+export const shopSticks = ['hammer', 'white-star', 'jisoo-cone'];
+export const isShopStick = (value) => shopSticks.some(id => id === value);
 const sticks = {
+    hammer: { tr: 'BLACKPINK · Pembe çekiç', ru: 'BLACKPINK · Розовый молоточек', color: '#ff91ba' },
+    'white-star': { tr: 'Beyaz yıldız', ru: 'Белая звезда', color: '#edeeff' },
+    'jisoo-cone': { tr: 'Jisoo · Dondurma', ru: 'Джису · Мороженое', color: '#c8a5f6' },
     heart: { tr: 'Pembe kalp', ru: 'Розовое сердце', color: '#ff78b6' },
     moon: { tr: 'Lila ay', ru: 'Сиреневая луна', color: '#bc91ff' },
     star: { tr: 'Nane yıldızı', ru: 'Мятная звезда', color: '#69eed5' },
 };
 export function stickId(value) {
-    return value === 'heart' || value === 'moon' || value === 'star' ? value : null;
+    return value && isShopStick(value) ? value : value === 'heart' || value === 'moon' || value === 'star' ? value : null;
 }
 export function stickName(id, lang) { return sticks[id][lang]; }
 function wand(id) {
     return `<img class="wand-art" src="art/lightsticks/${id}.webp" alt="">`;
 }
-export function renderMinho(lang, selected) {
-    const tr = lang === 'tr';
-    const shelves = Object.keys(sticks).map(id => {
-        const item = sticks[id];
-        return `<button type="button" class="stick-item" data-act="stick-${id}" aria-pressed="${selected === id}" style="--stick:${item.color}"><i class="wand-plinth"></i>${wand(id)}<strong>${item[lang]}</strong><span class="wand-check" aria-hidden="true">✓</span></button>`;
+export function merchButtons(lang, selected, owned, walk = false) {
+    return shopSticks.map(id => {
+        const equipped = selected === id;
+        const verb = equipped ? (lang === 'ru' ? 'В руке' : 'Elinde') : owned.has(id) ? (lang === 'ru' ? 'Взять' : 'Eline al') : (lang === 'ru' ? 'Купить · 1 купон' : 'Satın al · 1 kupon');
+        const hook = walk ? `data-equip="${id}"` : `data-act="stick-${id}"`;
+        return `<button type="button" class="stick-item" ${hook} aria-pressed="${equipped}" style="--stick:${sticks[id].color}">${wand(id)}<strong>${stickName(id, lang)}</strong><small>${verb}</small></button>`;
     }).join('');
+}
+export function couponLabel(lang, owned) {
+    const count = shopSticks.length - owned.size;
+    return lang === 'ru' ? 'Купоны на лайтстики · ' + count : 'Lightstick kuponun · ' + count;
+}
+export function renderMinho(lang, selected, owned = new Set()) {
+    const tr = lang === 'tr';
+    const shelves = merchButtons(lang, selected, owned);
     return `<section class="minho-shop" aria-labelledby="shop-title">
     <div class="minho-head"><button class="smallbtn" data-act="trip-street">‹ ${tr ? 'Hongdae' : 'Хондэ'}</button></div>
     <div class="minho-interior"><h2 id="shop-title">${tr ? 'Minho’nun K-pop dükkânı' : 'K-pop магазин Минхо'}</h2></div>
-    <p class="minho-dialog"><b>${tr ? 'Minho' : 'Минхо'}</b> ${tr ? 'Bir lightstick seç! Şarkı başlayınca ritme dokun, tribünü birlikte aydınlatalım.' : 'Выбери лайтстик! Нажимай в такт песне, и мы вместе зажжём трибуны.'}</p>
-    <div class="stick-shelf" role="group" aria-label="${tr ? 'Lightstick seç' : 'Выбери лайтстик'}">${shelves}</div>
-    <p class="shop-bag" role="status">${selected ? (tr ? 'Çantanda · ' : 'В рюкзаке · ') + sticks[selected][lang] : tr ? 'Denemek için birine dokun.' : 'Коснись лайтстика, чтобы примерить.'}</p>
+    <p class="minho-dialog"><b>${tr ? 'Minho' : 'Минхо'}</b> ${tr ? 'Konser biletinin yanında üç oyun kuponu var. Hangi lightstick’i alacaksın?' : 'К билету прилагаются три игровых купона. Какой лайтстик возьмёшь на концерт?'}</p>
+    <p class="coupon-count">${couponLabel(lang, owned)}</p><div class="stick-shelf" role="group" aria-label="${tr ? 'Lightstick seç' : 'Выбери лайтстик'}">${shelves}</div>
+    <p class="shop-bag" role="status">${selected ? (tr ? 'Çantanda · ' : 'В рюкзаке · ') + sticks[selected][lang] : tr ? 'Her model bir kupon.' : 'Один лайтстик стоит один купон.'}</p>
     <button class="shop-go" data-act="stick-concert" ${selected ? '' : 'disabled'}>${tr ? 'Konsere götür' : 'Взять на концерт'} →</button>
   </section>`;
 }

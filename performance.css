@@ -40,3 +40,16 @@
 .live-stage[data-playing=true] .live-light::before{animation:live-cues 3.9s ease-in-out infinite}
 @keyframes live-cues{0%,100%{background-color:var(--cue-0)}33%{background-color:var(--cue-1)}66%{background-color:var(--cue-2)}}
 @media(prefers-reduced-motion:reduce){.live-stage[data-playing=true] .live-light::before{animation:none}}
+.concert-entries{display:grid;grid-template-columns:1.25fr 1fr;gap:8px}.concert-entries button{min-height:48px;font-weight:750}
+.drawn-pass{display:flex;align-items:center;gap:15px;background:linear-gradient(125deg,#43233b,#231c2a);border:1px solid #a0698e;border-radius:16px;padding:14px}.drawn-pass img,.drawn-pass>span{width:24%;height:125px;object-fit:cover;object-position:top;border-radius:9px}.drawn-pass small{color:#ffb0d2}.drawn-pass h2,.drawn-pass p{margin:4px 0}.drawn-pass p{font-size:14px}.drawn-pass{animation:pass-appear .4s ease-out}
+@keyframes pass-appear{from{transform:translateY(8px);opacity:.3}}
+.live-set:not(.secret-set) .live-dancer{left:var(--spot);width:auto;height:72%;max-width:25%;aspect-ratio:180 / 268;bottom:18%}
+.live-set:not(.secret-set) .live-dancer b{position:absolute;top:99%;left:50%;transform:translateX(-50%);font:700 11px system-ui;background:#291526d9;color:#fff1fa;border-radius:12px;padding:1px 7px}
+.live-set:not(.secret-set) .live-dancer:nth-child(odd)>div{animation-delay:-.65s}
+.stick-item small{display:block;color:#fff1ca}.coupon-count{color:#f5d49a;font-weight:700}.walk-panel .stick-item .wand-art{max-height:12svh}.walk-panel .stick-item{min-width:0}
+@media(prefers-reduced-motion:reduce){.drawn-pass{animation:none}}
+
+.live-set:not(.secret-set) .live-dancer>div{background-position:var(--column) 0}
+.live-stage[data-playing=true] .live-set:not(.secret-set) .live-dancer>div{animation-name:concert-poses;animation-duration:1.8s}
+.live-set:not(.secret-set) .held-stick{height:45%;width:18%;bottom:-12%;right:1%}
+@keyframes concert-poses{0%,100%{background-position:var(--column) 0}33%{background-position:var(--column) 50%}67%{background-position:var(--column) 100%}}

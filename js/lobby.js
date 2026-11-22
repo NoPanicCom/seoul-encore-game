@@ -55,11 +55,16 @@ export function renderLobby(lang, count, total, hasReplay, resumeLabel = '', pho
       <span class="el-glint el-glint--right" aria-hidden="true"></span>
       <h1 class="el-title" id="encore-title"><span>Seoul</span> <strong>Encore</strong></h1>
     </section>
-    <button type="button" class="el-start" data-act="walk">
+    <button type="button" class="el-start" data-act="random">
       <span class="el-play" aria-hidden="true"></span>
-      <strong>${lang === 'ru' ? 'Гулять по Сеулу за Софию' : 'Sofia ile Seul’de yürü'}</strong>
+      <strong>${lang === 'ru' ? 'Вытянуть роль' : 'Rolünü kurayla çek'}</strong>
       <i class="el-arrow" aria-hidden="true"></i>
     </button>
+    <div class="concert-entries">
+      <button class="secondary" data-act="arena">${lang === 'ru' ? 'На концерт BLACKPINK' : 'BLACKPINK konserine git'}</button>
+      <button class="secondary" data-act="shop">${lang === 'ru' ? 'Купить лайтстик' : 'Lightstick satın al'}</button>
+    </div>
+    <button type="button" class="el-role-select secondary" data-act="walk">${lang === 'ru' ? 'Гулять по Сеулу за Софию' : 'Sofia ile Seul’de yürü'}</button>
     <button type="button" class="el-role-select secondary" data-act="world">${label.world}</button>
     <button type="button" class="el-role-select secondary" data-act="start">${label.start}</button>
     ${resumeLabel ? `<button class="resume" data-act="resume">${resumeLabel}</button>` : ''}

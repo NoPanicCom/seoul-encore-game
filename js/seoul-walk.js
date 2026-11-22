@@ -1,7 +1,7 @@
 import { createWorldEngine } from './world-engine.js';
 import { mountNariDuet } from './nari-duet.js';
 import { worldAudio } from './world-audio.js';
-import { stickName } from './lightstick.js';
+import { stickName, merchButtons, couponLabel, isShopStick } from './lightstick.js';
 const titles = {
     street: ['Улица в Сеуле', 'Seul sokağı'], hall: ['Холл YG', 'YG koridoru'], dance: ['Танцзал', 'Dans odası'],
     studio: ['Студия звука', 'Ses stüdyosu'], plaza: ['Площадь арены', 'Arena meydanı'], hotel: ['Номер Софии', 'Sofia’nın otel odası'],
@@ -67,7 +67,7 @@ function save(s) {
     catch { /* Keep progress in this tab. */ }
 }
 export function renderSeoulWalk() { return '<section class="walk-host"></section>'; }
-export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
+export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
     const root = document.querySelector('.walk-host');
     if (!root)
         throw new Error('Missing walking world');
@@ -84,7 +84,7 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
         const room = state.room;
         const together = state.invitation === 'together' || state.invitation === 'onstage';
         const spots = together ? rooms[room].filter(s => s.id !== 'nari') : rooms[room];
-        const scene = { width: 1200, height: 800, background: 'art/walk/' + room + '.webp', spawn: { x: state.x, y: state.y }, walkable: { x: 25, y: 510, width: 1150, height: 245 }, obstacles: [], hotspots: spots };
+        const scene = { width: 1200, height: 800, background: 'art/walk/' + (room === 'dance' ? 'mirrored-studio' : room) + '.webp', spawn: { x: state.x, y: state.y }, walkable: { x: 25, y: 510, width: 1150, height: 245 }, obstacles: [], hotspots: spots };
         const day = () => state.days === 0 ? say(['Сегодня концерт', 'Bugün konser var']) : state.days === 1 ? say(['Концерт завтра', 'Konser yarın']) : say(['До концерта 2 дня', 'Konsere 2 gün var']);
         const tip = () => together ? say(directions[room]) : room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
             room === 'hall' ? say(['Дверь танцзала слева, студия справа.', 'Dans odası solda, ses stüdyosu sağda.']) :
@@ -299,7 +299,7 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                 return;
             }
             if (id === 'merch') {
-                panelShow(`<h3>${say(['Концертные лайтстики', 'Konser lightstick’leri'])}</h3><div class="walk-merch">${['heart', 'moon', 'star'].map(id => `<button data-equip="${id}" aria-pressed="${equipped === id}"><img src="art/lightsticks/${id}.webp" alt=""><span>${stickName(id, lang)}</span></button>`).join('')}</div>`);
+                panelShow(`<h3>${say(['Концертные лайтстики', 'Konser lightstick’leri'])}</h3><p>${couponLabel(lang, owned)}</p><div class="stick-shelf">${merchButtons(lang, equipped, owned, true)}</div>`);
                 return;
             }
         }
@@ -419,7 +419,7 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                 return;
             }
             const item = button.dataset.equip;
-            if (item === 'moon' || item === 'star' || item === 'heart') {
+            if (item && isShopStick(item)) {
                 equipped = item;
                 equip(item);
                 worldAudio.cue('delivery');

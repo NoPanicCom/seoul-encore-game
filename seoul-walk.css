@@ -37,7 +37,7 @@
 .walk-bow{text-align:center}.walk-bow img{width:100%;max-height:32svh;object-fit:cover;border-radius:15px}
 
 /* The lesson stays on the studio floor, framed closer so both dancers are legible. */
-.walk-panel.duet-stage{inset:0;overflow:hidden;display:flex;flex-direction:column;border:0;border-radius:inherit;padding:0;background:linear-gradient(0deg,#241728 3%,transparent 53%,#1f172849),url("art/walk/dance.webp") center/cover;box-shadow:none}
+.walk-panel.duet-stage{inset:0;overflow:hidden;display:flex;flex-direction:column;border:0;border-radius:inherit;padding:0;background:linear-gradient(0deg,#241728 3%,transparent 53%,#1f172849),url("art/walk/mirrored-studio.webp") center/cover;box-shadow:none}
 .duet-top{display:flex;justify-content:space-between;align-items:center;padding:8px 13px;color:#fff4e0;font-weight:700;text-shadow:0 2px 3px #210f27}
 .duet-exit{border:1px solid #ffffff80;background:#281a32cc;border-radius:50%;width:43px;height:43px;font-size:21px}
 .duet-floor{display:flex;align-items:flex-end;justify-content:center;min-height:0;flex:1;touch-action:none;padding:0 3% 9px}
