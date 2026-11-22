@@ -30,7 +30,16 @@ const rooms = {
 };
 const route = [0, 2, 1, 0, 2, 1];
 const roomKey = (value) => Object.prototype.hasOwnProperty.call(titles, value);
-const fresh = () => ({ room: 'street', days: 2, arrival: true, danced: false, step: 0, duo: 0, x: 505, y: 646 });
+const nextDoor = { dance: 'hall', hall: 'street', street: 'plaza', plaza: 'gate', hotel: 'street', studio: 'hall' };
+const directions = {
+    dance: ['Нари: Идём через холл!', 'Nari: Koridordan geçelim!'],
+    hall: ['Нари: Выход на улицу слева.', 'Nari: Sokak çıkışı solda.'],
+    street: ['Нари: Видишь огни справа? Нам к арене!', 'Nari: Sağdaki ışıkları görüyor musun? Arena o tarafta!'],
+    plaza: ['Нари: За этими воротами наша сцена. Готова?', 'Nari: O kapının ardında sahnemiz var. Hazır mısın?'],
+    hotel: ['Нари: Когда будешь готова, выйдем на улицу.', 'Nari: Hazır olunca sokağa çıkalım.'],
+    studio: ['Нари: Пойдём через холл, когда закончишь.', 'Nari: Hazır olunca koridordan geçelim.'],
+};
+const fresh = () => ({ invitation: 'none', room: 'street', days: 2, arrival: true, danced: false, step: 0, duo: 0, x: 505, y: 646 });
 const key = 'encore1.sofia-walk.v1';
 let memory;
 function load() {
@@ -43,16 +52,17 @@ function load() {
     }
     if (!raw)
         return memory ?? fresh();
-    const [place, days, arrival, danced, step, x, y, duo] = raw.split('|');
+    const [place, days, arrival, danced, step, x, y, duo, invite] = raw.split('|');
     if (!place || !roomKey(place) || !['0', '1', '2'].includes(days ?? '') || !['0', '1'].includes(arrival ?? '') || !['0', '1'].includes(danced ?? '') ||
         !/^[0-6]$/.test(step ?? '') || !x || !y || !Number.isFinite(Number(x)) || !Number.isFinite(Number(y)))
         return fresh();
-    return { room: place, days: Number(days), arrival: arrival === '1', danced: danced === '1', step: Number(step), duo: duo && /^[0-3]$/.test(duo) ? Number(duo) : 0, x: Math.max(26, Math.min(1174, Number(x))), y: Math.max(510, Math.min(754, Number(y))) };
+    const invitation = invite === 'offered' || invite === 'together' || (invite === 'onstage' && place === 'plaza') || invite === 'performed' ? invite : 'none';
+    return { invitation, room: place, days: Number(days), arrival: arrival === '1', danced: danced === '1', step: Number(step), duo: duo && /^[0-3]$/.test(duo) ? Number(duo) : 0, x: Math.max(26, Math.min(1174, Number(x))), y: Math.max(510, Math.min(754, Number(y))) };
 }
 function save(s) {
     memory = { ...s };
     try {
-        localStorage.setItem(key, [s.room, s.days, +s.arrival, +s.danced, s.step, Math.round(s.x), Math.round(s.y), s.duo].join('|'));
+        localStorage.setItem(key, [s.room, s.days, +s.arrival, +s.danced, s.step, Math.round(s.x), Math.round(s.y), s.duo, s.invitation].join('|'));
     }
     catch { /* Keep progress in this tab. */ }
 }
@@ -72,22 +82,23 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     function renderRoom() {
         const room = state.room;
-        const spots = rooms[room];
+        const together = state.invitation === 'together' || state.invitation === 'onstage';
+        const spots = together ? rooms[room].filter(s => s.id !== 'nari') : rooms[room];
         const scene = { width: 1200, height: 800, background: 'art/walk/' + room + '.webp', spawn: { x: state.x, y: state.y }, walkable: { x: 25, y: 510, width: 1150, height: 245 }, obstacles: [], hotspots: spots };
         const day = () => state.days === 0 ? say(['Сегодня концерт', 'Bugün konser var']) : state.days === 1 ? say(['Концерт завтра', 'Konser yarın']) : say(['До концерта 2 дня', 'Konsere 2 gün var']);
-        const tip = () => room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
+        const tip = () => together ? say(directions[room]) : room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
             room === 'hall' ? say(['Дверь танцзала слева, студия справа.', 'Dans odası solda, ses stüdyosu sağda.']) :
                 room === 'street' ? say(['Тяни джойстик или коснись тротуара. Вход в YG под вывеской.', 'Yön kolunu sürükle veya kaldırıma dokun. YG girişi tabelanın altında.']) :
                     room === 'plaza' ? say(['Подойди к воротам, чтобы попасть на концерт.', 'Konsere girmek için kapıya yürü.']) :
                         room === 'studio' ? say(['Найди синтезатор и сыграй мелодию.', 'Synth’in yanına yürü ve melodini çal.']) : say(['У кровати можно отдохнуть до следующего дня.', 'Yatağın yanına gidip ertesi güne geçebilirsin.']);
         host.innerHTML = `<div class="walk-title"><h2>${say(titles[room])}</h2><span data-day></span></div>
-      <div class="walk-board hongdae-board" data-walk-room="${room}"><canvas tabindex="0" aria-label="${say(titles[room])}"></canvas>
-      <div class="walk-pins">${spots.map(s => `<button class="walk-pin ${s.id.startsWith('pad') ? 'floor-pin' : ''}" data-walk-to="${s.id}" aria-label="${s.id.startsWith('pad') ? say(['Танцевальная метка', 'Dans işareti']) + ' ' : ''}${say(s.label)}">${say(s.label)}</button>`).join('')}</div>
+      <div class="walk-board hongdae-board" data-walk-room="${room}" data-with-nari="${together}"><canvas tabindex="0" aria-label="${say(titles[room])}"></canvas>
+      <div class="walk-pins">${spots.map(s => `<button class="walk-pin ${s.id.startsWith('pad') ? 'floor-pin' : ''} ${together && s.id === nextDoor[room] ? 'nari-route' : ''}" data-walk-to="${s.id}" aria-label="${s.id.startsWith('pad') ? say(['Танцевальная метка', 'Dans işareti']) + ' ' : ''}${say(s.label)}">${say(s.label)}</button>`).join('')}</div>
       <div class="walk-bottom"><div class="world-stick" aria-label="${say(['Джойстик', 'Yön kolu'])}"><span aria-hidden="true">＋</span><i></i></div><button class="walk-use" hidden></button></div>
       <div class="walk-panel" hidden></div></div>
-      <div class="walk-trail"><span>SOFIA</span><div class="trail-line"><i class="you-dot"></i>${spots.map(s => `<b style="left:${s.position.x / 12}%"></b>`).join('')}</div><span>✦</span></div>
+      <div class="walk-trail"><span>${together ? say(['СОФИЯ + НАРИ', 'SOFIA + NARI']) : 'SOFIA'}</span><div class="trail-line"><i class="you-dot"></i>${spots.map(s => `<b style="left:${s.position.x / 12}%"></b>`).join('')}</div><span>✦</span></div>
       <p class="walk-tip" role="status"></p>
-      ${room === 'dance' ? '<div class="dance-steps"></div>' : ''}
+      ${room === 'dance' && !together ? '<div class="dance-steps"></div>' : ''}
       ${state.arrival && room === 'street' ? `<button class="walk-arrival">${state.days === 2 ? say(['Начать за день до концерта', 'Konsere bir gün kala başla']) : say(['Начать за два дня', 'İki gün kala başla'])}</button>` : ''}`;
         const get = (q) => {
             const el = host.querySelector(q);
@@ -108,25 +119,55 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
         let curtainTimer = 0;
         let endDuet;
         let nearNari = false;
-        function startDuet() {
+        function acceptInvitation() {
+            leaveRoom();
+            state.invitation = 'together';
+            notice = '';
+            save(state);
+            renderRoom();
+        }
+        function meetNari() {
+            if (state.invitation === 'offered') {
+                panelShow(`<h3>${say(['Приглашение Нари', 'Nari’nin daveti'])}</h3><p>${say(['София, пойдём со мной на мой первый концерт? Станцуем наш танец!', 'Sofia, ilk konserime benimle gelir misin? Birlikte bizim dansı yapalım!'])}</p>
+          <button class="duet-next" data-invite>${say(['Пойдём вместе!', 'Birlikte gidelim!'])}</button>
+          <button class="duet-again" data-rehearse>${say(['Ещё раз отрепетировать', 'Bir kez daha prova yap'])}</button>`);
+            }
+            else
+                startDuet(false);
+        }
+        function startDuet(live) {
             if (open)
                 return;
             open = true;
             engine.setPaused(true);
             host.classList.add('in-duet');
             panel.classList.add('duet-stage');
+            panel.classList.toggle('debut-stage', live);
             panel.hidden = false;
+            if (live)
+                get('h2').textContent = say(['Первый концерт Нари', 'Nari’nin ilk konseri']);
             endDuet = mountNariDuet(panel, lang, state.duo, count => { state.duo = count; save(state); }, () => {
-                if (!state.danced && state.days > 0)
+                if (!live && !state.danced && state.days > 0)
                     --state.days;
                 state.duo = 0;
                 state.step = route.length;
                 state.danced = true;
-                notice = say(['Дуэт с Нари готов! Можно идти на арену.', 'Nari ile düet tamam! Artık arenaya yürüyebilirsin.']);
+                state.invitation = live ? 'performed' : 'offered';
+                notice = live ? say(['Вы с Нари выступили вместе!', 'Nari ile ilk sahnenize çıktınız!']) : say(['Нари ждёт тебя в танцзале.', 'Nari seni dans odasında bekliyor.']);
                 board.dataset.danceStep = String(state.step);
                 save(state);
                 refresh();
             }, () => {
+                if (live) {
+                    leaveRoom();
+                    if (state.invitation === 'onstage') {
+                        state.invitation = 'together';
+                        state.duo = 0;
+                    }
+                    save(state);
+                    renderRoom();
+                    return;
+                }
                 endDuet?.();
                 endDuet = undefined;
                 host.classList.remove('in-duet');
@@ -134,7 +175,7 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                 panel.replaceChildren();
                 nearNari = true;
                 panelClose();
-            });
+            }, live ? { kind: 'concert', continueShow: concert } : { kind: 'rehearsal', invite: acceptInvitation });
         }
         function refresh() {
             board.dataset.days = String(state.days);
@@ -212,7 +253,7 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                 return;
             }
             if (id === 'nari') {
-                startDuet();
+                meetNari();
                 return;
             }
             if (id.startsWith('pad')) {
@@ -221,6 +262,14 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
             }
             if (id === 'gate') {
                 worldAudio.cue('curtain');
+                if (together) {
+                    state.days = 0;
+                    state.invitation = 'onstage';
+                    save(state);
+                    refresh();
+                    startDuet(true);
+                    return;
+                }
                 if (state.days > 0) {
                     state.days = 0;
                     save(state);
@@ -254,7 +303,10 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                 return;
             }
         }
-        const engine = createWorldEngine({ canvas, scene, player, joystick: { base: stick, thumb: get('.world-stick i') },
+        const engine = createWorldEngine({ canvas, scene, player, ...(together ? { companion: {
+                    ...player, image: 'art/walk/nari-walk.webp', speed: 440, followDistance: 78,
+                    spawn: { x: state.x + (state.x < 145 ? 78 : -78), y: Math.max(510, state.y - 12) },
+                } } : {}), joystick: { base: stick, thumb: get('.world-stick i') },
             onStep: () => worldAudio.cue('step'), onInteract: arrive,
             onProximityChange(id) { use.hidden = !id || id.startsWith('pad'); use.textContent = say(spots.find(s => s.id === id)?.label ?? ['', '']); },
             onAssetError: () => { status.textContent = say(['Не удалось загрузить сцену. Обнови страницу.', 'Sahne yüklenemedi. Sayfayı yenile.']); },
@@ -262,6 +314,11 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                 const p = engine.getPosition(), c = engine.getCamera(), now = performance.now();
                 board.dataset.playerX = p.x.toFixed(1);
                 board.dataset.playerY = p.y.toFixed(1);
+                const partner = engine.getCompanionPosition();
+                if (partner) {
+                    board.dataset.nariX = partner.x.toFixed(1);
+                    board.dataset.nariY = partner.y.toFixed(1);
+                }
                 dot.style.left = (p.x / 12) + '%';
                 const previous = previousPosition;
                 if (p.x !== previousPosition.x || p.y !== previousPosition.y) {
@@ -296,11 +353,11 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                     arrive(doorway.id);
                     return;
                 }
-                if (room === 'dance' && !open) {
+                if (room === 'dance' && !together && !open) {
                     const close = Math.hypot(nari.position.x - p.x, nari.position.y - p.y) < 82 || Math.hypot(nari.approach.x - p.x, nari.approach.y - p.y) < 28;
                     if (close && !nearNari && !engine.getTargetHotspot()) {
                         nearNari = true;
-                        startDuet();
+                        meetNari();
                         return;
                     }
                     nearNari = close;
@@ -339,6 +396,17 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
                 renderRoom();
                 return;
             }
+            if (button.hasAttribute('data-invite')) {
+                acceptInvitation();
+                return;
+            }
+            if (button.hasAttribute('data-rehearse')) {
+                panelClose();
+                state.invitation = 'none';
+                save(state);
+                startDuet(false);
+                return;
+            }
             if (button.hasAttribute('data-walk-close')) {
                 panelClose();
                 return;
@@ -372,6 +440,8 @@ export function mountSeoulWalk(lang, sound, chosen, equip, concert) {
         window.addEventListener('pagehide', () => save(state), listen);
         canvas.focus({ preventScroll: true });
         leaveRoom = () => { endDuet?.(); host.classList.remove('in-duet'); window.clearTimeout(curtainTimer); window.clearTimeout(poseTimer); const p = engine.getPosition(); state.x = p.x; state.y = p.y; save(state); engine.destroy(); controller.abort(); };
+        if (state.invitation === 'onstage')
+            startDuet(true);
     }
     worldAudio.setEnabled(sound);
     renderRoom();

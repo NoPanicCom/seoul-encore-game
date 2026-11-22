@@ -6,10 +6,10 @@ const moves = [
 ];
 const sequence = [0, 1, 2];
 const finale = [0, 1, 2, 1, 0, 2, 0, 1];
-export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit) {
-    const tr = lang === 'tr';
+export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit, scene) {
+    const tr = lang === 'tr', live = scene.kind === 'concert';
     const nari = tr ? 'Nari' : 'Нари', sofia = tr ? 'Sofia' : 'София';
-    panel.innerHTML = `<div class="duet-top"><b>${nari} × ${sofia}</b><button type="button" class="duet-exit" aria-label="${tr ? 'Provadan çık' : 'Выйти из репетиции'}">×</button></div>
+    panel.innerHTML = `<div class="duet-top"><b>${live ? (tr ? 'İlk sahnemiz' : 'Наш дебют') + ' · ' : ''}${nari} × ${sofia}</b><button type="button" class="duet-exit" aria-label="${live ? (tr ? 'Meydana dön' : 'Вернуться на площадь') : (tr ? 'Provadan çık' : 'Выйти из репетиции')}">×</button></div>
     <div class="duet-floor" aria-label="${tr ? 'Dans pisti' : 'Танцпол'}">
       <div class="duet-performer"><i class="duet-body nari-body" data-pose="idle"></i><span>${nari}</span></div>
       <div class="duet-performer"><i class="duet-body sofia-body" data-pose="idle"></i><span>${sofia}</span></div>
@@ -18,7 +18,7 @@ export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit)
       <p class="duet-message" role="status"></p>
       <div class="duet-moves" role="group" aria-label="${tr ? 'Dans hareketleri' : 'Танцевальные движения'}">${moves.map((m, i) => `<button type="button" data-duet-move="${i}"><b>${m.icon}</b>${m[lang]}</button>`).join('')}</div>
       <small class="duet-gesture">${tr ? 'Pistte parmağını sola, yukarı veya sağa kaydırabilirsin.' : 'На танцполе можно провести пальцем влево, вверх или вправо.'}</small>
-      <button type="button" class="duet-again"></button>
+      <button type="button" class="duet-next" hidden></button><button type="button" class="duet-again"></button>
     </div>`;
     function get(selector) {
         const element = panel.querySelector(selector);
@@ -28,6 +28,7 @@ export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit)
     }
     const leader = get('.nari-body'), follower = get('.sofia-body'), floor = get('.duet-floor');
     const message = get('.duet-message'), moveBar = get('.duet-moves'), again = get('.duet-again');
+    const nextButton = get('.duet-next');
     const buttons = Array.from(moveBar.querySelectorAll('button'));
     const marks = Array.from(panel.querySelectorAll('.duet-track i'));
     const controller = new AbortController(), listener = { signal: controller.signal };
@@ -46,23 +47,34 @@ export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit)
         buttons.forEach(b => { b.disabled = next !== 'echo'; });
         moveBar.hidden = next === 'finale' || next === 'done';
         again.hidden = next !== 'echo' && next !== 'done';
-        again.textContent = next === 'done' ? (tr ? 'Prova odasına dön' : 'Вернуться в танцзал') : (tr ? 'Nari, tekrar göster' : 'Нари, покажи ещё раз');
+        nextButton.hidden = next !== 'done';
+        nextButton.textContent = live ? (tr ? 'Konseri izle' : 'Смотреть концерт') : (tr ? 'Birlikte gidelim!' : 'Пойдём вместе!');
+        if (live && next === 'echo')
+            again.hidden = true;
+        again.textContent = next === 'done' ? (live ? (tr ? 'Meydana dön' : 'На площадь') : (tr ? 'Daha sonra' : 'Чуть позже')) : (tr ? 'Nari, tekrar göster' : 'Нари, покажи ещё раз');
         if (next === 'demo' && expected !== undefined) {
             pose(leader, null);
             pose(follower, null);
             message.textContent = tr ? `Nari’yi izle · ${moves[expected].tr}` : `Смотри на Нари · ${moves[expected].ru}`;
         }
         else if (next === 'echo') {
-            message.textContent = tr ? 'Sıra sende! Nari’nin hareketini yap.' : 'Твоя очередь! Повтори движение Нари.';
+            if (live && expected !== undefined) {
+                message.textContent = tr ? `Seyirci hazır! Şimdi birlikte · ${moves[expected].tr}` : `Зал ждёт! Танцуем вместе · ${moves[expected].ru}`;
+            }
+            else
+                message.textContent = tr ? 'Sıra sende! Nari’nin hareketini yap.' : 'Твоя очередь! Повтори движение Нари.';
         }
         else if (next === 'match') {
             message.textContent = tr ? 'Aynı anda!' : 'Синхронно!';
         }
         else if (next === 'finale') {
-            message.textContent = tr ? 'Müzik başladı. Şimdi düet!' : 'Музыка пошла. Теперь дуэт!';
+            if (live)
+                message.textContent = tr ? 'Final bizim! Işıklar ikinizi takip ediyor.' : 'Наш финал! Лучи следуют за вами.';
+            else
+                message.textContent = tr ? 'Müzik başladı. Şimdi düet!' : 'Музыка пошла. Теперь дуэт!';
         }
         else if (next === 'done') {
-            message.textContent = tr ? 'Nari: Son hareketimiz tam ritmindeydi!' : 'Нари: Последнее движение — точно в такт!';
+            message.textContent = live ? (tr ? 'Nari: İlk alkışımız, Sofia! İyi ki benimle sahneye çıktın.' : 'Нари: София, это наши первые аплодисменты! Спасибо, что вышла со мной.') : (tr ? 'Nari: Sofia, bu benim ilk konserim! Bizim dansı sahnede birlikte yapalım mı?' : 'Нари: София, это будет мой первый концерт! Станцуем наш танец вместе на сцене?');
         }
     }
     function answer(move) {
@@ -101,7 +113,11 @@ export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit)
             wrongAt = null;
         }
         else if (phase === 'match' && elapsed >= 880) {
-            setPhase(count === sequence.length ? 'finale' : 'demo');
+            setPhase(count === sequence.length ? 'finale' : live ? 'echo' : 'demo');
+        }
+        else if (live && phase === 'echo' && Math.floor(elapsed / 520) !== beat) {
+            beat = Math.floor(elapsed / 520);
+            worldAudio.groove(beat);
         }
         else if (phase === 'finale') {
             const index = Math.floor(elapsed / 520);
@@ -127,6 +143,13 @@ export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit)
         const button = event.target instanceof Element ? event.target.closest('button') : null;
         if (!button)
             return;
+        if (button === nextButton && phase === 'done') {
+            if (scene.kind === 'concert')
+                scene.continueShow();
+            else
+                scene.invite();
+            return;
+        }
         if (button.classList.contains('duet-exit') || (button === again && phase === 'done')) {
             onExit();
             return;
@@ -156,7 +179,7 @@ export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit)
             answer(1);
     }, listener);
     floor.addEventListener('pointercancel', () => { gesture = null; }, listener);
-    setPhase(count >= sequence.length ? 'finale' : 'demo');
+    setPhase(count >= sequence.length ? 'finale' : live ? 'echo' : 'demo');
     frame = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(frame); controller.abort(); delete panel.dataset.phase; delete panel.dataset.beat; };
 }
