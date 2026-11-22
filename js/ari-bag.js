@@ -172,6 +172,7 @@ export function mountAriZip(root, draw) {
         root.querySelector('[data-act="ari-dress"]')?.focus({ preventScroll: true });
     };
     const progress = (event, start) => Math.max(0, Math.min(1, (event.clientY - start.y) / start.length));
+    const pastTap = (event, start) => Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6;
     const endDrag = () => {
         drag = null;
         bag.style.removeProperty('--ari-zip');
@@ -181,27 +182,31 @@ export function mountAriZip(root, draw) {
         if (!event.isPrimary || event.button !== 0)
             return;
         moved = false;
-        drag = { pointer: event.pointerId, y: event.clientY, length: rail.getBoundingClientRect().height };
+        drag = { pointer: event.pointerId, x: event.clientX, y: event.clientY, length: rail.getBoundingClientRect().height };
         handle.setPointerCapture(event.pointerId);
         bag.dataset.ariDragging = 'true';
     }, listener);
     handle.addEventListener('pointermove', event => {
         if (!drag || event.pointerId !== drag.pointer)
             return;
-        moved || (moved = Math.abs(event.clientY - drag.y) > 6);
+        moved || (moved = pastTap(event, drag));
         bag.style.setProperty('--ari-zip', String(progress(event, drag)));
     }, listener);
     handle.addEventListener('pointerup', event => {
         if (!drag || event.pointerId !== drag.pointer)
             return;
-        moved || (moved = Math.abs(event.clientY - drag.y) > 6);
+        moved || (moved = pastTap(event, drag));
         const completed = progress(event, drag) >= .82;
         endDrag();
         if (completed)
             drawOpening();
     }, listener);
-    handle.addEventListener('pointercancel', endDrag, listener);
-    handle.addEventListener('lostpointercapture', endDrag, listener);
+    const cancelDrag = (event) => {
+        if (drag?.pointer === event.pointerId)
+            endDrag();
+    };
+    handle.addEventListener('pointercancel', cancelDrag, listener);
+    handle.addEventListener('lostpointercapture', cancelDrag, listener);
     handle.addEventListener('click', event => {
         if (!moved || event.detail === 0)
             drawOpening();

@@ -10,6 +10,8 @@
   margin: 4px 0 15px;
 }
 
+.ari-fitting { margin-bottom: 22px; }
+
 .ari-guide {
   display: flex;
   align-items: center;
@@ -335,10 +337,11 @@
 
 .ari-bag-garment img {
   display: block;
-  width: min(98%, 126px);
+  width: min(98%, 139px);
   height: 94%;
   min-height: 0;
   object-fit: contain;
+  filter: brightness(1.12);
   mix-blend-mode: multiply;
 }
 
@@ -350,6 +353,8 @@
   filter: drop-shadow(4px 5px 8px #16091fbb);
   animation: ari-garment-appear .34s ease-out;
 }
+
+.secret-set .live-dancer:has(.worn-look) { height: 79%; }
 
 @keyframes ari-unfold-left { from { transform: translateX(-6px); } }
 @keyframes ari-unfold-right { from { transform: translateX(6px); } }
