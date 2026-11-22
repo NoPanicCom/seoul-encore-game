@@ -321,7 +321,7 @@ function saveButton(lang, kind, saved) {
     return `<button type="button" class="studio-save" data-act="studio-save-${kind}"${saved ? ' disabled' : ''}>${copy(lang, label)}</button>`;
 }
 function travelButton(lang, kind, wearing) {
-    const label = wearing ? ['✓ Gezi kombinin', '✓ Образ для прогулки'] : ['Gezide giy', 'Надеть на прогулку'];
+    const label = wearing ? ['✓ Üzerinde', '✓ Надето'] : ['Kıyafeti giydir', 'Надеть образ'];
     return control(`wear-${kind}`, copy(lang, label), 'studio-save', wearing);
 }
 function renderMix(lang, member) {

@@ -6,9 +6,9 @@ const moves = [
 ];
 const sequence = [0, 1, 2];
 const finale = [0, 1, 2, 1, 0, 2, 0, 1];
-export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit, scene) {
+export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit, scene, guest) {
     const tr = lang === 'tr', live = scene.kind === 'concert';
-    const nari = tr ? 'Nari' : 'Нари', sofia = tr ? 'Sofia' : 'София';
+    const nari = tr ? 'Nari' : 'Нари', sofia = guest?.name ?? (tr ? 'Sofia' : 'София');
     panel.innerHTML = `<div class="duet-top"><b>${live ? (tr ? 'İlk sahnemiz' : 'Наш дебют') + ' · ' : ''}${nari} × ${sofia}</b><button type="button" class="duet-exit" aria-label="${live ? (tr ? 'Meydana dön' : 'Вернуться на площадь') : (tr ? 'Provadan çık' : 'Выйти из репетиции')}">×</button></div>
     <div class="duet-floor" aria-label="${tr ? 'Dans pisti' : 'Танцпол'}">
       <div class="duet-performer"><i class="duet-body nari-body" data-pose="idle"></i><span>${nari}</span></div>
@@ -27,6 +27,10 @@ export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit,
         return element;
     }
     const leader = get('.nari-body'), follower = get('.sofia-body'), floor = get('.duet-floor');
+    if (guest?.image) {
+        follower.classList.add('cast-body');
+        follower.style.backgroundImage = 'url("' + guest.image + '")';
+    }
     const message = get('.duet-message'), moveBar = get('.duet-moves'), again = get('.duet-again');
     const nextButton = get('.duet-next');
     const buttons = Array.from(moveBar.querySelectorAll('button'));
@@ -74,7 +78,7 @@ export function mountNariDuet(panel, lang, learned, onLearn, onComplete, onExit,
                 message.textContent = tr ? 'Müzik başladı. Şimdi düet!' : 'Музыка пошла. Теперь дуэт!';
         }
         else if (next === 'done') {
-            message.textContent = live ? (tr ? 'Nari: İlk alkışımız, Sofia! İyi ki benimle sahneye çıktın.' : 'Нари: София, это наши первые аплодисменты! Спасибо, что вышла со мной.') : (tr ? 'Nari: Sofia, bu benim ilk konserim! Bizim dansı sahnede birlikte yapalım mı?' : 'Нари: София, это будет мой первый концерт! Станцуем наш танец вместе на сцене?');
+            message.textContent = live ? (tr ? 'Nari: İlk alkışımız! İyi ki benimle sahneye çıktın.' : 'Нари: Это наши первые аплодисменты! Спасибо, что вышла со мной.') : (tr ? 'Nari: Bu benim ilk konserim! Bizim dansı sahnede birlikte yapalım mı?' : 'Нари: Это будет мой первый концерт! Станцуем наш танец вместе на сцене?');
         }
     }
     function answer(move) {

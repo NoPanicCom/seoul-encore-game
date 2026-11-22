@@ -14,6 +14,12 @@ export function travelLook(memberName) {
     const variant = selection.kind === 'set' ? `set-${selection.id}` : selection.id;
     return { asset: `travel/${member}-${variant}`, pieces: [] };
 }
+export function concertCostume(member) {
+    const look = travelLook(member);
+    if (!look || look.asset.startsWith('world/'))
+        return '';
+    return `<span class="worn-look" data-costume="${look.asset}">${[look.asset, ...look.pieces].map(asset => `<img src="art/${asset}.webp" alt="">`).join('')}</span>`;
+}
 async function loadLayer(asset) {
     const image = new Image();
     image.src = `art/${asset}.webp`;

@@ -2,6 +2,12 @@ import { beatCount, beatMs } from './rules.js';
 let context;
 let bus;
 let generation = 0;
+let enabled = true;
+export function setMusicEnabled(value) {
+    enabled = value;
+    if (bus && context)
+        bus.gain.setTargetAtTime(enabled ? .17 : 0, context.currentTime, .008);
+}
 export function silence() {
     generation++;
     bus?.disconnect();
@@ -16,7 +22,7 @@ async function instrument() {
         return null;
     const ctx = context;
     const output = ctx.createGain();
-    output.gain.value = .17;
+    output.gain.value = enabled ? .17 : 0;
     output.connect(ctx.destination);
     bus = output;
     return (pitch, time, length, type, volume, slide = 1) => {

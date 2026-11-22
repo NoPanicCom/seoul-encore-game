@@ -140,7 +140,7 @@ export function mountHongdae(lang, member, onAction) {
         sound = window.localStorage.getItem('encore1.sound') !== 'off';
     }
     catch {
-        sound = false;
+        sound = true;
     }
     worldAudio.setEnabled(sound);
     function playRecords() {
@@ -232,8 +232,7 @@ export function mountHongdae(lang, member, onAction) {
                 marker.style.transform = transform;
         }
     }
-    function enterAudio() { if (sound)
-        void worldAudio.enter(); }
+    function enterAudio() { void worldAudio.enter(); }
     root.addEventListener('pointerdown', enterAudio, { ...listener, capture: true });
     root.addEventListener('click', enterAudio, { ...listener, capture: true });
     root.addEventListener('keydown', enterAudio, { ...listener, capture: true });

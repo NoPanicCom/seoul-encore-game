@@ -77,3 +77,7 @@
 @keyframes debut-lights{from{transform:skewX(-6deg)}to{transform:skewX(6deg)}}
 @keyframes debut-bow{50%{transform:translateY(5px) scaleY(.93);transform-origin:bottom}}
 @media(prefers-reduced-motion:reduce){.debut-stage *, .debut-stage .duet-floor:before,.debut-stage .duet-floor:after{animation:none!important}}
+.duet-stage .cast-body{background-size:400% 300%;background-position:0 0}
+.duet-stage .cast-body[data-pose="0"]{background-position:33.333% 0;transform:rotate(-7deg)}
+.duet-stage .cast-body[data-pose="1"]{background-position:66.666% 0;transform:translateY(-8px)}
+.duet-stage .cast-body[data-pose="2"]{background-position:100% 0;transform:rotate(7deg)}

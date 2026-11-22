@@ -2,6 +2,8 @@ import { createWorldEngine } from './world-engine.js';
 import { mountNariDuet } from './nari-duet.js';
 import { worldAudio } from './world-audio.js';
 import { stickName, merchButtons, couponLabel, isShopStick } from './lightstick.js';
+import { passes } from './story.js';
+import { studioMemberId, studioTravelSelection } from './studio.js';
 const titles = {
     street: ['Улица в Сеуле', 'Seul sokağı'], hall: ['Холл YG', 'YG koridoru'], dance: ['Танцзал', 'Dans odası'],
     studio: ['Студия звука', 'Ses stüdyosu'], plaza: ['Площадь арены', 'Arena meydanı'], hotel: ['Номер Софии', 'Sofia’nın otel odası'],
@@ -40,9 +42,12 @@ const directions = {
     studio: ['Нари: Пойдём через холл, когда закончишь.', 'Nari: Hazır olunca koridordan geçelim.'],
 };
 const fresh = () => ({ invitation: 'none', room: 'street', days: 2, arrival: true, danced: false, step: 0, duo: 0, x: 505, y: 646 });
-const key = 'encore1.sofia-walk.v1';
-let memory;
-function load() {
+const sofiaKey = 'encore1.sofia-walk.v1';
+const roleKey = (id) => 'encore1.role-walk.' + id + '.v1';
+const memories = new Map();
+export function beginRoleWalk(id, days) { save(roleKey(id), { ...fresh(), days, arrival: false }); }
+function load(key) {
+    const memory = memories.get(key);
     let raw;
     try {
         raw = localStorage.getItem(key);
@@ -59,21 +64,34 @@ function load() {
     const invitation = invite === 'offered' || invite === 'together' || (invite === 'onstage' && place === 'plaza') || invite === 'performed' ? invite : 'none';
     return { invitation, room: place, days: Number(days), arrival: arrival === '1', danced: danced === '1', step: Number(step), duo: duo && /^[0-3]$/.test(duo) ? Number(duo) : 0, x: Math.max(26, Math.min(1174, Number(x))), y: Math.max(510, Math.min(754, Number(y))) };
 }
-function save(s) {
-    memory = { ...s };
+function save(key, s) {
+    memories.set(key, { ...s });
     try {
         localStorage.setItem(key, [s.room, s.days, +s.arrival, +s.danced, s.step, Math.round(s.x), Math.round(s.y), s.duo, s.invitation].join('|'));
     }
     catch { /* Keep progress in this tab. */ }
 }
 export function renderSeoulWalk() { return '<section class="walk-host"></section>'; }
-export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
+export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast) {
     const root = document.querySelector('.walk-host');
     if (!root)
         throw new Error('Missing walking world');
     const host = root;
     const say = (words) => words[lang === 'ru' ? 0 : 1];
-    const state = load();
+    const key = cast ? roleKey(cast.id) : sofiaKey;
+    const state = load(key);
+    const part = cast ? passes[cast.id] : undefined;
+    const name = part ? (part.name === 'BLINK' ? 'BLINK' : part.item || studioMemberId(cast?.id ?? '') ? part.name : part.job[lang]) : say(['София', 'Sofia']);
+    const member = studioMemberId(part?.person ?? '');
+    const ruMember = member ? { jisoo: 'Джису', jennie: 'Дженни', rose: 'Розэ', lisa: 'Лисы' }[member] : '';
+    const artist = studioMemberId(cast?.id ?? '');
+    const dressed = !!(member && studioTravelSelection(member));
+    const costumeRoom = !!(part?.item || artist);
+    const fan = !cast || cast.id === 'blink';
+    const player = fan ? { image: 'art/walk/sofia-walk.webp', width: 163, height: 163, speed: 410,
+        sheet: { frameWidth: 192, frameHeight: 192, rows: { south: 0, east: 1, north: 2 }, idleColumn: 0, walkColumns: [1, 2, 0, 3] } } :
+        artist ? { image: 'art/world/' + artist + '.webp', width: 129, height: 161, speed: 410, sheet: { frameWidth: 128, frameHeight: 160, rows: { south: 0, west: 1, north: 2 }, idleColumn: 0, walkColumns: [1, 2, 3] } } :
+            { image: 'art/walk/cast-' + cast.id + '.webp', width: 126, height: 163, speed: 410, sheet: { frameWidth: 144, frameHeight: 192, rows: { south: 0, west: 1, north: 2 }, idleColumn: 0, walkColumns: [1, 2, 3, 0] } };
     let equipped = chosen;
     let leaveRoom = () => { };
     let notice = '';
@@ -83,20 +101,30 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
     function renderRoom() {
         const room = state.room;
         const together = state.invitation === 'together' || state.invitation === 'onstage';
-        const spots = together ? rooms[room].filter(s => s.id !== 'nari') : rooms[room];
+        const spots = rooms[room].filter(s => s.id !== 'nari' || !together);
+        if (cast && room === 'hall' && part) {
+            const entrance = door('role-room', costumeRoom ? ['Гримёрка ' + ruMember, 'Giyinme odası · ' + part.person] : ['Задание · ' + name, 'Görev · ' + name], 650, 531, 351);
+            if (part.item && member) {
+                entrance.image = 'art/world/hero-' + member + '.webp';
+                entrance.size = { width: 100, height: 162 };
+                entrance.position = { x: 623, y: 534 };
+            }
+            spots.push(entrance);
+        }
         const scene = { width: 1200, height: 800, background: 'art/walk/' + (room === 'dance' ? 'mirrored-studio' : room) + '.webp', spawn: { x: state.x, y: state.y }, walkable: { x: 25, y: 510, width: 1150, height: 245 }, obstacles: [], hotspots: spots };
         const day = () => state.days === 0 ? say(['Сегодня концерт', 'Bugün konser var']) : state.days === 1 ? say(['Концерт завтра', 'Konser yarın']) : say(['До концерта 2 дня', 'Konsere 2 gün var']);
-        const tip = () => together ? say(directions[room]) : room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
+        const roleTip = costumeRoom && part ? (dressed ? say(['Костюм для ' + ruMember + ' готов. Встретимся на арене!', 'Konser kıyafeti hazır. ' + part.person + ' seni arenada bekliyor!']) : room === 'hall' ? say(['Подойди к гримёрке, чтобы выбрать костюм для ' + ruMember + '.', part.person + ' için kostüm seçmek üzere giyinme odasına yürü.']) : say(['Войди в YG и приготовь костюм для ' + ruMember + '.', 'YG’ye gir ve ' + part.person + ' için konser kıyafetini seç.'])) : say(['В холле YG тебя ждёт задание.', 'Görevin YG koridorunda seni bekliyor.']);
+        const tip = () => together ? say(directions[room]) : cast && (room === 'street' || room === 'hall') ? roleTip : room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
             room === 'hall' ? say(['Дверь танцзала слева, студия справа.', 'Dans odası solda, ses stüdyosu sağda.']) :
                 room === 'street' ? say(['Тяни джойстик или коснись тротуара. Вход в YG под вывеской.', 'Yön kolunu sürükle veya kaldırıma dokun. YG girişi tabelanın altında.']) :
                     room === 'plaza' ? say(['Подойди к воротам, чтобы попасть на концерт.', 'Konsere girmek için kapıya yürü.']) :
                         room === 'studio' ? say(['Найди синтезатор и сыграй мелодию.', 'Synth’in yanına yürü ve melodini çal.']) : say(['У кровати можно отдохнуть до следующего дня.', 'Yatağın yanına gidip ertesi güne geçebilirsin.']);
-        host.innerHTML = `<div class="walk-title"><h2>${say(titles[room])}</h2><span data-day></span></div>
-      <div class="walk-board hongdae-board" data-walk-room="${room}" data-with-nari="${together}"><canvas tabindex="0" aria-label="${say(titles[room])}"></canvas>
+        host.innerHTML = `<div class="walk-title"><h2>${(room === 'hotel' && cast ? say(['Отель', 'Otel']) : say(titles[room]))}</h2><span data-day></span></div>
+      <div class="walk-board hongdae-board" data-walk-room="${room}" data-walk-role="${cast?.id ?? 'sofia'}" data-with-nari="${together}"><canvas tabindex="0" aria-label="${(room === 'hotel' && cast ? say(['Отель', 'Otel']) : say(titles[room]))}"></canvas>
       <div class="walk-pins">${spots.map(s => `<button class="walk-pin ${s.id.startsWith('pad') ? 'floor-pin' : ''} ${together && s.id === nextDoor[room] ? 'nari-route' : ''}" data-walk-to="${s.id}" aria-label="${s.id.startsWith('pad') ? say(['Танцевальная метка', 'Dans işareti']) + ' ' : ''}${say(s.label)}">${say(s.label)}</button>`).join('')}</div>
       <div class="walk-bottom"><div class="world-stick" aria-label="${say(['Джойстик', 'Yön kolu'])}"><span aria-hidden="true">＋</span><i></i></div><button class="walk-use" hidden></button></div>
       <div class="walk-panel" hidden></div></div>
-      <div class="walk-trail"><span>${together ? say(['СОФИЯ + НАРИ', 'SOFIA + NARI']) : 'SOFIA'}</span><div class="trail-line"><i class="you-dot"></i>${spots.map(s => `<b style="left:${s.position.x / 12}%"></b>`).join('')}</div><span>✦</span></div>
+      <div class="walk-trail"><span>${name}${together ? say([' + Нари', ' + Nari']) : ''}</span><div class="trail-line"><i class="you-dot"></i>${spots.map(s => `<b style="left:${s.position.x / 12}%"></b>`).join('')}</div><span>✦</span></div>
       <p class="walk-tip" role="status"></p>
       ${room === 'dance' && !together ? '<div class="dance-steps"></div>' : ''}
       ${state.arrival && room === 'street' ? `<button class="walk-arrival">${state.days === 2 ? say(['Начать за день до концерта', 'Konsere bir gün kala başla']) : say(['Начать за два дня', 'İki gün kala başla'])}</button>` : ''}`;
@@ -123,12 +151,12 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             leaveRoom();
             state.invitation = 'together';
             notice = '';
-            save(state);
+            save(key, state);
             renderRoom();
         }
         function meetNari() {
             if (state.invitation === 'offered') {
-                panelShow(`<h3>${say(['Приглашение Нари', 'Nari’nin daveti'])}</h3><p>${say(['София, пойдём со мной на мой первый концерт? Станцуем наш танец!', 'Sofia, ilk konserime benimle gelir misin? Birlikte bizim dansı yapalım!'])}</p>
+                panelShow(`<h3>${say(['Приглашение Нари', 'Nari’nin daveti'])}</h3><p>${say(['Пойдём со мной на мой первый концерт? Станцуем наш танец!', 'İlk konserime benimle gelir misin? Birlikte bizim dansı yapalım!'])}</p>
           <button class="duet-next" data-invite>${say(['Пойдём вместе!', 'Birlikte gidelim!'])}</button>
           <button class="duet-again" data-rehearse>${say(['Ещё раз отрепетировать', 'Bir kez daha prova yap'])}</button>`);
             }
@@ -146,7 +174,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             panel.hidden = false;
             if (live)
                 get('h2').textContent = say(['Первый концерт Нари', 'Nari’nin ilk konseri']);
-            endDuet = mountNariDuet(panel, lang, state.duo, count => { state.duo = count; save(state); }, () => {
+            endDuet = mountNariDuet(panel, lang, state.duo, count => { state.duo = count; save(key, state); }, () => {
                 if (!live && !state.danced && state.days > 0)
                     --state.days;
                 state.duo = 0;
@@ -155,7 +183,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                 state.invitation = live ? 'performed' : 'offered';
                 notice = live ? say(['Вы с Нари выступили вместе!', 'Nari ile ilk sahnenize çıktınız!']) : say(['Нари ждёт тебя в танцзале.', 'Nari seni dans odasında bekliyor.']);
                 board.dataset.danceStep = String(state.step);
-                save(state);
+                save(key, state);
                 refresh();
             }, () => {
                 if (live) {
@@ -164,7 +192,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                         state.invitation = 'together';
                         state.duo = 0;
                     }
-                    save(state);
+                    save(key, state);
                     renderRoom();
                     return;
                 }
@@ -175,7 +203,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                 panel.replaceChildren();
                 nearNari = true;
                 panelClose();
-            }, live ? { kind: 'concert', continueShow: concert } : { kind: 'rehearsal', invite: acceptInvitation });
+            }, live ? { kind: 'concert', continueShow: concert } : { kind: 'rehearsal', invite: acceptInvitation }, cast ? { name, image: fan ? null : player.image } : undefined);
         }
         function refresh() {
             board.dataset.days = String(state.days);
@@ -193,8 +221,6 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             panel.hidden = false;
         }
         function panelClose() { open = false; panel.hidden = true; engine.setPaused(false); canvas.focus({ preventScroll: true }); }
-        const player = { image: 'art/walk/sofia-walk.webp', width: 163, height: 163, speed: 410,
-            sheet: { frameWidth: 192, frameHeight: 192, rows: { south: 0, east: 1, north: 2 }, idleColumn: 0, walkColumns: [1, 2, 0, 3] } };
         const dancingPlayer = { image: avatar.src, width: 126, height: 163, speed: 410,
             draw(ctx, { height }, direction) {
                 if (!avatar.complete || !avatar.naturalWidth)
@@ -218,7 +244,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                 state.step = 0;
             Object.assign(state, { room: next, x: spawn.x + 42, y: Math.min(740, spawn.y + 79), arrival: false });
             notice = '';
-            save(state);
+            save(key, state);
             renderRoom();
         }
         function dance(id) {
@@ -227,7 +253,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                 return;
             pose = n;
             poseUntil = performance.now() + 820;
-            engine.setAppearance(dancingPlayer);
+            engine.setAppearance(fan ? dancingPlayer : player);
             window.clearTimeout(poseTimer);
             poseTimer = window.setTimeout(() => engine.setAppearance(player), 820);
             worldAudio.note(n);
@@ -242,7 +268,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             else
                 notice = '';
             board.dataset.danceStep = String(state.step);
-            save(state);
+            save(key, state);
             refresh();
         }
         function arrive(id) {
@@ -250,6 +276,13 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                 return;
             if (roomKey(id)) {
                 destination(id);
+                return;
+            }
+            if (id === 'role-room' && cast) {
+                if (costumeRoom)
+                    cast.openWardrobe();
+                else
+                    cast.mission();
                 return;
             }
             if (id === 'nari') {
@@ -265,14 +298,14 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                 if (together) {
                     state.days = 0;
                     state.invitation = 'onstage';
-                    save(state);
+                    save(key, state);
                     refresh();
                     startDuet(true);
                     return;
                 }
                 if (state.days > 0) {
                     state.days = 0;
-                    save(state);
+                    save(key, state);
                     refresh();
                     board.classList.add('evening');
                     open = true;
@@ -289,7 +322,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                     --state.days;
                 state.arrival = false;
                 notice = day();
-                save(state);
+                save(key, state);
                 refresh();
                 worldAudio.cue('delivery');
                 return;
@@ -304,7 +337,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             }
         }
         const engine = createWorldEngine({ canvas, scene, player, ...(together ? { companion: {
-                    ...player, image: 'art/walk/nari-walk.webp', speed: 440, followDistance: 78,
+                    width: 163, height: 163, sheet: { frameWidth: 192, frameHeight: 192, rows: { south: 0, east: 1, north: 2 }, idleColumn: 0, walkColumns: [1, 2, 0, 3] }, image: 'art/walk/nari-walk.webp', speed: 440, followDistance: 78,
                     spawn: { x: state.x + (state.x < 145 ? 78 : -78), y: Math.max(510, state.y - 12) },
                 } } : {}), joystick: { base: stick, thumb: get('.world-stick i') },
             onStep: () => worldAudio.cue('step'), onInteract: arrive,
@@ -326,7 +359,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                     state.y = p.y;
                     previousPosition = p;
                     if (now - lastSave > 850) {
-                        save(state);
+                        save(key, state);
                         lastSave = now;
                     }
                 }
@@ -348,7 +381,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
                     pin.style.top = Math.max(26, Math.min(canvas.clientHeight - 35, py)) + 'px';
                     pin.dataset.side = off ? (screen.x < 22 ? 'left' : 'right') : '';
                 }
-                const doorway = spots.find(s => (roomKey(s.id) || s.id === 'gate') && Math.hypot(s.approach.x - p.x, s.approach.y - p.y) < 25 && Math.hypot(s.approach.x - previous.x, s.approach.y - previous.y) >= 25);
+                const doorway = spots.find(s => (roomKey(s.id) || s.id === 'gate' || s.id === 'role-room') && Math.hypot(s.approach.x - p.x, s.approach.y - p.y) < 25 && Math.hypot(s.approach.x - previous.x, s.approach.y - previous.y) >= 25);
                 if (doorway && !open) {
                     arrive(doorway.id);
                     return;
@@ -379,10 +412,8 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             } });
         board.dataset.danceStep = String(state.step);
         refresh();
-        host.addEventListener('pointerdown', () => { if (sound)
-            void worldAudio.enter(); }, { ...listen, capture: true });
-        host.addEventListener('keydown', () => { if (sound)
-            void worldAudio.enter(); }, { ...listen, capture: true });
+        host.addEventListener('pointerdown', () => { void worldAudio.enter(); }, { ...listen, capture: true });
+        host.addEventListener('keydown', () => { void worldAudio.enter(); }, { ...listen, capture: true });
         host.addEventListener('click', event => {
             const button = event.target instanceof Element ? event.target.closest('button') : null;
             if (!button)
@@ -390,7 +421,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             const id = button.dataset.walkTo;
             if (button.classList.contains('walk-arrival')) {
                 state.days = state.days === 1 ? 2 : 1;
-                save(state);
+                save(key, state);
                 notice = '';
                 leaveRoom();
                 renderRoom();
@@ -403,7 +434,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             if (button.hasAttribute('data-rehearse')) {
                 panelClose();
                 state.invitation = 'none';
-                save(state);
+                save(key, state);
                 startDuet(false);
                 return;
             }
@@ -437,9 +468,9 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert) {
             else if (button === use)
                 engine.interact();
         }, listen);
-        window.addEventListener('pagehide', () => save(state), listen);
+        window.addEventListener('pagehide', () => save(key, state), listen);
         canvas.focus({ preventScroll: true });
-        leaveRoom = () => { endDuet?.(); host.classList.remove('in-duet'); window.clearTimeout(curtainTimer); window.clearTimeout(poseTimer); const p = engine.getPosition(); state.x = p.x; state.y = p.y; save(state); engine.destroy(); controller.abort(); };
+        leaveRoom = () => { endDuet?.(); host.classList.remove('in-duet'); window.clearTimeout(curtainTimer); window.clearTimeout(poseTimer); const p = engine.getPosition(); state.x = p.x; state.y = p.y; save(key, state); engine.destroy(); controller.abort(); };
         if (state.invitation === 'onstage')
             startDuet(true);
     }

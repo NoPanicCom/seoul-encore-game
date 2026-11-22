@@ -72,13 +72,13 @@ export function mountFanReplay(root, record, sound, lang) {
         silence();
     }
     async function run() {
-        if (sound) {
+        {
             try {
                 await melody(null, true, true);
             }
             catch {
                 const status = root.querySelector('#feedback');
-                if (active && status)
+                if (sound && active && status)
                     status.textContent = lang === 'tr' ? 'Kayıt sessiz oynatılıyor.' : 'Запись воспроизводится без звука.';
             }
         }
