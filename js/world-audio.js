@@ -204,7 +204,7 @@ function brush(mixer, start, length, peak) {
     voice(mixer, source, envelope(mixer, start, length, peak), start, length);
 }
 const repeatDelay = {
-    step: .16, pixel: .26, delivery: .37, spotlight: .28, curtain: 1.05, note: .074, groove: .18,
+    step: .28, pixel: .26, delivery: .37, spotlight: .28, curtain: 1.05, note: .074, groove: .18,
 };
 function useCue(key, play) {
     const mixer = mix;
@@ -220,8 +220,7 @@ function cue(event) {
     useCue(event, (mixer, start) => {
         switch (event) {
             case 'step':
-                ring(mixer, start, 136, .083, .072, 'triangle', 79);
-                brush(mixer, start, .053, .062);
+                brush(mixer, start, .062, .026);
                 break;
             case 'pixel':
                 ring(mixer, start, 640, .105, .094, 'sine', 850);
@@ -256,13 +255,7 @@ function note(index) {
 }
 function groove(beat) {
     useCue('groove', (mixer, time) => {
-        const bass = [130.81, 130.81, 103.83, 116.54][Math.floor(beat / 2) % 4] ?? 130.81;
-        ring(mixer, time, bass / 2, .27, .14, 'triangle');
-        if (beat % 2 === 0)
-            ring(mixer, time, 145, .15, .2, 'sine', 43);
-        else
-            brush(mixer, time, .1, .15);
-        brush(mixer, time + .26, .04, .065);
+        brush(mixer, time, beat % 2 === 0 ? .12 : .09, beat % 2 === 0 ? .094 : .072);
     });
 }
 export const worldAudio = {

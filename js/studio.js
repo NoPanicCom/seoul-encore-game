@@ -1,9 +1,10 @@
 const slots = ['top', 'bottom', 'jacket', 'shoes'];
+const pieceTypes = [...slots, 'accessory'];
 const memberNames = {
     jisoo: 'Jisoo', jennie: 'Jennie', rose: 'Rosé', lisa: 'Lisa',
 };
 const modes = {
-    looks: ['Kostüm', 'Костюм'],
+    looks: ['Sahne kostümü', 'Сценический образ'],
     mix: ['Serbest kombin', 'Свой образ'],
     sets: ['Hazır setler', 'Комплекты'],
 };
@@ -13,6 +14,7 @@ const phases = {
 };
 const slotNames = {
     top: ['Üst', 'Верх'], bottom: ['Alt', 'Низ'], jacket: ['Ceket', 'Куртка'], shoes: ['Ayakkabı', 'Обувь'],
+    accessory: ['Aksesuar', 'Аксессуар'],
 };
 const looks = [
     {
@@ -65,6 +67,24 @@ const outfitSets = [
             rose: ['Gümüş ayna', 'Серебряное зеркало'], lisa: ['Altın sahne', 'Золотая сцена'],
         },
     },
+    {
+        id: 'backstage', names: {
+            jisoo: ['Bordo gül ve dantel', 'Бордовая роза и кружево'], jennie: ['İncili pembe tüvit', 'Розовый твид с жемчугом'],
+            rose: ['Gümüş yıldız ve zincir', 'Серебряные звёзды и цепочки'], lisa: ['Fuşya kargo', 'Карго цвета фуксии'],
+        },
+    },
+    {
+        id: 'rehearsal', names: {
+            jisoo: ['Pembe kiraz çiçeği', 'Розовая сакура'], jennie: ['Gümüş şerit ve lacivert', 'Серебро и тёмно-синий'],
+            rose: ['Leylak payet', 'Сиреневые пайетки'], lisa: ['Zümrüt ve krem', 'Изумруд и кремовый'],
+        },
+    },
+    {
+        id: 'original', names: {
+            jisoo: ['Kadife gül', 'Бархатная роза'], jennie: ['Pembe tüvit ve fiyonk', 'Розовый твид и бант'],
+            rose: ['Gümüş zincir ve korse', 'Серебряные цепочки и корсет'], lisa: ['Fuşya neon', 'Неоновая фуксия'],
+        },
+    },
 ];
 const collections = [
     {
@@ -106,11 +126,21 @@ function garments(collection, slot) {
         }]);
 }
 const wardrobe = collections.flatMap(collection => slots.flatMap(slot => garments(collection, slot)));
+const accessories = [
+    { id: 'crystal-accessory-belt', slot: 'accessory', label: ['Yıldızlı zincirli kemer', 'Ремень со звёздами и цепочками'] },
+    { id: 'crystal-accessory-gloves', slot: 'accessory', label: ['Pembe taşlı eldiven', 'Розовые перчатки со стразами'] },
+];
+export const studioTotals = {
+    outfits: Object.keys(memberNames).length * (looks.length + outfitSets.length),
+    pieces: wardrobe.length + accessories.length,
+};
 function lookupMix(ids) {
-    if (ids.length !== slots.length)
-        return null;
     const items = slots.map((slot, index) => wardrobe.find(item => item.slot === slot && item.id === ids[index]));
-    return items.every(item => item !== undefined) ? items : null;
+    if (!items.every(item => item !== undefined))
+        return null;
+    const extras = ids.slice(slots.length);
+    const equipped = accessories.filter(item => extras.includes(item.id));
+    return equipped.length === extras.length ? [...items, ...equipped] : null;
 }
 function parseCard(value) {
     const [kind, ...ids] = value.split(',');
@@ -212,17 +242,18 @@ export function studioTravelSelection(member) {
 let mode = 'looks';
 let phase = 'rehearsal';
 let slot = 'top';
-let collection = collections[0];
+let collection = null;
 let outfit = outfitSets[0];
 const mix = {
     top: 'crystal-top-1', bottom: 'crystal-bottom-1', jacket: 'crystal-jacket-1', shoes: 'crystal-shoes-2',
 };
-const mixIds = () => slots.map(key => mix[key]);
+const equippedAccessories = new Set();
+const mixIds = () => [...slots.map(key => mix[key]), ...accessories.filter(item => equippedAccessories.has(item.id)).map(item => item.id)];
 function isMode(value) {
     return Object.keys(modes).some(key => value === key);
 }
 function isSlot(value) {
-    return slots.some(key => value === key);
+    return pieceTypes.some(key => value === key);
 }
 function isPhase(value) {
     return value === 'rehearsal' || value === 'final';
@@ -243,10 +274,14 @@ export function studioAction(action, memberName) {
         phase = value;
         return true;
     }
-    if (verb === 'wear' && looks.some(look => look.id === value && look.phase === phase)) {
-        save(`look.${member}.${phase}`, value);
-        save(`travel.${member}`, `look,${value}`);
-        return true;
+    if (verb === 'wear') {
+        const look = looks.find(entry => (entry.id === value && entry.phase === phase) || `costume-${entry.id}` === value);
+        if (look) {
+            phase = look.phase;
+            save(`look.${member}.${phase}`, look.id);
+            save(`travel.${member}`, `look,${look.id}`);
+            return true;
+        }
     }
     if (verb === 'wear' && value === 'mix' && mode === 'mix') {
         save(`travel.${member}`, ['mix', ...mixIds()].join(','));
@@ -261,13 +296,22 @@ export function studioAction(action, memberName) {
         return true;
     }
     if (verb === 'collection') {
+        if (value === 'all') {
+            collection = null;
+            return true;
+        }
         const selected = collections.find(entry => entry.id === value);
         if (!selected)
             return false;
         collection = selected;
         return true;
     }
-    if (verb === 'piece' && wardrobe.some(item => item.id === value && item.slot === slot)) {
+    if (verb === 'piece' && slot === 'accessory' && accessories.some(item => item.id === value)) {
+        if (!equippedAccessories.delete(value))
+            equippedAccessories.add(value);
+        return true;
+    }
+    if (verb === 'piece' && slot !== 'accessory' && wardrobe.some(item => item.id === value && item.slot === slot)) {
         mix[slot] = value;
         return true;
     }
@@ -297,26 +341,26 @@ function picture(asset, alt = '', decorative = true) {
 }
 function renderLooks(lang, member) {
     const selected = chosenLook(member, phase);
-    const options = looks.filter(look => look.phase === phase);
-    const preview = selected ?? options[0];
+    const preview = selected ?? looks.find(look => look.phase === phase);
     if (!preview)
         throw new Error('studio phase');
     const title = copy(lang, preview.names[member]);
     const selectionText = selected
         ? copy(lang, ['Seçildi', 'Выбрано'])
         : copy(lang, ['Önizleme', 'Примерка']);
-    return `<div class="studio-switch studio-phases" role="group" aria-label="${copy(lang, ['Kostüm aşaması', 'Этап концерта'])}">
-    ${control('phase-rehearsal', copy(lang, phases.rehearsal), '', phase === 'rehearsal')}
-    ${control('phase-final', copy(lang, phases.final), '', phase === 'final')}
+    const phaseGroups = ['rehearsal', 'final'];
+    return `<div class="studio-look-rack" role="group" aria-label="${copy(lang, ['Kostüm seç', 'Выбери костюм'])}">
+    ${phaseGroups.map(group => `<div class="studio-look-group">
+      ${control(`phase-${group}`, copy(lang, phases[group]), 'studio-phase', phase === group)}
+      <div class="studio-look-picker">
+        ${looks.filter(look => look.phase === group).map(look => control(group === phase ? `wear-${look.id}` : `wear-costume-${look.id}`, picture(`${member}-${look.id}`) + `<span>${copy(lang, look.names[member])}</span>`, 'studio-look-option', chosenLook(member, group)?.id === look.id)).join('')}
+      </div>
+    </div>`).join('')}
   </div>
   <figure class="studio-portrait">
     ${picture(`${member}-${preview.id}`, `${memberNames[member]} · ${title}`, false)}
     <figcaption><span>${selectionText}</span><strong>${title}</strong></figcaption>
-  </figure>
-  <div class="studio-look-picker" role="group" aria-label="${copy(lang, ['Kostüm seç', 'Выбери костюм'])}">
-    ${options.map(look => control(`wear-${look.id}`, picture(`${member}-${look.id}`) +
-        `<span>${copy(lang, look.names[member])}</span>`, 'studio-look-option', selected?.id === look.id)).join('')}
-  </div>`;
+  </figure>`;
 }
 function mixPictures(lang, items) {
     return `<div class="studio-flatlay">${items.map(item => picture(item.id, copy(lang, item.label))).join('')}</div>`;
@@ -334,35 +378,42 @@ function renderMix(lang, member) {
     const items = lookupMix(ids);
     if (!items)
         throw new Error('studio mix');
-    return `<figure class="studio-mix-preview">
+    const selected = collection;
+    const options = slot === 'accessory' ? accessories : selected ? garments(selected, slot) : wardrobe.filter(item => item.slot === slot);
+    return `<div class="studio-switch studio-slots" role="group" aria-label="${copy(lang, ['Parça türü', 'Тип одежды'])}">
+    ${pieceTypes.map(key => control(`slot-${key}`, copy(lang, slotNames[key]), '', slot === key)).join('')}
+  </div>
+  ${slot === 'accessory' ? '' : `<div class="studio-switch studio-collections" role="group" aria-label="${copy(lang, ['Koleksiyon', 'Коллекция'])}">
+    ${control('collection-all', copy(lang, ['Tümü', 'Все']), '', selected === null)}
+    ${collections.map(entry => control(`collection-${entry.id}`, copy(lang, entry.label), '', selected?.id === entry.id)).join('')}
+  </div>`}
+  <figure class="studio-mix-preview">
     ${mixPictures(lang, items)}
     <figcaption>${copy(lang, ['Sofia’nın kombini', 'Образ Софии'])}</figcaption>
   </figure>
-  <div class="studio-switch studio-slots" role="group" aria-label="${copy(lang, ['Parça türü', 'Тип одежды'])}">
-    ${slots.map(key => control(`slot-${key}`, copy(lang, slotNames[key]), '', slot === key)).join('')}
-  </div>
-  <div class="studio-switch studio-collections" role="group" aria-label="${copy(lang, ['Koleksiyon', 'Коллекция'])}">
-    ${collections.map(entry => control(`collection-${entry.id}`, copy(lang, entry.label), '', collection.id === entry.id)).join('')}
+  <div class="studio-fit-actions">
+    ${travelButton(lang, 'mix', read(`travel.${member}`) === ['mix', ...ids].join(','))}
+    ${saveButton(lang, 'mix', archive().includes(['mix', ...ids].join(',')))}
   </div>
   <div class="studio-piece-picker" role="group" aria-label="${copy(lang, slotNames[slot])}">
-    ${garments(collection, slot).map(item => control(`piece-${item.id}`, picture(item.id) +
-        `<span>${copy(lang, item.label)}</span>`, 'studio-piece', mix[slot] === item.id)).join('')}
-  </div>
-  ${travelButton(lang, 'mix', read(`travel.${member}`) === ['mix', ...ids].join(','))}
-  ${saveButton(lang, 'mix', archive().includes(['mix', ...ids].join(',')))}`;
+    ${options.map(item => control(`piece-${item.id}`, picture(item.id) +
+        `<span>${copy(lang, item.label)}</span>`, 'studio-piece', ids.includes(item.id))).join('')}
+  </div>`;
 }
 function renderSets(lang, member) {
     const title = copy(lang, outfit.names[member]);
-    return `<figure class="studio-set-preview">
+    return `<div class="studio-set-picker" role="group" aria-label="${copy(lang, ['Set seç', 'Выбери комплект'])}">
+    ${outfitSets.map(entry => control(`set-${entry.id}`, picture(`${member}-set-${entry.id}`) +
+        `<span>${copy(lang, entry.names[member])}</span>`, 'studio-set-option', entry.id === outfit.id)).join('')}
+  </div>
+  <div class="studio-fit-actions">
+    ${travelButton(lang, 'set', read(`travel.${member}`) === ['set', member, outfit.id].join(','))}
+    ${saveButton(lang, 'set', archive().includes(['set', member, outfit.id].join(',')))}
+  </div>
+  <figure class="studio-set-preview">
     ${picture(`${member}-set-${outfit.id}`, `${memberNames[member]} · ${title}`, false)}
     <figcaption>${title}</figcaption>
-  </figure>
-  <div class="studio-piece-picker" role="group" aria-label="${copy(lang, ['Set seç', 'Выбери комплект'])}">
-    ${outfitSets.map(entry => control(`set-${entry.id}`, picture(`${member}-set-${entry.id}`) +
-        `<span>${copy(lang, entry.names[member])}</span>`, 'studio-piece', entry.id === outfit.id)).join('')}
-  </div>
-  ${travelButton(lang, 'set', read(`travel.${member}`) === ['set', member, outfit.id].join(','))}
-  ${saveButton(lang, 'set', archive().includes(['set', member, outfit.id].join(',')))}`;
+  </figure>`;
 }
 function storageNotice(lang) {
     return storageIssue ? `<p class="studio-storage" role="status">${copy(lang, [
@@ -375,11 +426,16 @@ export function renderStudio(lang, memberName, fittingAction = '') {
     if (!member)
         return `<p role="status">${copy(lang, ['Gardırop için bir üye seç.', 'Выбери участницу для примерки.'])}</p>`;
     const content = mode === 'looks' ? renderLooks(lang, member) : mode === 'mix' ? renderMix(lang, member) : renderSets(lang, member);
-    const modeOptions = ['looks', 'mix', 'sets'];
+    const modeOptions = ['looks', 'sets', 'mix'];
+    const totals = {
+        looks: [`${looks.length} görünüm`, `${looks.length} образа`],
+        sets: [`${outfitSets.length} görünüm`, `${outfitSets.length} образов`],
+        mix: [`${studioTotals.pieces} parça`, `${studioTotals.pieces} предмета`],
+    };
     return `<section class="studio" aria-label="${copy(lang, ['Gardırop', 'Гардероб'])}">
     <div class="studio-title"><h2>${copy(lang, ['Gardırop', 'Гардероб'])}</h2><span>${memberNames[member]}</span></div>
     <div class="studio-switch studio-modes" role="group" aria-label="${copy(lang, ['Gardırop bölümü', 'Раздел гардероба'])}">
-      ${modeOptions.map(key => control(`mode-${key}`, copy(lang, modes[key]), '', mode === key)).join('')}
+      ${modeOptions.map(key => control(`mode-${key}`, `${copy(lang, modes[key])}<small>${copy(lang, totals[key])}</small>`, '', mode === key)).join('')}
     </div>
     ${content}
     ${storageNotice(lang)}

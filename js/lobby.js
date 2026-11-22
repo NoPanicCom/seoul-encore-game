@@ -1,3 +1,4 @@
+import { studioTotals } from './studio.js';
 const copy = {
     tr: {
         concert: 'Konser gecesi',
@@ -73,7 +74,7 @@ export function renderLobby(lang, count, total, hasReplay, resumeLabel = '', pho
       <div class="el-grid">
         ${shortcut('city', label.city)}
         ${shortcut('pets', label.pets)}
-        ${shortcut('studio', label.studio)}
+        ${shortcut('studio', label.studio, '<span class="el-count">' + (lang === 'ru' ? studioTotals.outfits + ' образа · ' + studioTotals.pieces + ' предмета' : studioTotals.outfits + ' görünüm · ' + studioTotals.pieces + ' parça') + '</span>')}
         ${shortcut('album', label.album, `<span class="el-count">${albumCount}</span>`)}
       </div>
     </nav>

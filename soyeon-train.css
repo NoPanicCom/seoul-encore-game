@@ -1,0 +1,273 @@
+.soyeon-fitting,
+.soyeon-room {
+  overflow: hidden;
+  border: 1px solid #80566a;
+  border-radius: 12px;
+  background: #2b202a;
+}
+
+.soyeon-fitting {
+  display: grid;
+  grid-template-columns: minmax(93px, 34%) minmax(0, 1fr);
+  align-items: stretch;
+  margin-bottom: 14px;
+}
+
+.soyeon-fitting-preview {
+  position: relative;
+  min-height: 152px;
+  background: radial-gradient(ellipse at 65% 35%, #a34e697d, transparent 75%), #261420;
+}
+
+.soyeon-fitting-copy {
+  align-self: center;
+  padding: 11px 12px;
+}
+
+.soyeon-fitting h2,
+.soyeon-room h2 {
+  margin: 0;
+  font-size: clamp(20px, 5.6vw, 30px);
+  line-height: 1.12;
+  letter-spacing: -.03em;
+}
+
+.soyeon-fitting .primary {
+  margin: 10px 0 0;
+  min-height: 44px;
+  padding: 7px 10px;
+}
+
+.soyeon-fitting p {
+  margin: 8px 0 0;
+  color: var(--pink);
+  font-weight: 650;
+}
+
+.soyeon-room h2 {
+  padding: 13px 14px 15px;
+  text-align: center;
+}
+
+.soyeon-floor,
+.soyeon-stairs {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: clamp(255px, 43svh, 415px);
+}
+
+.soyeon-floor {
+  background: linear-gradient(180deg, #2a122518, #28152152 73%, #22111cbb),
+    url('art/world/backstage.webp') center/cover;
+}
+
+.soyeon-floor::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse at 57% 49%, #ffe9d93d, transparent 63%);
+  content: '';
+}
+
+.soyeon-floor .soyeon-figure,
+.soyeon-fitting-preview .soyeon-figure {
+  position: absolute;
+  bottom: 5%;
+  left: 50%;
+  width: auto;
+  height: 92%;
+  aspect-ratio: 56 / 100;
+  transform: translateX(-59%);
+}
+
+.soyeon-fitting-preview .soyeon-figure {
+  transform: translateX(-56%);
+}
+
+.soyeon-fitting-preview .worn-look:not(.soyeon-figure) {
+  position: absolute;
+  inset: 4% 5%;
+  width: 90%;
+  height: 92%;
+}
+
+.soyeon-figure .soyeon-model {
+  inset: 0 auto 0 39%;
+  width: 61%;
+  height: 100%;
+  object-position: center bottom;
+  pointer-events: none;
+}
+
+.soyeon-figure [data-train-cloth] {
+  inset: 37% auto auto 0;
+  width: 82%;
+  height: 68%;
+  object-fit: fill;
+  transform: scale(calc(1 - var(--soyeon-lift) * .41), calc(1 - var(--soyeon-lift) * .69));
+  transform-origin: 88% top;
+  transition: transform .25s ease-out;
+  -webkit-user-drag: none;
+}
+
+.soyeon-floor [data-train-cloth],
+.soyeon-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.soyeon-handle {
+  position: absolute;
+  z-index: 2;
+  bottom: calc(2% + var(--soyeon-lift) * 45%);
+  left: calc(14% + var(--soyeon-lift) * 25%);
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  color: #2f1022;
+  border: 2px solid #fff2eb;
+  border-radius: 50%;
+  background: #ffc0d4;
+  box-shadow: 0 1px 13px #301023bd;
+  font-size: 29px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+[data-train-dragging=true] [data-train-cloth] {
+  cursor: grabbing;
+  transition: none;
+}
+
+[data-train-ready=true] .soyeon-handle {
+  visibility: hidden;
+}
+
+[data-train-ready=true] .soyeon-floor [data-train-cloth] {
+  cursor: auto;
+}
+
+.soyeon-controls {
+  display: grid;
+  gap: 10px;
+  padding: 12px 13px 14px;
+}
+
+.soyeon-controls p {
+  min-height: 2.9em;
+  margin: 0;
+  color: #ffe4e3;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.soyeon-controls progress {
+  width: 100%;
+  height: 10px;
+  accent-color: #ffc0d4;
+}
+
+.soyeon-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.soyeon-controls button {
+  margin: 0;
+  min-width: 0;
+  padding: 8px;
+  text-align: center;
+}
+
+.soyeon-controls button:disabled {
+  cursor: default;
+  opacity: .53;
+}
+
+.soyeon-stairs {
+  background: radial-gradient(ellipse at 79% 30%, #db8ab4aa, #4d27483e 65%, #27142699),
+    linear-gradient(180deg, #2d1631 5%, #432938 52%, #22151f);
+}
+
+.soyeon-stairs::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: conic-gradient(from 139deg at 80% 4%, #ffd5de00 0deg, #ffd5de61 18deg, #ffafd334 35deg, #ffd5de00 54deg);
+  content: '';
+}
+
+.soyeon-stage-door {
+  position: absolute;
+  right: 0;
+  bottom: 48%;
+  width: 25%;
+  height: 41%;
+  border: 2px solid #ffc4db7a;
+  border-bottom: 0;
+  background: linear-gradient(90deg, #8a3865, #ffc3d9 48%, #c7749d);
+  box-shadow: inset 0 0 24px #a33563, 0 0 32px #ffc4d768;
+}
+
+.soyeon-treads span {
+  position: absolute;
+  right: 0;
+  bottom: calc(5% + var(--soyeon-step) * 8.7%);
+  left: calc(6% + var(--soyeon-step) * 15%);
+  height: 10%;
+  border-top: 3px solid #ffa9c7;
+  background: linear-gradient(#8c4e6e 12%, #3d273c 32%, #261927 97%);
+  box-shadow: 0 -1px 10px #f36d9e7d;
+  clip-path: polygon(8% 0, 100% 0, 100% 100%, 0 100%, 0 32%);
+  animation: soyeon-tread .5s ease-out calc(.14s + var(--soyeon-step) * .41s) both;
+}
+
+[data-train-climber] {
+  position: absolute;
+  left: 18%;
+  bottom: 15%;
+  height: 47%;
+  aspect-ratio: 56 / 100;
+  transform: translateX(-65%);
+  filter: drop-shadow(0 4px 2px #210c1ec9);
+  animation: soyeon-ascent 2.35s linear both;
+}
+
+.live-dancer .soyeon-figure .soyeon-model {
+  left: 16%;
+  width: 68%;
+}
+
+.live-dancer .soyeon-figure [data-train-cloth] {
+  left: -3%;
+  width: 63%;
+}
+
+@keyframes soyeon-ascent {
+  0% { left: 18%; bottom: 15%; }
+  10% { left: 25%; bottom: 23%; transform: translateX(-65%) rotate(3deg); }
+  18% { left: 32%; bottom: 23.7%; }
+  28% { left: 39%; bottom: 32%; transform: translateX(-65%) rotate(-3deg); }
+  36% { left: 47%; bottom: 32.4%; }
+  46% { left: 53%; bottom: 41%; transform: translateX(-65%) rotate(3deg); }
+  54% { left: 62%; bottom: 41.1%; }
+  64% { left: 69%; bottom: 50%; transform: translateX(-65%) rotate(-3deg); }
+  72% { left: 77%; bottom: 49.8%; }
+  88%, 100% { left: 83%; bottom: 49.8%; transform: translateX(-65%); }
+}
+
+@keyframes soyeon-tread {
+  from { border-top-color: #795167; }
+  42% { border-top-color: #fff2e5; }
+  to { border-top-color: #ffa9c7; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soyeon-figure [data-train-cloth] { transition: none; }
+  [data-train-climber] { animation: none; left: 83%; bottom: 49.8%; }
+  .soyeon-treads span { animation: none; }
+}

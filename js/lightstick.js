@@ -1,8 +1,8 @@
 export const shopSticks = ['hammer', 'white-star', 'jisoo-cone'];
 export const isShopStick = (value) => shopSticks.some(id => id === value);
 const sticks = {
-    hammer: { tr: 'BLACKPINK · Pembe çekiç', ru: 'BLACKPINK · Розовый молоточек', color: '#ff91ba' },
-    'white-star': { tr: 'Beyaz yıldız', ru: 'Белая звезда', color: '#edeeff' },
+    hammer: { tr: 'BLACKPINK · Kalpli çekiç', ru: 'BLACKPINK · Молоточек с сердцами', color: '#ff91ba' },
+    'white-star': { tr: 'Lisa · Beyaz yıldız', ru: 'Лиса · Белая звезда', color: '#edeeff' },
     'jisoo-cone': { tr: 'Jisoo · Dondurma', ru: 'Джису · Мороженое', color: '#c8a5f6' },
     heart: { tr: 'Pembe kalp', ru: 'Розовое сердце', color: '#ff78b6' },
     moon: { tr: 'Lila ay', ru: 'Сиреневая луна', color: '#bc91ff' },
@@ -12,8 +12,10 @@ export function stickId(value) {
     return value && isShopStick(value) ? value : value === 'heart' || value === 'moon' || value === 'star' ? value : null;
 }
 export function stickName(id, lang) { return sticks[id][lang]; }
+const wandArt = (id) => `art/lightsticks/${id}.webp`;
+const audienceStyle = (id) => `--stick:${sticks[id].color};--wand-art:url('${wandArt(id)}')`;
 function wand(id) {
-    return `<img class="wand-art" src="art/lightsticks/${id}.webp" alt="">`;
+    return `<img class="wand-art" src="${wandArt(id)}" alt="">`;
 }
 export function merchButtons(lang, selected, owned, walk = false) {
     return shopSticks.map(id => {
@@ -45,7 +47,7 @@ export function renderHeldStick(id, lang, playing, watching = false) {
     const model = `class="held-stick" data-held-stick="${id}" style="--stick:${item.color}"`;
     const held = watching ? `<div ${model} aria-hidden="true">${content}</div>` :
         `<button type="button" ${model} data-act="${playing ? 'tap' : 'play'}" aria-label="${item[lang]} · ${lang === 'tr' ? 'Ritimle yak' : 'Зажечь в такт'}">${content}</button>`;
-    return `<div class="fan-lights" aria-hidden="true" style="--stick:${item.color}">${'<i></i>'.repeat(12)}</div>${held}`;
+    return `<div class="fan-lights" aria-hidden="true" style="${audienceStyle(id)}">${'<i></i>'.repeat(12)}</div>${held}`;
 }
 export function lightBeat(area, beat) {
     // The hit rank advances on each accepted tap, including after a missed beat.
@@ -61,7 +63,7 @@ export function renderBlackout(lang) {
 }
 export function renderArena(id) {
     const rows = Array.from({ length: 5 }, (_, row) => `<div style="--row:${row}">${'<i></i>'.repeat(22)}</div>`).join('');
-    return `<div class="encore-arena" aria-hidden="true" style="--stick:${sticks[id].color}">${rows}</div>`;
+    return `<div class="encore-arena" aria-hidden="true" style="${audienceStyle(id)}">${rows}</div>`;
 }
 export function secretPhotocard(lang, id, playable = false) {
     const title = lang === 'tr' ? 'Lisa’nın gizli bisi' : 'Секретный бис Лисы';

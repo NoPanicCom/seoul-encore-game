@@ -1,13 +1,13 @@
 import { concertCostume } from './travel-look.js';
 import { renderHeldStick, renderArena } from './lightstick.js';
-export function renderPerformance(member, lang, playing, lights, stick = null, secret = false, watching = false, jennieCostume = '') {
+export function renderPerformance(member, lang, playing, lights, stick = null, secret = false, watching = false, jennieCostume = '', jisooCostume = '') {
     const cue = lang === 'ru' ? 'Поймай звезду у круга' : 'Yıldız halkaya gelince dokun';
     const palette = ['#ff80c2', '#bca2ff', '#ffe29e'];
     const colors = lights.map((key, index) => '--cue-' + index + ':' + palette[key]).join(';');
     const cast = secret ? [member] : ['jisoo', 'jennie', 'rose', 'lisa'];
     const names = { jisoo: 'Jisoo', jennie: 'Jennie', rose: 'Rosé', lisa: 'Lisa' };
     const dancers = cast.map((id, index) => {
-        const shirt = secret ? '' : id === 'jennie' && jennieCostume ? jennieCostume : concertCostume(id);
+        const shirt = secret ? '' : id === 'jennie' && jennieCostume ? jennieCostume : id === 'jisoo' && jisooCostume ? jisooCostume : concertCostume(id);
         const figure = shirt || `<div style="background-image:url('art/world/${secret ? id : 'concert-quartet'}.webp')"></div>`;
         return `<div class="live-dancer" data-artist="${id}" style="--spot:${13 + index * 24}%;--column:${index * 100 / 3}%">${figure}${secret ? '' : `<b>${names[id]}</b>`}</div>`;
     }).join('');

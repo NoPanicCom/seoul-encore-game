@@ -9,6 +9,7 @@ import { renderBooth, mountBooth, boothAlbum, boothPhotoCount } from './booth.js
 import { shopSticks, isShopStick, stickId, renderMinho, renderLightResult, renderBlackout, secretPhotocard, lightBeat } from './lightstick.js';
 import { encodeFanRecording, readFanRecording, renderFanReplay, mountFanReplay } from './fan-replay.js';
 import { changeRoom, fastenJacket, hangJacket, jacketPhase, mountJacketDrag, releaseSnap, resetJacket, sendJennieBack, showFigure, startChange } from './mina-jacket.js';
+import { trainPhase, dressVelvet, pinTrain, startStairs, resetTrain, velvetFitting, velvetBackstage, mountVelvetBackstage, velvetStairs, mountVelvetStairs, velvetStageFigure } from './soyeon-train.js';
 import { concertCostume } from './travel-look.js';
 import { renderPerformance } from './performance.js';
 import { renderLobby } from './lobby.js';
@@ -107,6 +108,7 @@ const fanCards = () => ['heart', 'moon', 'star', ...shopSticks].filter(id => rea
 let tourEncore = false;
 let firstSongScore = 0;
 let playing = false;
+let listening = false;
 let epoch = 0;
 let start = 0;
 let frame = 0;
@@ -135,17 +137,21 @@ function checkpoint(next) {
     save('checkpoint', [role, next, remaining].join('|'));
     saveCityCheckpoint();
 }
-function isMinaConcert() {
-    return role === 'mina' && (walkedToConcert ? walkRole === 'mina' && arenaEntrance === 'walk' : cityMode === 'tour');
+function stylistConcert(stylist) {
+    return role === stylist && (walkedToConcert ? walkRole === stylist && arenaEntrance === 'walk' : cityMode === 'tour');
 }
-function inMinaFitting() {
-    return studioMember === 'Jennie' && role === 'mina' && (studioBack === 'walk' || studioBack === 'brief' || studioBack === 'city' || studioBack === 'item');
+function stylistFitting(stylist) {
+    return studioMember === passes[stylist]?.person && role === stylist && (studioBack === 'walk' || studioBack === 'brief' || studioBack === 'city' || studioBack === 'item');
 }
 function go(next) {
-    if ((next === 'stage' || next === 'lightshow') && isMinaConcert() && jacketPhase() === 'change')
+    if ((next === 'stage' || next === 'lightshow') && stylistConcert('mina') && jacketPhase() === 'change')
         next = 'mina-change';
-    if (next !== 'lightshow' && next !== 'stage' && next !== 'mina-change')
+    if ((next === 'stage' || next === 'lightshow') && stylistConcert('soyeon') && (trainPhase() === 'dressed' || trainPhase() === 'pinned'))
+        next = 'soyeon-change';
+    if (!['lightshow', 'stage', 'mina-change', 'soyeon-change', 'soyeon-stairs'].includes(next))
         walkedToConcert = false;
+    if (!['stage', 'lightshow', 'secret', 'blackout', 'mina-change', 'walk-bow'].includes(next))
+        listening = false;
     if (next !== 'blackout' && next !== 'secret')
         tourEncore = false;
     const hash = sceneHash(next);
@@ -160,9 +166,14 @@ function go(next) {
 }
 function isTravelWardrobe() { return studioBack === 'world' || studioBack === 'hongdae'; }
 function sceneHash(next) {
-    if ((next === 'stage' || next === 'lightshow' || next === 'mina-change') && isMinaConcert() && jacketPhase())
+    if ((next === 'stage' || next === 'lightshow' || next === 'mina-change') && stylistConcert('mina') && jacketPhase())
         return '#mina-show/' + (walkedToConcert ? 'arena' : 'tour');
-    if (next === 'studio' && inMinaFitting() && studioBack !== 'walk')
+    if (stylistConcert('soyeon') && trainPhase() && ['stage', 'lightshow', 'soyeon-change', 'soyeon-stairs'].includes(next)) {
+        return (next === 'soyeon-stairs' ? '#soyeon-stairs/' : '#soyeon-show/') + (walkedToConcert ? 'arena' : 'tour');
+    }
+    if (next === 'studio' && stylistFitting('soyeon') && studioBack !== 'walk')
+        return '#soyeon-fitting/' + studioBack;
+    if (next === 'studio' && stylistFitting('mina') && studioBack !== 'walk')
         return '#mina-fitting/' + studioBack;
     if (walkedToConcert && (next === 'lightshow' || next === 'stage'))
         return arenaEntrance === 'home' ? '#concert' : '#arena-live' + (walkRole ? '/' + walkRole : '');
@@ -178,6 +189,8 @@ function sceneHash(next) {
         return '#secret/' + tripMember;
     if (next === 'minho' || next === 'lightshow' || next === 'hongdae' || next === 'booth')
         return '#' + next + '/' + tripMember;
+    if (next === 'studio' && studioBack === 'home')
+        return '#gallery/' + (memberIds[studioMember] ?? 'lisa');
     if (next === 'album' && albumSection === 'hongdae')
         return '#hongdae-album/' + tripMember;
     if (next === 'studio' && studioBack === 'walk' && walkRole)
@@ -188,6 +201,28 @@ function sceneHash(next) {
 }
 function restoreScene() {
     const [place, first, second] = location.hash.slice(1).split('/');
+    if ((place === 'soyeon-show' || place === 'soyeon-stairs') && (first === 'arena' || first === 'tour')) {
+        role = 'soyeon';
+        actor = 'Jisoo';
+        tripMember = 'jisoo';
+        walkedToConcert = first === 'arena';
+        walkRole = walkedToConcert ? role : null;
+        arenaEntrance = 'walk';
+        cityMode = walkedToConcert ? 'free' : 'tour';
+        if (trainPhase() === 'pinned' || trainPhase() === 'dressed')
+            return 'soyeon-change';
+        if (place === 'soyeon-stairs' && trainPhase() === 'stage')
+            return 'soyeon-stairs';
+        return walkedToConcert && lightstick ? 'lightshow' : 'stage';
+    }
+    if (place === 'soyeon-fitting' && (first === 'item' || first === 'brief' || first === 'city')) {
+        role = 'soyeon';
+        actor = 'Jisoo';
+        studioMember = actor;
+        studioBack = first;
+        cityMode = 'tour';
+        return 'studio';
+    }
     if (place === 'mina-fitting' && (first === 'brief' || first === 'city' || first === 'item')) {
         role = 'mina';
         actor = 'Jennie';
@@ -250,6 +285,11 @@ function restoreScene() {
     if (!member)
         return 'home';
     tripMember = member;
+    if (place === 'gallery') {
+        studioMember = pass(member).person;
+        studioBack = 'home';
+        return 'studio';
+    }
     if (place === 'concert-album') {
         albumSection = 'concert';
         return 'album';
@@ -322,7 +362,9 @@ function studioScreen() {
         ? `<div class="segmented">${Object.keys(memberIds).map(name => action('artist-' + name, name, name === studioMember ? 'chosen' : '')).join('')}</div>` : '';
     const travelExit = isTravelWardrobe() ? action('trip-street', t('Pixel ile Hongdae’ye çık', 'На прогулку с Пикселем'), 'trip-exit') : '';
     const costume = studioBack === 'walk' ? concertCostume(studioMember) : '';
-    if (inMinaFitting()) {
+    if (stylistFitting('soyeon'))
+        return velvetFitting(lang) + renderStudio(lang, studioMember);
+    if (stylistFitting('mina')) {
         const under = concertCostume('Jennie');
         const ready = jacketPhase() === 'opening';
         const cue = ready ? t('İlk şarkı için ceket iliklendi. Finalden önce çıtçıtları sen açacaksın.', 'Жакет застёгнут для первой песни. Перед финалом ты расстегнёшь кнопки.') : under ? t('Final kıyafeti hazır. İlk şarkı için üstüne pembe ceketi giydir.', 'Образ для финала готов. Надень сверху розовый жакет для первой песни.') : t('Önce aşağıdan Jennie’nin final kıyafetini seç.', 'Сначала выбери ниже наряд Дженни для финальной песни.');
@@ -353,15 +395,24 @@ function stage() {
     const secret = page === 'secret';
     const fromShop = page === 'lightshow' || secret || walkedToConcert;
     const performer = secret ? 'lisa' : fromShop ? tripMember : (memberIds[p.person] ?? 'lisa');
-    const jacket = !secret && isMinaConcert() ? jacketPhase() : undefined;
+    const jacket = !secret && stylistConcert('mina') ? jacketPhase() : undefined;
+    const velvet = !secret && stylistConcert('soyeon') && trainPhase() === 'stage';
     const title = jacket === 'final' ? t('BLACKPINK · Final şarkısı', 'BLACKPINK · Финальная песня') : jacket === 'opening' ? t('BLACKPINK · Açılış şarkısı', 'BLACKPINK · Первая песня') : secret ? t('Lisa’nın gizli bisi', 'Секретный бис Лисы') : t('BLACKPINK konseri', 'Концерт BLACKPINK');
-    const description = jacket === 'final' ? t('Jennie, hazırladığın ikinci kıyafetle sahnede. Son nakarata eşlik et!', 'Дженни вернулась в твоём втором образе. Лови ритм последнего припева!') : jacket === 'opening' ? t('Jennie pembe ceketiyle sahnede. Şarkı bitince kuliste buluşun.', 'Дженни вышла в розовом жакете. После песни встречайтесь за кулисами.') : secret ? t('Lisa geri döndü! Yıldız halkaya ulaşınca dokun, bütün salon senin renginde yansın.', 'Лиса вернулась! Коснись лайтстика, когда звезда дойдёт до кольца, и весь зал засияет твоим цветом.') : fromShop ? t('Jisoo, Jennie, Rosé ve Lisa sahnede! Yıldız halkaya gelince ritme dokun.', 'На сцене Джису, Дженни, Розэ и Лиса! Когда звезда дойдёт до круга, нажми в такт.') : p.result[lang];
-    return `<div class="stage live-stage" data-playing="${playing}">${renderPerformance(performer, lang, playing, worldChallenge(performer, 'light'), lightstick, secret, false, jacket ? showFigure() : '')}${!fromShop && stageLook(p.person, 'rehearsal') ? photo(stageLook(p.person, 'rehearsal') ?? p.card, p.person, 'rhythm-look') : ''}<span class="kicker">SEOUL LIVE</span><h2>${title}</h2><p>${description}</p><div class="dots" aria-hidden="true">${'<i class="dot"></i>'.repeat(beatCount)}</div>
-  <button id="pad" class="disc" data-act="${playing ? 'tap' : 'play'}">${playing ? t('Dokun', 'Нажми') : t('Başlat ▶', 'Старт ▶')}</button>
+    const description = velvet ? t('Jisoo merdivenleri çıktı! Hazırladığın bordo kadife elbiseyle sahnede.', 'Джису поднялась по ступенькам! На ней бордовое бархатное платье, которое ты подготовила.') : jacket === 'final' ? t('Jennie, hazırladığın ikinci kıyafetle sahnede. Son nakarata eşlik et!', 'Дженни вернулась в твоём втором образе. Лови ритм последнего припева!') : jacket === 'opening' ? t('Jennie pembe ceketiyle sahnede. Şarkı bitince kuliste buluşun.', 'Дженни вышла в розовом жакете. После песни встречайтесь за кулисами.') : secret ? t('Lisa geri döndü! Yıldız halkaya ulaşınca dokun, bütün salon senin renginde yansın.', 'Лиса вернулась! Коснись лайтстика, когда звезда дойдёт до кольца, и весь зал засияет твоим цветом.') : fromShop ? t('Jisoo, Jennie, Rosé ve Lisa sahnede! Yıldız halkaya gelince ritme dokun.', 'На сцене Джису, Дженни, Розэ и Лиса! Когда звезда дойдёт до круга, нажми в такт.') : p.result[lang];
+    const watching = playing && listening;
+    const mix = secret ? 'Afterglow' : jacket === 'final' ? 'Pink Horizon' : 'Seoul Lights';
+    const credit = t('Oyun için bestelenen müzik', 'Музыка для игры') + ' · ' + mix;
+    const scene = renderPerformance(performer, lang, playing, worldChallenge(performer, 'light'), lightstick, secret, watching, jacket ? showFigure() : '', velvet ? velvetStageFigure(lang) : '');
+    if (watching)
+        return `<div class="stage live-stage watch-concert" data-playing="true" data-mode="listen">${scene}<h2>${title}</h2><p>${credit}</p><progress id="concert-time" max="${beatCount * beatMs}" value="0" aria-label="${t('Şarkı', 'Песня')}"></progress>${action('pause', t('Duraklat', 'Пауза'), 'secondary')}</div>`;
+    return `<div class="stage live-stage" data-playing="${playing}">${scene}${!fromShop && stageLook(p.person, 'rehearsal') ? photo(stageLook(p.person, 'rehearsal') ?? p.card, p.person, 'rhythm-look') : ''}<span class="kicker">${credit}</span><h2>${title}</h2><p>${description}</p><div class="dots" aria-hidden="true">${'<i class="dot"></i>'.repeat(beatCount)}</div>
+  <button id="pad" class="disc" data-act="${playing ? 'tap' : 'play'}">${playing ? t('Ritme vur', 'В такт') : t('Ritim oyunu ▶', 'Играть в ритм ▶')}</button>
   <p id="count" class="mono">0 / ${beatCount}</p>${lightstick ? '<p class="light-feedback" id="light-feedback" role="status"></p>' : ''}</div>
   ${fromShop ? '' : '<p class="intro">' + t('İç halka büyüyüp kenara vardığında dokun. Kaçırırsan sıradaki vuruştan devam et.', 'Нажимай, когда кольцо дорастёт до края. Если пропустишь, лови следующий удар.') + '</p>'}
+  ${playing ? '' : action('listen', t('Konseri sadece izle ve dinle', 'Смотреть и слушать концерт'), 'secondary')}
   ${playing ? action('pause', t('Duraklat', 'Пауза'), 'secondary') : ''}
-  ${playing || fromShop ? '' : action('relax', t('Süre tutmadan finali izle', 'Посмотреть финал без таймера'), 'secondary')}`;
+  ${playing || fromShop ? '' : action('relax', t('Süre tutmadan finali izle', 'Посмотреть финал без таймера'), 'secondary')}
+  ${playing ? '' : `<details class="concert-videos"><summary>${t('BLACKPINK’in resmî klipleri', 'Официальные клипы BLACKPINK')}</summary><a href="https://www.youtube.com/watch?v=gQlMMD8auMs" target="_blank" rel="noopener noreferrer">Pink Venom · YouTube ↗</a><a href="https://www.youtube.com/watch?v=POe9SOEKotk" target="_blank" rel="noopener noreferrer">Shut Down · YouTube ↗</a></details>`}`;
 }
 function memories() {
     const note = read('note.' + role + '.' + lang);
@@ -411,7 +462,7 @@ function albumPage() {
 function back() {
     if (walkedToConcert || page === 'walk-bow')
         return arenaEntrance;
-    if (page === 'mina-change')
+    if (page === 'mina-change' || page === 'soyeon-change' || page === 'soyeon-stairs')
         return 'brief';
     if (page === 'fan-replay')
         return 'album';
@@ -446,10 +497,16 @@ function draw() {
     unmountScene = undefined;
     app.dataset.page = page;
     document.documentElement.lang = lang;
-    const screens = { 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт')} · ${hits.size} / ${beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
+    const screens = { 'soyeon-change': () => velvetBackstage(lang), 'soyeon-stairs': () => velvetStairs(lang), 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${listening ? t('Sahne ışıkları söndü. Seul’den iyi geceler!', 'Свет на сцене погас. Спокойной ночи, Сеул!') : t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт') + ' · ' + hits.size + ' / ' + beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
     app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button type="button" class="audio-switch" data-act="sound" aria-pressed="${sound}">${sound ? '♫ ' : '○ '}${soundLabel()}</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'walk', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result', 'fan-replay'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(page === 'lightshow' || page === 'secret') ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
     element('feedback').textContent = feedback;
-    if (page === 'mina-change') {
+    if (page === 'soyeon-change') {
+        unmountScene = mountVelvetBackstage(app);
+    }
+    else if (page === 'soyeon-stairs') {
+        unmountScene = mountVelvetStairs(app, () => go(walkedToConcert && lightstick ? 'lightshow' : 'stage'));
+    }
+    else if (page === 'mina-change') {
         unmountScene = mountJacketDrag(app, () => { if (hangJacket())
             draw(); });
     }
@@ -472,7 +529,7 @@ function draw() {
     }
     else if (page === 'blackout') {
         if (!document.hidden) {
-            const timer = window.setTimeout(() => { go('secret'); void play(); }, 2800);
+            const timer = window.setTimeout(() => { go('secret'); void play(listening); }, 2800);
             unmountScene = () => window.clearTimeout(timer);
         }
     }
@@ -536,7 +593,7 @@ function chooseFinale() {
     return 'solo';
 }
 function finish(free) {
-    if ((page === 'stage' || page === 'lightshow') && isMinaConcert()) {
+    if ((page === 'stage' || page === 'lightshow') && stylistConcert('mina')) {
         if (jacketPhase() === 'opening') {
             startChange();
             hits.clear();
@@ -547,6 +604,15 @@ function finish(free) {
             resetJacket();
     }
     if (page === 'stage' && walkedToConcert && !lightstick) {
+        go('walk-bow');
+        return;
+    }
+    if (page === 'secret' && lightstick && listening) {
+        if (tourEncore) {
+            forecast = 'solo';
+            lastFree = true;
+            collectCard(false, firstSongScore);
+        }
         go('walk-bow');
         return;
     }
@@ -569,14 +635,16 @@ function finish(free) {
         return;
     }
     forecast = chooseFinale();
-    lastFree = free;
+    lastFree = free || listening;
     const looks = {};
     for (const name of Object.keys(memberIds)) {
         const selected = stageLook(name);
         if (selected)
             looks[name] = selected;
     }
-    startEncore({ role, member: actor, looks, score: free ? null : hits.size, cityNote: { tr: noteFor('tr'), ru: noteFor('ru') }, signal: forecast });
+    if (stylistConcert('soyeon') && trainPhase() === 'stage')
+        looks.Jisoo = 'soyeon/jisoo-velvet';
+    startEncore({ role, member: actor, looks, score: lastFree ? null : hits.size, cityNote: { tr: noteFor('tr'), ru: noteFor('ru') }, signal: forecast });
     viewing = false;
     go('show');
 }
@@ -585,7 +653,7 @@ function collectCard(openEnding = true, score = hits.size) {
     album = cardIds([...(cardIds(read('album'))), ...album, role].join(','));
     save('album', album.join(','));
     save('signal.' + role, forecast);
-    save('look.' + role, stageLook(actor) ?? 'studio/' + memberIds[actor] + '-spotlight');
+    save('look.' + role, role === 'soyeon' && trainPhase() === 'stage' ? 'soyeon/jisoo-velvet' : (stageLook(actor) ?? 'studio/' + memberIds[actor] + '-spotlight'));
     save('score.' + role, lastFree ? 'free' : String(score));
     save('note.' + role + '.tr', noteFor('tr'));
     save('note.' + role + '.ru', noteFor('ru'));
@@ -604,6 +672,13 @@ function tick(now) {
         finish(false);
         return;
     }
+    if (listening) {
+        const progress = element('concert-time');
+        if (progress instanceof HTMLProgressElement)
+            progress.value = elapsed;
+        frame = requestAnimationFrame(tick);
+        return;
+    }
     const phase = (Math.max(0, elapsed) % beatMs) / beatMs;
     const pad = element('pad');
     element('note-rail').style.setProperty('--phase', String(phase));
@@ -616,7 +691,8 @@ function tick(now) {
     });
     frame = requestAnimationFrame(tick);
 }
-async function play() {
+async function play(watch = false) {
+    listening = watch;
     stop();
     const token = epoch;
     const button = element('pad');
@@ -624,7 +700,7 @@ async function play() {
         button.disabled = true;
     {
         try {
-            await melody(page === 'secret' ? null : cityProgress().intro, page === 'lightshow' || page === 'secret', page === 'secret', isMinaConcert() && jacketPhase() === 'final' && page !== 'secret');
+            await melody(page === 'secret' ? null : cityProgress().intro, page === 'lightshow' || page === 'secret', page === 'secret', stylistConcert('mina') && jacketPhase() === 'final' && page !== 'secret');
         }
         catch {
             if (sound && token === epoch) {
@@ -649,6 +725,8 @@ function rolePick(id, lottery = false) {
         return;
     if (id === 'mina')
         resetJacket();
+    if (id === 'soyeon')
+        resetTrain();
     drawn = lottery;
     role = id;
     actor = pass().person;
@@ -829,6 +907,8 @@ app.addEventListener('click', e => {
         rolePick(act.slice(5));
         return;
     }
+    if (page === 'time' && role === 'soyeon' && (act === 'enter-role-city' || act.startsWith('days-')))
+        resetTrain();
     if (act === 'enter-role-city' || (drawn && (act === 'days-2' || act === 'days-1'))) {
         walkRole = role;
         remaining = act === 'days-1' ? 1 : 2;
@@ -893,7 +973,27 @@ app.addEventListener('click', e => {
         go('studio');
         return;
     }
-    if (act === 'fasten-jacket' && page === 'studio' && inMinaFitting()) {
+    if (page === 'studio' && act === 'soyeon-dress' && stylistFitting('soyeon')) {
+        if (dressVelvet()) {
+            draw();
+            app.querySelector('[data-act=soyeon-exit]')?.focus({ preventScroll: true });
+        }
+        return;
+    }
+    if (page === 'soyeon-change') {
+        if (act === 'soyeon-pin') {
+            if (pinTrain()) {
+                draw();
+                app.querySelector('[data-act=soyeon-stairs]')?.focus({ preventScroll: true });
+            }
+            return;
+        }
+        if (act === 'soyeon-stairs' && startStairs()) {
+            go('soyeon-stairs');
+            return;
+        }
+    }
+    if (act === 'fasten-jacket' && page === 'studio' && stylistFitting('mina')) {
         if (fastenJacket())
             draw();
         return;
@@ -912,12 +1012,20 @@ app.addEventListener('click', e => {
         if (act === 'jennie-return' && sendJennieBack()) {
             hits.clear();
             go(walkedToConcert && lightstick ? 'lightshow' : 'stage');
-            void play();
+            void play(listening);
             return;
         }
     }
-    if (act === 'studio-continue') {
-        if (inMinaFitting() && studioBack === 'item') {
+    if (act === 'studio-continue' || (act === 'soyeon-exit' && page === 'studio' && stylistFitting('soyeon') && trainPhase())) {
+        if (stylistFitting('soyeon') && studioBack === 'item') {
+            if (!trainPhase()) {
+                message('Önce Jisoo’ya bordo kadife elbiseyi giydir.', 'Сначала надень на Джису бордовое бархатное платье.');
+                return;
+            }
+            go('cue');
+            return;
+        }
+        if (stylistFitting('mina') && studioBack === 'item') {
             if (jacketPhase() !== 'opening') {
                 message('Önce final kıyafetini seç ve pembe ceketi giydir.', 'Сначала выбери образ для финала и надень розовый жакет.');
                 return;
@@ -932,7 +1040,7 @@ app.addEventListener('click', e => {
         const selected = act.slice(7);
         if (Object.prototype.hasOwnProperty.call(memberIds, selected)) {
             studioMember = selected;
-            draw();
+            go('studio');
         }
         return;
     }
@@ -951,7 +1059,7 @@ app.addEventListener('click', e => {
         return;
     }
     if (act.startsWith('studio-') && studioAction(act, studioMember)) {
-        if (inMinaFitting() && act.startsWith('studio-wear-') && jacketPhase() === 'opening')
+        if (stylistFitting('mina') && act.startsWith('studio-wear-') && jacketPhase() === 'opening')
             fastenJacket();
         draw();
         return;
@@ -969,6 +1077,12 @@ app.addEventListener('click', e => {
         return;
     }
     if (act.startsWith('item-')) {
+        if (role === 'soyeon' && act === 'item-rosecoat' && !trainPhase()) {
+            studioBack = 'item';
+            studioMember = 'Jisoo';
+            go('studio');
+            return;
+        }
         if (role === 'mina' && act === 'item-jacket' && jacketPhase() !== 'opening') {
             studioBack = 'item';
             studioMember = 'Jennie';
@@ -1016,6 +1130,10 @@ app.addEventListener('click', e => {
             changeSound(!sound);
         return;
     }
+    if (act === 'listen') {
+        void play(true);
+        return;
+    }
     if (act === 'play') {
         void play();
         return;
@@ -1028,7 +1146,7 @@ app.addEventListener('click', e => {
     if (act === 'pause') {
         stop();
         draw();
-        message('Prova durdu. Başlat ile ölçüyü baştan al.', 'Пауза. Нажми «Старт», чтобы начать такт заново.');
+        message('Şarkı durdu. Tekrar dinleyebilir veya ritme eşlik edebilirsin.', 'Пауза. Можно снова послушать песню или сыграть в ритм.');
         return;
     }
     if (act === 'relax') {

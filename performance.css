@@ -80,3 +80,8 @@
 .jacket-hanger .pink-jacket{position:absolute;top:0;height:130%;width:auto;max-width:none;clip-path:inset(16% 0 44%);pointer-events:none}
 .quick-change[data-hung=true] .change-model{animation:costume-turn .6s ease-out}
 @keyframes costume-turn{50%{transform:scaleX(.9) rotate(-2deg)}}@media(prefers-reduced-motion:reduce){.quick-change[data-hung=true] .change-model{animation:none}}
+
+.watch-concert .live-set{height:clamp(230px,46svh,460px)}
+.watch-concert progress{display:block;width:85%;height:5px;margin:16px auto;accent-color:#ffa2ce}
+
+.concert-videos{margin:12px 0;text-align:center}.concert-videos summary,.concert-videos a{padding:12px;min-height:44px;font-weight:650;cursor:pointer}.concert-videos a{display:inline-block;color:inherit}
