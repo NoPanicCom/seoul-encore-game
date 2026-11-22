@@ -1,19 +1,23 @@
+import { isAriEncoreCostume } from './ari-bag.js';
 import { beatAt, beatCount, beatMs, windowMs } from './rules.js';
 import { lightBeat, stickName } from './lightstick.js';
 import { renderPerformance } from './performance.js';
 import { melody, silence } from './sound.js';
+import { dressedFigure } from './travel-look.js';
 import { worldChallenge } from './world.js';
 const duration = beatCount * beatMs + windowMs + 60;
-export function encodeFanRecording(times) {
-    return 'v1:' + times.join(',');
+export function encodeFanRecording(times, costume) {
+    const cues = times.join(',');
+    return costume && isAriEncoreCostume(costume) ? `v2:${costume}:${cues}` : `v1:${cues}`;
 }
 export function readFanRecording(stick, value) {
     // Older cards stored just the stick. Their preview uses the musical downbeats.
     if (value === '1')
         return { stick, times: Array.from({ length: beatCount }, (_, i) => (i + 1) * beatMs), legacy: true };
-    if (!value || !/^v1:(?:\d{1,4}(?:,\d{1,4}){0,11})?$/.test(value))
+    const [, costume, cues] = /^(?:v1:|v2:([^:]+):)((?:\d{1,4}(?:,\d{1,4}){0,11})?)$/.exec(value ?? '') ?? [];
+    if (cues === undefined || (costume !== undefined && !isAriEncoreCostume(costume)))
         return null;
-    const times = value.length === 3 ? [] : value.slice(3).split(',').map(Number);
+    const times = cues ? cues.split(',').map(Number) : [];
     let previous = -1;
     for (const ms of times) {
         const beat = beatAt(ms);
@@ -21,14 +25,15 @@ export function readFanRecording(stick, value) {
             return null;
         previous = beat;
     }
-    return { stick, times, legacy: false };
+    return { stick, times, legacy: false, ...(costume === undefined ? {} : { costume }) };
 }
 export function renderFanReplay(lang, record) {
     const tr = lang === 'tr';
     const label = record.legacy ? (tr ? 'Sahne canlandırması' : 'Реконструкция сцены') : (tr ? 'Konser kaydı' : 'Запись концерта');
+    const costumes = record.costume ? { lisa: dressedFigure({ asset: record.costume, pieces: [] }) } : {};
     return `<section class="live-stage fan-replay" data-playing="false" aria-labelledby="replay-heading">
     <div class="film-head"><span>${label}</span><span aria-hidden="true">SEOUL</span></div>
-    ${renderPerformance('lisa', lang, false, worldChallenge('lisa', 'light'), record.stick, true, true)}
+    ${renderPerformance('lisa', lang, false, worldChallenge('lisa', 'light'), record.stick, true, true, costumes)}
     <div class="film-timeline"><progress max="${duration}" value="0" aria-label="${tr ? 'Kayıt süresi' : 'Время записи'}"></progress><output>0:00 / 0:08</output></div>
     <h2 id="replay-heading">${tr ? 'Lisa’nın gizli bisi' : 'Секретный бис Лисы'}</h2>
     <p>${stickName(record.stick, lang)}</p>

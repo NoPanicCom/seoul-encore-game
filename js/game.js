@@ -11,7 +11,8 @@ import { encodeFanRecording, readFanRecording, renderFanReplay, mountFanReplay }
 import { changeRoom, fastenJacket, hangJacket, jacketPhase, mountJacketDrag, releaseSnap, resetJacket, sendJennieBack, showFigure, startChange } from './mina-jacket.js';
 import { trainPhase, dressVelvet, pinTrain, startStairs, resetTrain, velvetFitting, velvetBackstage, mountVelvetBackstage, velvetStairs, mountVelvetStairs, velvetStageFigure } from './soyeon-train.js';
 import { resetYuna, yunaFitting, yunaRehearsal, yunaAction, yunaDressed, yunaCue, yunaFigure, mountYunaAim } from './yuna-light.js';
-import { concertCostume } from './travel-look.js';
+import { ariPhase, resetAri, ariAction, startAriBackstage, ariAsset, ariFitting, ariBackstage, mountAriZip, ariFigure } from './ari-bag.js';
+import { concertCostume, travelLook, dressedFigure } from './travel-look.js';
 import { renderPerformance } from './performance.js';
 import { renderLobby } from './lobby.js';
 import { renderPets, petAction, petAlbum, petTourNote, openPet, openPetLobby } from './pets.js';
@@ -106,6 +107,7 @@ function buyOrEquip(id) {
     save('lightstick', id);
 }
 const fanCards = () => ['heart', 'moon', 'star', ...shopSticks].filter(id => readFanRecording(id, read('secret-card.' + id)) !== null);
+let ariVenue = null;
 let tourEncore = false;
 let firstSongScore = 0;
 let playing = false;
@@ -149,11 +151,17 @@ function go(next) {
         next = 'mina-change';
     if ((next === 'stage' || next === 'lightshow') && stylistConcert('soyeon') && (trainPhase() === 'dressed' || trainPhase() === 'pinned'))
         next = 'soyeon-change';
-    if (!['lightshow', 'stage', 'mina-change', 'soyeon-change', 'soyeon-stairs'].includes(next))
+    if ((next === 'stage' || next === 'lightshow') && stylistConcert('ari') && ['backstage', 'open', 'dressed'].includes(ariPhase() ?? '')) {
+        ariVenue = walkedToConcert ? 'arena' : 'tour';
+        next = 'ari-change';
+    }
+    if (!['blackout', 'ari-change', 'secret'].includes(next))
+        ariVenue = null;
+    if (!ariVenue && !['lightshow', 'stage', 'mina-change', 'soyeon-change', 'soyeon-stairs'].includes(next))
         walkedToConcert = false;
-    if (!['stage', 'lightshow', 'secret', 'blackout', 'mina-change', 'walk-bow'].includes(next))
+    if (!['stage', 'lightshow', 'secret', 'blackout', 'ari-change', 'mina-change', 'walk-bow'].includes(next))
         listening = false;
-    if (next !== 'blackout' && next !== 'secret')
+    if (next !== 'blackout' && next !== 'ari-change' && next !== 'secret')
         tourEncore = false;
     const hash = sceneHash(next);
     if (location.hash !== hash)
@@ -167,6 +175,12 @@ function go(next) {
 }
 function isTravelWardrobe() { return studioBack === 'world' || studioBack === 'hongdae'; }
 function sceneHash(next) {
+    if (ariVenue && ['blackout', 'ari-change', 'secret'].includes(next))
+        return '#ari-bis/' + ariVenue + '/' + next;
+    if (next === 'studio' && stylistFitting('ari') && studioBack !== 'walk')
+        return '#ari-fitting/' + studioBack;
+    if ((next === 'stage' || next === 'lightshow') && stylistConcert('ari') && ariPhase() === 'packed')
+        return '#ari-opening/' + (walkedToConcert ? 'arena' : 'tour');
     if (next === 'yuna-rehearsal')
         return '#yuna-rehearsal/' + studioBack;
     if (next === 'studio' && stylistFitting('yuna') && studioBack !== 'walk')
@@ -207,7 +221,37 @@ function sceneHash(next) {
     return '';
 }
 function restoreScene() {
+    ariVenue = null;
     const [place, first, second] = location.hash.slice(1).split('/');
+    if (place === 'ari-fitting' && (first === 'item' || first === 'brief' || first === 'city')) {
+        role = 'ari';
+        actor = 'Lisa';
+        studioMember = actor;
+        studioBack = first;
+        cityMode = 'tour';
+        return 'studio';
+    }
+    if ((place === 'ari-opening' || place === 'ari-bis') && (first === 'arena' || first === 'tour')) {
+        role = 'ari';
+        actor = 'Lisa';
+        tripMember = 'lisa';
+        walkedToConcert = first === 'arena';
+        arenaEntrance = 'walk';
+        walkRole = walkedToConcert ? role : null;
+        cityMode = walkedToConcert ? 'free' : 'tour';
+        const phase = ariPhase();
+        if (place === 'ari-bis' && phase && phase !== 'preparing') {
+            ariVenue = first;
+            tourEncore = first === 'tour';
+            const [points, mode] = (read('ari-show-meta') ?? '').split('|');
+            firstSongScore = Math.min(beatCount, Math.max(0, Number(points) || 0));
+            listening = mode === 'listen';
+            if (phase === 'packed')
+                return 'blackout';
+            return phase === 'encore' ? 'secret' : 'ari-change';
+        }
+        return walkedToConcert && lightstick ? 'lightshow' : 'stage';
+    }
     if ((place === 'yuna-fitting' || place === 'yuna-rehearsal') && (first === 'walk' || first === 'item' || first === 'brief' || first === 'city')) {
         role = 'yuna';
         actor = 'Rosé';
@@ -389,6 +433,8 @@ function studioScreen() {
         ? `<div class="segmented">${Object.keys(memberIds).map(name => action('artist-' + name, name, name === studioMember ? 'chosen' : '')).join('')}</div>` : '';
     const travelExit = isTravelWardrobe() ? action('trip-street', t('Pixel ile Hongdae’ye çık', 'На прогулку с Пикселем'), 'trip-exit') : '';
     const costume = studioBack === 'walk' ? concertCostume(studioMember) : '';
+    if (stylistFitting('ari'))
+        return ariFitting(lang) + renderStudio(lang, studioMember);
     if (stylistFitting('yuna'))
         return yunaFitting(lang) + renderStudio(lang, studioMember);
     if (stylistFitting('soyeon'))
@@ -427,18 +473,25 @@ function stage() {
     const jacket = !secret && stylistConcert('mina') ? jacketPhase() : undefined;
     const velvet = !secret && stylistConcert('soyeon') && trainPhase() === 'stage';
     const roseDressed = !secret && stylistConcert('yuna') && yunaDressed();
+    const packed = !secret && stylistConcert('ari') && ariPhase() === 'packed';
+    const ariSolo = secret && ariVenue !== null && ariPhase() === 'encore';
+    let lisa = '';
+    if (ariSolo)
+        lisa = ariFigure(lang);
+    else if (packed && travelLook('Lisa')?.asset === ariAsset())
+        lisa = dressedFigure({ asset: 'travel/lisa-soundcheck', pieces: [] });
     const roseCue = roseDressed ? yunaCue() : null;
     const title = jacket === 'final' ? t('BLACKPINK · Final şarkısı', 'BLACKPINK · Финальная песня') : jacket === 'opening' ? t('BLACKPINK · Açılış şarkısı', 'BLACKPINK · Первая песня') : secret ? t('Lisa’nın gizli bisi', 'Секретный бис Лисы') : t('BLACKPINK konseri', 'Концерт BLACKPINK');
-    const description = roseCue ? t('Provada seçtiğin spot Rosé’yi buldu. Çizmeleri ilk adımında parlıyor!', 'Твой свет поймал Розэ. На первом же шаге её сапоги засияли!') : velvet ? t('Jisoo merdivenleri çıktı! Hazırladığın bordo kadife elbiseyle sahnede.', 'Джису поднялась по ступенькам! На ней бордовое бархатное платье, которое ты подготовила.') : jacket === 'final' ? t('Jennie, hazırladığın ikinci kıyafetle sahnede. Son nakarata eşlik et!', 'Дженни вернулась в твоём втором образе. Лови ритм последнего припева!') : jacket === 'opening' ? t('Jennie pembe ceketiyle sahnede. Şarkı bitince kuliste buluşun.', 'Дженни вышла в розовом жакете. После песни встречайтесь за кулисами.') : secret ? t('Lisa geri döndü! Yıldız halkaya ulaşınca dokun, bütün salon senin renginde yansın.', 'Лиса вернулась! Коснись лайтстика, когда звезда дойдёт до кольца, и весь зал засияет твоим цветом.') : fromShop ? t('Jisoo, Jennie, Rosé ve Lisa sahnede! Yıldız halkaya gelince ritme dokun.', 'На сцене Джису, Дженни, Розэ и Лиса! Когда звезда дойдёт до круга, нажми в такт.') : p.result[lang];
+    const description = ariSolo ? t('Lisa, kılıfta sakladığın kıyafetle sahnede! Son nakarata sen de eşlik et.', 'Лиса вышла в наряде, который ты спрятала в чехле! Лови ритм последнего припева.') : packed ? t('Kılıf kuliste seni bekliyor. BLACKPINK ile açılış şarkısına eşlik et.', 'Чехол ждёт тебя за кулисами. А пока поймай ритм первой песни BLACKPINK.') : roseCue ? t('Provada seçtiğin spot Rosé’yi buldu. Çizmeleri ilk adımında parlıyor!', 'Твой свет поймал Розэ. На первом же шаге её сапоги засияли!') : velvet ? t('Jisoo merdivenleri çıktı! Hazırladığın bordo kadife elbiseyle sahnede.', 'Джису поднялась по ступенькам! На ней бордовое бархатное платье, которое ты подготовила.') : jacket === 'final' ? t('Jennie, hazırladığın ikinci kıyafetle sahnede. Son nakarata eşlik et!', 'Дженни вернулась в твоём втором образе. Лови ритм последнего припева!') : jacket === 'opening' ? t('Jennie pembe ceketiyle sahnede. Şarkı bitince kuliste buluşun.', 'Дженни вышла в розовом жакете. После песни встречайтесь за кулисами.') : secret ? t('Lisa geri döndü! Yıldız halkaya ulaşınca dokun, bütün salon senin renginde yansın.', 'Лиса вернулась! Коснись лайтстика, когда звезда дойдёт до кольца, и весь зал засияет твоим цветом.') : fromShop ? t('Jisoo, Jennie, Rosé ve Lisa sahnede! Yıldız halkaya gelince ritme dokun.', 'На сцене Джису, Дженни, Розэ и Лиса! Когда звезда дойдёт до круга, нажми в такт.') : p.result[lang];
     const watching = playing && listening;
     const mix = secret ? 'Afterglow' : jacket === 'final' ? 'Pink Horizon' : 'Seoul Lights';
     const credit = t('Oyun için bestelenen müzik', 'Музыка для игры') + ' · ' + mix;
     const scene = renderPerformance(performer, lang, playing, worldChallenge(performer, 'light'), lightstick, secret, watching, {
-        jennie: jacket ? showFigure() : '', jisoo: velvet ? velvetStageFigure(lang) : '', rose: roseDressed ? yunaFigure(lang) : ''
+        lisa, jennie: jacket ? showFigure() : '', jisoo: velvet ? velvetStageFigure(lang) : '', rose: roseDressed ? yunaFigure(lang) : ''
     }, roseCue);
     if (watching)
         return `<div class="stage live-stage watch-concert" data-playing="true" data-mode="listen">${scene}<h2>${title}</h2><p>${credit}</p><progress id="concert-time" max="${beatCount * beatMs}" value="0" aria-label="${t('Şarkı', 'Песня')}"></progress>${action('pause', t('Duraklat', 'Пауза'), 'secondary')}</div>`;
-    return `<div class="stage live-stage" data-playing="${playing}">${scene}${!fromShop && !roseDressed && stageLook(p.person, 'rehearsal') ? photo(stageLook(p.person, 'rehearsal') ?? p.card, p.person, 'rhythm-look') : ''}<span class="kicker">${credit}</span><h2>${title}</h2><p>${description}</p><div class="dots" aria-hidden="true">${'<i class="dot"></i>'.repeat(beatCount)}</div>
+    return `<div class="stage live-stage" data-playing="${playing}">${scene}${!fromShop && !roseDressed && !packed && stageLook(p.person, 'rehearsal') ? photo(stageLook(p.person, 'rehearsal') ?? p.card, p.person, 'rhythm-look') : ''}<span class="kicker">${credit}</span><h2>${title}</h2><p>${description}</p><div class="dots" aria-hidden="true">${'<i class="dot"></i>'.repeat(beatCount)}</div>
   <button id="pad" class="disc" data-act="${playing ? 'tap' : 'play'}">${playing ? t('Ritme vur', 'В такт') : t('Ritim oyunu ▶', 'Играть в ритм ▶')}</button>
   <p id="count" class="mono">0 / ${beatCount}</p>${lightstick ? '<p class="light-feedback" id="light-feedback" role="status"></p>' : ''}</div>
   ${fromShop ? '' : '<p class="intro">' + t('İç halka büyüyüp kenara vardığında dokun. Kaçırırsan sıradaki vuruştan devam et.', 'Нажимай, когда кольцо дорастёт до края. Если пропустишь, лови следующий удар.') + '</p>'}
@@ -474,7 +527,7 @@ function storedScore() {
 }
 function ending() {
     const p = pass();
-    return `<p class="kicker">${t('Konser hatırası', 'На память о концерте')}</p><h2>${t('Bir kez daha!', 'На бис!')}</h2><div class="memcard">${photo(memoryLook(role), p.person)}<strong>${p.person}</strong><small class="mono">SEOUL ENCORE · ${p.job[lang]}</small></div><p>${read('signal.' + role) ? signalTitle(read('signal.' + role)) + ' · ' + p.result[lang] : p.finale[lang]}</p><div class="log">${p.name} · ${p.job[lang]}<br>${storedScore()}<br>${memories()}</div>
+    return `<p class="kicker">${t('Konser hatırası', 'На память о концерте')}</p><h2>${t('Bir kez daha!', 'На бис!')}</h2><div class="memcard">${photo(memoryLook(role), p.person)}<strong>${p.person}</strong><small class="mono">SEOUL ENCORE · ${p.job[lang]}</small></div><p>${read('signal.' + role) ? signalTitle(read('signal.' + role)) + ' · ' + (role === 'ari' ? p.finale : p.result)[lang] : p.finale[lang]}</p><div class="log">${p.name} · ${p.job[lang]}<br>${storedScore()}<br>${memories()}</div>
   ${action('pet-visit', t('Konserden sonra eve uğra', 'Навестить питомца после шоу'))}${action('afterparty', t('Ertesi gün · Turneye devam', 'На следующий день · Продолжить тур'), 'secondary')}${action('clipday', t('Klip çekim gününe katıl', 'Остаться на съёмки клипа'), 'secondary')}${action('album', albumTitle(), 'secondary')}${action('start', t('Başka bir kartla oyna', 'Играть с другим пропуском'), 'secondary')}`;
 }
 function albumPage() {
@@ -493,6 +546,8 @@ function albumPage() {
     return `<h2>${albumTitle()}</h2><div class="segmented">${tabs.map(([id, name]) => action('section-' + id, String(name), albumSection === id ? 'chosen' : '')).join('')}</div>${sections[albumSection]?.() ?? concertCards}`;
 }
 function back() {
+    if (ariVenue && page === 'ari-change')
+        return ariVenue === 'arena' ? 'walk' : 'brief';
     if (walkedToConcert || page === 'walk-bow')
         return arenaEntrance;
     if (page === 'yuna-rehearsal')
@@ -532,10 +587,13 @@ function draw() {
     unmountScene = undefined;
     app.dataset.page = page;
     document.documentElement.lang = lang;
-    const screens = { 'yuna-rehearsal': () => yunaRehearsal(lang), 'soyeon-change': () => velvetBackstage(lang), 'soyeon-stairs': () => velvetStairs(lang), 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${listening ? t('Sahne ışıkları söndü. Seul’den iyi geceler!', 'Свет на сцене погас. Спокойной ночи, Сеул!') : t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт') + ' · ' + hits.size + ' / ' + beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
+    const screens = { 'ari-change': () => ariBackstage(lang), 'yuna-rehearsal': () => yunaRehearsal(lang), 'soyeon-change': () => velvetBackstage(lang), 'soyeon-stairs': () => velvetStairs(lang), 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${listening ? t('Sahne ışıkları söndü. Seul’den iyi geceler!', 'Свет на сцене погас. Спокойной ночи, Сеул!') : t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт') + ' · ' + hits.size + ' / ' + beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
     app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button type="button" class="audio-switch" data-act="sound" aria-pressed="${sound}">${sound ? '♫ ' : '○ '}${soundLabel()}</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'walk', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result', 'fan-replay'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(page === 'lightshow' || page === 'secret') ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
     element('feedback').textContent = feedback;
-    if (page === 'yuna-rehearsal') {
+    if (page === 'ari-change') {
+        unmountScene = mountAriZip(app, draw);
+    }
+    else if (page === 'yuna-rehearsal') {
         unmountScene = mountYunaAim(app, draw);
     }
     else if (page === 'soyeon-change') {
@@ -569,7 +627,15 @@ function draw() {
     }
     else if (page === 'blackout') {
         if (!document.hidden) {
-            const timer = window.setTimeout(() => { go('secret'); void play(listening); }, 2800);
+            const timer = window.setTimeout(() => {
+                if (ariVenue) {
+                    startAriBackstage();
+                    go('ari-change');
+                    return;
+                }
+                go('secret');
+                void play(listening);
+            }, 2800);
             unmountScene = () => window.clearTimeout(timer);
         }
     }
@@ -643,6 +709,37 @@ function finish(free) {
         if (jacketPhase() === 'final')
             resetJacket();
     }
+    if ((page === 'stage' || page === 'lightshow') && stylistConcert('ari') && ariPhase() === 'packed') {
+        ariVenue = walkedToConcert ? 'arena' : 'tour';
+        tourEncore = ariVenue === 'tour';
+        firstSongScore = hits.size;
+        listening = listening || free;
+        save('ari-show-meta', [firstSongScore, listening ? 'listen' : 'rhythm'].join('|'));
+        hits.clear();
+        go('blackout');
+        return;
+    }
+    if (page === 'secret' && ariVenue) {
+        const touring = ariVenue === 'tour';
+        const recording = lightstick && !listening;
+        forecast = 'solo';
+        lastFree = listening || free;
+        if (lightstick && recording) {
+            save('secret-card.' + lightstick, encodeFanRecording(secretTimes, ariAsset()));
+            save('lastAlbum', 'concert');
+        }
+        if (touring) {
+            startEncore({ role, member: actor, looks: { Lisa: ariAsset() ?? 'travel/lisa-encore' }, score: lastFree ? null : firstSongScore, cityNote: { tr: noteFor('tr'), ru: noteFor('ru') }, signal: 'solo' });
+            encoreAction('encore-cue');
+            encoreAction('encore-pink');
+            viewing = false;
+            collectCard(!recording, firstSongScore);
+            if (!recording)
+                return;
+        }
+        go(recording ? 'light-result' : 'walk-bow');
+        return;
+    }
     if (page === 'stage' && walkedToConcert && !lightstick) {
         go('walk-bow');
         return;
@@ -696,7 +793,14 @@ function collectCard(openEnding = true, score = hits.size) {
     album = cardIds([...(cardIds(read('album'))), ...album, role].join(','));
     save('album', album.join(','));
     save('signal.' + role, forecast);
-    save('look.' + role, role === 'yuna' && yunaDressed() ? 'travel/rose-set-original' : role === 'soyeon' && trainPhase() === 'stage' ? 'soyeon/jisoo-velvet' : (stageLook(actor) ?? 'studio/' + memberIds[actor] + '-spotlight'));
+    let cardLook = stageLook(actor) ?? 'studio/' + memberIds[actor] + '-spotlight';
+    if (role === 'ari' && ariPhase() === 'encore')
+        cardLook = ariAsset() ?? cardLook;
+    if (role === 'yuna' && yunaDressed())
+        cardLook = 'travel/rose-set-original';
+    if (role === 'soyeon' && trainPhase() === 'stage')
+        cardLook = 'soyeon/jisoo-velvet';
+    save('look.' + role, cardLook);
     save('score.' + role, lastFree ? 'free' : String(score));
     save('note.' + role + '.tr', noteFor('tr'));
     save('note.' + role + '.ru', noteFor('ru'));
@@ -956,6 +1060,10 @@ app.addEventListener('click', e => {
         rolePick(act.slice(5));
         return;
     }
+    if (page === 'time' && role === 'ari' && (act === 'enter-role-city' || act.startsWith('days-'))) {
+        resetAri();
+        save('ari-show-meta', '');
+    }
     if (page === 'time' && role === 'yuna' && (act === 'enter-role-city' || act.startsWith('days-')))
         resetYuna();
     if (page === 'time' && role === 'soyeon' && (act === 'enter-role-city' || act.startsWith('days-')))
@@ -1024,6 +1132,33 @@ app.addEventListener('click', e => {
         go('studio');
         return;
     }
+    if (page === 'studio' && stylistFitting('ari') && act.startsWith('ari-')) {
+        if (act === 'ari-exit' && ariPhase() && ariPhase() !== 'preparing') {
+            if (studioBack === 'item')
+                completeRoleTask();
+            else
+                go(studioBack);
+            return;
+        }
+        if (ariAction(act)) {
+            draw();
+            app.querySelector('[data-act="' + (act === 'ari-pack' ? 'ari-exit' : act) + '"]')?.focus({ preventScroll: true });
+        }
+        return;
+    }
+    if (page === 'ari-change' && ariVenue && act.startsWith('ari-')) {
+        if (!ariAction(act))
+            return;
+        if (act === 'ari-cue') {
+            go('secret');
+            void play(listening);
+        }
+        else {
+            draw();
+            app.querySelector(act === 'ari-open' ? '[data-act=ari-dress]' : '[data-act=ari-cue]')?.focus({ preventScroll: true });
+        }
+        return;
+    }
     if (stylistFitting('yuna') && (page === 'studio' || page === 'yuna-rehearsal') && act.startsWith('yuna-')) {
         if (page === 'studio' && act === 'yuna-rehearse' && yunaDressed()) {
             go('yuna-rehearsal');
@@ -1087,6 +1222,13 @@ app.addEventListener('click', e => {
         }
     }
     if (act === 'studio-continue' || (act === 'soyeon-exit' && page === 'studio' && stylistFitting('soyeon') && trainPhase())) {
+        if (stylistFitting('ari') && studioBack === 'item') {
+            if (ariPhase() === 'packed')
+                completeRoleTask();
+            else
+                message('Önce bis kıyafetini seç ve kılıfa yerleştir.', 'Сначала выбери наряд для биса и убери его в чехол.');
+            return;
+        }
         if (stylistFitting('yuna') && studioBack === 'item') {
             if (yunaCue())
                 completeRoleTask();
@@ -1156,6 +1298,16 @@ app.addEventListener('click', e => {
         return;
     }
     if (act.startsWith('item-')) {
+        if (role === 'ari' && act === 'item-gloves') {
+            if (ariPhase() === 'packed')
+                completeRoleTask();
+            else {
+                studioBack = 'item';
+                studioMember = 'Lisa';
+                go('studio');
+            }
+            return;
+        }
         if (role === 'yuna' && act === 'item-boots') {
             if (yunaCue())
                 completeRoleTask();

@@ -7,7 +7,7 @@ export function renderPerformance(member, lang, playing, lights, stick = null, s
     const cast = secret ? [member] : ['jisoo', 'jennie', 'rose', 'lisa'];
     const names = { jisoo: 'Jisoo', jennie: 'Jennie', rose: 'Rosé', lisa: 'Lisa' };
     const dancers = cast.map((id, index) => {
-        const shirt = secret ? '' : (costumes[id] || concertCostume(id));
+        const shirt = costumes[id] || (secret ? '' : concertCostume(id));
         const figure = shirt || `<div style="background-image:url('art/world/${secret ? id : 'concert-quartet'}.webp')"></div>`;
         return `<div class="live-dancer" data-artist="${id}" style="--spot:${13 + index * 24}%;--column:${index * 100 / 3}%">${figure}${secret ? '' : `<b>${names[id]}</b>`}</div>`;
     }).join('');
