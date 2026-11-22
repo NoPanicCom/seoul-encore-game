@@ -1,0 +1,9 @@
+{
+  "name": "Seoul Encore",
+  "short_name": "Seoul Encore",
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#181419",
+  "background_color": "#181419",
+  "icons": [{"src":"tour-icon.png","sizes":"180x180","type":"image/png"}]
+}
