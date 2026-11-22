@@ -321,7 +321,7 @@ function drawHeart(ctx, position, progress) {
     ctx.restore();
 }
 export function createWorldEngine(options) {
-    const { canvas, scene, joystick } = options;
+    const { canvas, scene, joystick, companion } = options;
     const doc = canvas.ownerDocument;
     const canvasContext = canvas.getContext('2d', { alpha: false });
     if (!canvasContext || !doc.defaultView) {
@@ -332,6 +332,10 @@ export function createWorldEngine(options) {
     const navigation = createWorldNavigation(scene);
     if (!navigation.canStand(scene.spawn))
         throw new RangeError('The world spawn must be on walkable ground');
+    if (companion && (!navigation.canStand(companion.spawn)
+        || !Number.isFinite(companion.followDistance) || companion.followDistance < 0)) {
+        throw new RangeError('A companion needs a walkable spawn and a nonnegative follow distance');
+    }
     const hotspots = [...scene.hotspots].sort((a, b) => a.position.y - b.position.y);
     const hotspotById = new Map(hotspots.map(hotspot => [hotspot.id, hotspot]));
     if (hotspotById.size !== hotspots.length || hotspots.some(hotspot => !navigation.canStand(hotspot.approach))) {
@@ -364,6 +368,12 @@ export function createWorldEngine(options) {
     let moving = false;
     let stride = 0;
     let stepDistance = 0;
+    let companionPosition = companion?.spawn ?? scene.spawn;
+    let companionFacing = 'south';
+    let companionStride = 0;
+    let companionMoving = false;
+    let companionRoute = [];
+    let companionTarget = scene.spawn;
     let route = [];
     let activeHotspot = null;
     let highlighted = null;
@@ -384,6 +394,7 @@ export function createWorldEngine(options) {
     }
     const background = loadImage(scene.background);
     let playerImage = loadImage(player.image);
+    const companionImage = companion ? loadImage(companion.image) : null;
     for (const hotspot of hotspots) {
         if (hotspot.image)
             hotspotImages.set(hotspot.id, loadImage(hotspot.image));
@@ -428,6 +439,7 @@ export function createWorldEngine(options) {
         tap = null;
         clearJoystick();
         moving = false;
+        companionMoving = false;
     }
     function available() {
         return !destroyed && !paused && !doc.hidden;
@@ -500,6 +512,36 @@ export function createWorldEngine(options) {
             }
         }
     }
+    function updateCompanion(dt) {
+        if (!companion)
+            return;
+        const gap = distance(companionPosition, position);
+        let waypoint;
+        let remaining;
+        if (navigation.canTravel(companionPosition, position)) {
+            companionRoute = [];
+            waypoint = position;
+            remaining = Math.max(0, gap - companion.followDistance);
+        }
+        else {
+            if (!companionRoute.length || distance(companionTarget, position) >= 28) {
+                companionTarget = position;
+                companionRoute = navigation.routeTo(companionPosition, companionTarget);
+            }
+            waypoint = companionRoute[0];
+            remaining = waypoint ? distance(companionPosition, waypoint) : 0;
+        }
+        const travel = Math.min(remaining, (companion.speed ?? defaultSpeed) * dt);
+        companionMoving = travel > epsilon;
+        if (!waypoint || !companionMoving)
+            return;
+        const length = distance(companionPosition, waypoint);
+        companionFacing = directionOf(difference(waypoint, companionPosition));
+        companionPosition = interpolate(companionPosition, waypoint, travel / length);
+        companionStride += travel;
+        if (travel >= length - epsilon)
+            companionRoute.shift();
+    }
     function update(dt) {
         const before = position;
         const direction = manualDirection();
@@ -521,6 +563,7 @@ export function createWorldEngine(options) {
         else {
             stepDistance = 0;
         }
+        updateCompanion(dt);
         updateProximity();
         if (activeHotspot && route.length === 0) {
             const id = activeHotspot;
@@ -537,35 +580,42 @@ export function createWorldEngine(options) {
             y: camera.y + (target.y - camera.y) * weight,
         };
     }
-    function drawPlayer(context) {
-        const { sheet } = player;
-        const depth = 0.86 + position.y / scene.height * 0.22;
-        const width = player.width * depth;
-        const height = player.height * depth;
-        const animate = moving && !reducedMotion.matches;
-        drawShadow(context, position, width);
-        if (!playerImage.complete || playerImage.naturalWidth === 0)
+    function drawPerformer(context, performer, image, point, direction, walking, steps) {
+        const { sheet, draw } = performer;
+        const depth = 0.86 + point.y / scene.height * 0.22;
+        const width = performer.width * depth;
+        const height = performer.height * depth;
+        const animate = walking && !reducedMotion.matches;
+        drawShadow(context, point, width);
+        if (!draw && (!image.complete || image.naturalWidth === 0))
             return;
         context.save();
-        context.translate(position.x, position.y);
-        if (sheet) {
-            const mirrorFrom = facing === 'east' ? 'west' : facing === 'west' ? 'east' : null;
-            const ownRow = sheet.rows[facing];
+        context.translate(point.x, point.y);
+        if (draw) {
+            if (animate) {
+                context.rotate(Math.sin(steps / 17) * 0.028);
+                context.translate(0, -Math.abs(Math.sin(steps / 17)) * 4);
+            }
+            draw(context, { width, height }, direction);
+        }
+        else if (sheet) {
+            const mirrorFrom = direction === 'east' ? 'west' : direction === 'west' ? 'east' : null;
+            const ownRow = sheet.rows[direction];
             const mirroredRow = mirrorFrom ? sheet.rows[mirrorFrom] : undefined;
             const row = ownRow ?? mirroredRow ?? sheet.rows.south ?? 0;
             if (ownRow === undefined && mirroredRow !== undefined)
                 context.scale(-1, 1);
-            const step = animate ? sheet.walkColumns[Math.floor(stride / 28) % sheet.walkColumns.length] : undefined;
+            const step = animate ? sheet.walkColumns[Math.floor(steps / 28) % sheet.walkColumns.length] : undefined;
             const column = step ?? sheet.idleColumn;
-            drawSheetFrame(context, playerImage, sheet, { width, height }, row, column);
+            drawSheetFrame(context, image, sheet, { width, height }, row, column);
         }
         else {
-            if (facing === 'west')
+            if (direction === 'west')
                 context.scale(-1, 1);
             if (animate)
-                context.rotate(Math.sin(stride / 17) * 0.035);
-            const lift = animate ? Math.abs(Math.sin(stride / 17)) * 4 : 0;
-            context.drawImage(playerImage, -width / 2, -height - lift, width, height);
+                context.rotate(Math.sin(steps / 17) * 0.035);
+            const lift = animate ? Math.abs(Math.sin(steps / 17)) * 4 : 0;
+            context.drawImage(image, -width / 2, -height - lift, width, height);
         }
         context.restore();
     }
@@ -617,19 +667,33 @@ export function createWorldEngine(options) {
             context.fill();
             context.stroke();
         }
-        let playerDrawn = false;
+        const actors = [{
+                performer: player, image: playerImage, point: position, direction: facing, walking: moving, steps: stride,
+            }];
+        if (companion && companionImage) {
+            actors.push({
+                performer: companion, image: companionImage, point: companionPosition, direction: companionFacing,
+                walking: companionMoving, steps: companionStride,
+            });
+            actors.sort((a, b) => a.point.y - b.point.y);
+        }
+        function drawActor(actor) {
+            drawPerformer(context, actor.performer, actor.image, actor.point, actor.direction, actor.walking, actor.steps);
+        }
+        let actor = actors.shift();
         for (const hotspot of hotspots) {
-            if (!playerDrawn && hotspot.position.y >= position.y) {
-                drawPlayer(context);
-                playerDrawn = true;
+            while (actor && hotspot.position.y >= actor.point.y) {
+                drawActor(actor);
+                actor = actors.shift();
             }
             drawHotspot(context, hotspot, now);
         }
-        if (!playerDrawn)
-            drawPlayer(context);
+        if (actor)
+            drawActor(actor);
+        actors.forEach(drawActor);
         const hint = highlighted ? hotspotById.get(highlighted) : undefined;
         if (hint && enabled(hint.id)) {
-            drawSparkle(context, { x: hint.position.x, y: hint.hitbox.y + 8 }, Math.max(13, 10 / camera.scale), reducedMotion.matches ? 0 : Math.sin(now / 200));
+            drawSparkle(context, { x: hint.marker?.x ?? hint.position.x, y: (hint.marker?.y ?? hint.hitbox.y) + 8 }, Math.max(13, 10 / camera.scale), reducedMotion.matches ? 0 : Math.sin(now / 200));
         }
     }
     function tick(now) {
@@ -841,9 +905,10 @@ export function createWorldEngine(options) {
         },
         getHotspotScreenPosition(id) {
             const hotspot = hotspotById.get(id);
-            return hotspot ? worldToCamera({ x: hotspot.position.x, y: hotspot.hitbox.y }, camera) : null;
+            return hotspot ? worldToCamera(hotspot.marker ?? { x: hotspot.position.x, y: hotspot.hitbox.y }, camera) : null;
         },
         getPosition: () => ({ ...position }),
+        getCompanionPosition: () => companion ? { ...companionPosition } : null,
         getCamera: () => ({ ...camera }),
     };
 }

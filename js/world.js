@@ -1,3 +1,4 @@
+import { drawTravelLook, loadTravelLook, travelLook } from './travel-look.js';
 import { worldAudio } from './world-audio.js';
 import { createWorldEngine } from './world-engine.js';
 const say = (phrase, lang) => phrase[lang === 'tr' ? 0 : 1];
@@ -32,8 +33,7 @@ const copy = {
     room: ['YG · Hazırlık odası', 'YG · Гримёрка'],
     canvas: ['Kulis odası. Yürümek için zemine dokun veya okları kullan.', 'Гримёрка. Коснись пола или используй стрелки, чтобы идти.'],
     steer: ['Hareket', 'Движение'],
-    guide: ['Yere dokun veya yön kolunu sürükle. Bir nesneye dokununca karakter yanına gider.', 'Коснись пола или потяни за джойстик. Коснись предмета, и героиня подойдёт к нему.'],
-    firstWalk: ['Zemine dokun veya joystick’i sürükle.', 'Коснись пола или потяни джойстик.'],
+    firstWalk: ['Bir eşyaya ya da zemine dokun.', 'Коснись предмета или пола.'],
     walk: ['Dolaş', 'Гуляй'],
     upNext: ['Sıradaki görev', 'Следующее задание'],
     map: ['Odadaki yerler', 'Места в гримёрке'],
@@ -42,8 +42,11 @@ const copy = {
     return: ['Hazırlık masası', 'Гримёрный столик'],
     console: ['Prova paneli', 'Пульт репетиции'],
     curtain: ['Sahne perdesi', 'Занавес сцены'],
+    'exit-city': ['Seul’e çık', 'Выйти в Сеул'],
+    citySign: ['Seul', 'Сеул'],
     pet: ['Pixel’i sev', 'Погладить Пикселя'],
     search: ['Rafı ara', 'Осмотреть полку'],
+    wardrobeStyle: ['Kıyafet değiştir', 'Сменить наряд'],
     bring: ['Kulaklığı bırak', 'Положить наушник'],
     check: ['Provayı aç', 'Открыть репетицию'],
     exit: ['Sahneye çık', 'Выйти на сцену'],
@@ -109,7 +112,8 @@ const symbols = {
         { icon: '▇', label: ['Tiz', 'Высокий'], color: 'gold' },
     ],
 };
-const hotspots = ['pixel', 'wardrobe', 'return', 'console', 'curtain'];
+const hotspots = ['pixel', 'wardrobe', 'return', 'console', 'curtain', 'exit-city'];
+const cityDoor = { x: 1383, y: 185 };
 const scene = {
     width: 1440,
     height: 960,
@@ -122,11 +126,12 @@ const scene = {
     obstacles: [],
     spawn: { x: 1150, y: 675 },
     hotspots: [
-        { id: 'pixel', position: { x: 1324, y: 438 }, hitbox: { x: 1262, y: 365, width: 119, height: 102 }, approach: { x: 1280, y: 505 }, radius: 86, image: art + 'pixel.webp', size: { width: 76, height: 76 }, sheet: { frameWidth: 96, frameHeight: 96, rows: { south: 0 }, idleColumn: 0, walkColumns: [1, 3, 2, 1], anchor: { x: 48, y: 88 } } },
-        { id: 'wardrobe', position: { x: 260, y: 355 }, hitbox: { x: 170, y: 285, width: 186, height: 154 }, approach: { x: 260, y: 507 }, radius: 87 },
-        { id: 'return', position: { x: 565, y: 250 }, hitbox: { x: 488, y: 218, width: 154, height: 195 }, approach: { x: 565, y: 471 }, radius: 82 },
-        { id: 'console', position: { x: 850, y: 280 }, hitbox: { x: 774, y: 241, width: 152, height: 170 }, approach: { x: 850, y: 476 }, radius: 82 },
-        { id: 'curtain', position: { x: 1160, y: 320 }, hitbox: { x: 1092, y: 250, width: 136, height: 189 }, approach: { x: 1160, y: 481 }, radius: 82 },
+        { id: 'pixel', position: { x: 1324, y: 438 }, marker: { x: 1250, y: 308 }, hitbox: { x: 1253, y: 359, width: 146, height: 111 }, approach: { x: 1280, y: 505 }, radius: 82, image: art + 'pixel.webp', size: { width: 76, height: 76 }, sheet: { frameWidth: 96, frameHeight: 96, rows: { south: 0 }, idleColumn: 0, walkColumns: [1, 3, 2, 1], anchor: { x: 48, y: 88 } } },
+        { id: 'wardrobe', position: { x: 260, y: 355 }, marker: { x: 260, y: 285 }, hitbox: { x: 82, y: 45, width: 351, height: 404 }, approach: { x: 260, y: 507 }, radius: 87 },
+        { id: 'return', position: { x: 565, y: 250 }, marker: { x: 565, y: 218 }, hitbox: { x: 433, y: 67, width: 263, height: 335 }, approach: { x: 565, y: 471 }, radius: 82 },
+        { id: 'console', position: { x: 850, y: 280 }, marker: { x: 850, y: 241 }, hitbox: { x: 697, y: 28, width: 307, height: 382 }, approach: { x: 850, y: 476 }, radius: 82 },
+        { id: 'curtain', position: { x: 1160, y: 320 }, marker: { x: 1160, y: 250 }, hitbox: { x: 1005, y: 8, width: 331, height: 396 }, approach: { x: 1160, y: 481 }, radius: 82 },
+        { id: 'exit-city', position: cityDoor, marker: cityDoor, hitbox: { x: 1337, y: 78, width: 103, height: 247 }, approach: { x: 1380, y: 562 }, radius: 45 },
     ],
 };
 function appearance(member) {
@@ -214,6 +219,12 @@ export function chooseWorldMember(state, member) {
     const { gear, light, sound } = state;
     return { ...state, ...(state.trails[member] ?? emptyTrail()), member, trails: { ...state.trails, [state.member]: { gear, light, sound } } };
 }
+export function selectBackstageMember(member) {
+    const current = progress();
+    const next = chooseWorldMember(current, member);
+    if (current !== next)
+        save(next);
+}
 function nextPlace(state) {
     if (state.gear === 'waiting')
         return 'pixel';
@@ -248,14 +259,20 @@ export function renderWorld(lang) {
       <div class="world-light" id="world-light" aria-hidden="true"></div>
       <div class="world-curtain" aria-hidden="true"></div>
       <div class="world-spots">
-        ${hotspots.map(id => `<button type="button" class="world-spot" data-world-go="${id}" hidden><span class="world-spot-pin" aria-hidden="true"></span><span class="world-spot-label">${say(copy[id], lang)}</span></button>`).join('')}
+        ${hotspots.map(id => id === 'exit-city'
+        ? `<button type="button" class="world-spot world-city-door" data-world-go="${id}" aria-label="${say(copy[id], lang)}" hidden><span aria-hidden="true">${say(copy.citySign, lang)}</span></button>`
+        : `<button type="button" class="world-spot" data-world-go="${id}" hidden><span class="world-spot-pin" aria-hidden="true"></span><span class="world-spot-label">${say(copy[id], lang)}</span></button>`).join('')}
       </div>
+      <p class="world-feedback world-room-feedback" id="world-feedback" role="status"></p>
       <div class="world-room-inventory" id="world-inventory" hidden><span aria-hidden="true">◉</span> ${say(copy.inBag, lang)}</div>
       <div class="world-held" id="world-held" hidden aria-hidden="true"></div>
       <div class="world-controls">
         <div class="world-stick" id="world-stick" aria-label="${say(copy.steer, lang)}"><span aria-hidden="true">↔</span><i id="world-thumb" aria-hidden="true"></i></div>
         ${action('interact', say(copy.walk, lang), 'world-interact').replace('type="button"', 'type="button" id="world-interact" hidden')}
       </div>
+    </div>
+    <div class="world-actions" id="world-map" role="group" aria-label="${say(copy.map, lang)}">
+      ${hotspots.map(id => action('walk-' + id, say(copy[id], lang), id === 'exit-city' ? 'world-city-action' : '')).join('')}
     </div>
     <div class="world-journal">
       <div class="world-objective">
@@ -264,12 +281,7 @@ export function renderWorld(lang) {
         <small class="world-first-walk" id="world-first-walk"${state.gear === 'waiting' ? '' : ' hidden'}>${say(copy.firstWalk, lang)}</small>
       </div>
       <ol class="world-checklist" id="world-checklist">${checklist(state, lang)}</ol>
-      <p class="world-feedback" id="world-feedback" role="status"></p>
-      <details class="world-map" id="world-map">
-        <summary>${say(copy.map, lang)}</summary>
-        <p>${say(copy.guide, lang)}</p>
-        <div class="world-map-grid">${hotspots.map(id => action('walk-' + id, say(copy[id], lang))).join('')}${action('toggle-sound', say(soundOn, lang))}</div>
-      </details>
+      ${action('toggle-sound', say(soundOn, lang), 'world-sound')}
       <p id="world-save-issue" class="world-feedback" role="status" hidden>${say(copy.saveIssue, lang)}</p>
       <p id="world-asset-issue" class="world-feedback" role="status" hidden>${say(copy.assetIssue, lang)}</p>
     </div>
@@ -298,10 +310,13 @@ function panelMarkup(panel, state, lang) {
         return dialogHeading(copy.pick, lang) + '<div class="world-cast-grid">' + members.map(id => action('member-' + id, castFace(id) + '<strong>' + say(costumes[id].name, lang) + '</strong>' + (id === state.member ? '<span aria-hidden="true">✓</span>' : ''), 'world-cast-option')
             .replace('type="button"', `type="button" aria-pressed="${id === state.member}"`)).join('') + '</div>' + (state.cards.includes(state.member) ? action('replay', say(copy.replay, lang), 'world-panel-text-button') : '');
     }
+    if (panel === 'wardrobe') {
+        return dialogHeading(copy.wardrobe, lang) + `<p>${say(copy.wardrobeEmpty, lang)}</p>${action('open-wardrobe', say(copy.wardrobeStyle, lang))}`;
+    }
     if (panel === 'shelves') {
         return dialogHeading(copy.shelves, lang) + `<p>${say(copy.shelfPrompt, lang)}</p><div class="world-shelf-grid">
       ${shelves.map((label, index) => action('shelf-' + index, '<span aria-hidden="true">' + ['▣', '♕', '●'][index] + '</span>' + say(label, lang), 'world-shelf')).join('')}
-    </div>${action('shelf-tip', say(copy.shelfTip, lang), 'world-panel-text-button')}<p class="world-panel-status" role="status"></p>`;
+    </div><div class="world-preview">${action('shelf-tip', say(copy.shelfTip, lang), 'world-panel-text-button')}${action('open-wardrobe', say(copy.wardrobeStyle, lang), 'world-panel-text-button')}</div><p class="world-panel-status" role="status"></p>`;
     }
     if (panel === 'console') {
         return dialogHeading(copy.consoleTitle, lang) + `<p>${say(copy.consoleIntro, lang)}</p><div class="world-console-grid">
@@ -348,7 +363,6 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
     const storageWarning = required('#world-save-issue');
     const assetWarning = required('#world-asset-issue');
     const lightOverlay = required('#world-light');
-    const places = required('#world-map');
     const soundButton = required('[data-world-action="toggle-sound"]');
     const markers = Array.from(room.querySelectorAll('[data-world-go]'));
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -359,12 +373,12 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
     let panel = null;
     let guesses = 0;
     let previewGeneration = 0;
+    let appearanceGeneration = 0;
     let exiting = false;
     let markerWidth = 0;
     const markerMargins = new Map();
     let lightTimer = 0;
     let openedFrom = null;
-    const descriptions = { pixel: copy.pet, wardrobe: copy.search, return: copy.bring, console: copy.check, curtain: copy.exit };
     const enterAudio = () => { void worldAudio.enter(); };
     worldAudio.setEnabled(sound);
     function after(callback, delay) {
@@ -388,9 +402,15 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
         room.dataset.worldSound = String(sound);
         soundButton.textContent = say(sound ? soundOn : soundOff, lang);
         soundButton.setAttribute('aria-pressed', String(sound));
-        engine.setHighlightedHotspot(state.gear === 'searching' || state.cards.includes(state.member) ? null : nextPlace(state));
-        for (const marker of markers)
-            marker.classList.toggle('world-destination', marker.dataset.worldGo === nextPlace(state));
+        const destination = state.cards.includes(state.member) ? null : nextPlace(state);
+        engine.setHighlightedHotspot(destination);
+        for (const marker of markers) {
+            marker.classList.toggle('world-destination', destination !== 'pixel' && marker.dataset.worldGo === destination);
+        }
+        room.querySelectorAll('#world-map button').forEach(button => {
+            button.classList.toggle('world-next-action', button.dataset.worldAction === `walk-${destination}`);
+        });
+        refreshInteract();
         markerMargins.clear();
     }
     function commit(next) {
@@ -443,9 +463,22 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
         worldAudio.cue('curtain');
         after(() => requestAction('world-enter-concert', state.member), sound ? 760 : media.matches ? 0 : 420);
     }
+    function refreshInteract() {
+        interact.hidden = !nearby;
+        if (!nearby)
+            return;
+        const descriptions = {
+            pixel: copy.pet, wardrobe: state.gear === 'searching' ? copy.search : copy.wardrobe,
+            return: state.gear === 'carrying' ? copy.bring : copy.return,
+            console: state.gear === 'returned' ? copy.check : copy.console,
+            curtain: copy.exit, 'exit-city': copy['exit-city'],
+        };
+        interact.textContent = say(descriptions[nearby], lang);
+    }
     function onInteract(id) {
         if (exiting || panel || !isHotspot(id))
             return;
+        feedback.textContent = '';
         if (id === 'pixel') {
             const first = state.gear === 'waiting';
             commit(advanceWorld(state, 'meet'));
@@ -454,10 +487,7 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
             show(first ? copy.pixelClue : copy.pixelAgain);
         }
         else if (id === 'wardrobe') {
-            if (state.gear === 'searching')
-                showPanel('shelves');
-            else
-                show(copy.wardrobeEmpty);
+            showPanel(state.gear === 'searching' ? 'shelves' : 'wardrobe');
         }
         else if (id === 'return') {
             if (state.gear === 'carrying') {
@@ -474,6 +504,11 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
             else
                 show(copy.consoleLocked);
         }
+        else if (id === 'exit-city') {
+            exiting = true;
+            engine.setPaused(true);
+            requestAction('world-exit-city', state.member);
+        }
         else
             door();
     }
@@ -486,12 +521,27 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
         onProximityChange: id => {
             nearby = id && isHotspot(id) ? id : null;
             board.dataset.worldNear = nearby ?? '';
-            interact.hidden = !nearby;
-            if (nearby)
-                interact.textContent = say(descriptions[nearby], lang);
+            refreshInteract();
         },
     });
-    interact.hidden = true;
+    function showAppearance(member) {
+        const image = appearance(member);
+        const generation = ++appearanceGeneration;
+        engine.setAppearance(image);
+        const selected = travelLook(member);
+        if (!selected || selected.asset === `world/hero-${member}`)
+            return;
+        void loadTravelLook(selected).then(look => {
+            if (listeners.signal.aborted || generation !== appearanceGeneration)
+                return;
+            engine.setAppearance({ ...image, draw: (context, { height }, facing) => {
+                    drawTravelLook(context, look, 0, 0, height, facing === 'west' ? -1 : 1);
+                } });
+        }).catch(() => {
+            if (!listeners.signal.aborted && generation === appearanceGeneration)
+                assetWarning.hidden = false;
+        });
+    }
     function updateMarkers() {
         const { x, y } = engine.getPosition();
         const width = canvas.clientWidth;
@@ -526,7 +576,7 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
             const margin = markerMargins.get(marker) ?? marker.offsetWidth / 2 + 4;
             markerMargins.set(marker, margin);
             const left = Math.round(Math.max(margin, Math.min(width - margin, position.x))) + 'px';
-            const minimumTop = marker.classList.contains('world-destination') ? 52 : 22;
+            const minimumTop = marker.classList.contains('world-destination') ? 52 : marker.classList.contains('world-city-door') ? 31 : 22;
             const top = Math.round(Math.max(minimumTop, position.y)) + 'px';
             if (marker.style.left !== left)
                 marker.style.left = left;
@@ -591,8 +641,7 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
             showPanel('console');
     }
     function walkTo(id) {
-        if (places.open)
-            places.open = false;
+        feedback.textContent = '';
         canvas.focus({ preventScroll: true });
         engine.moveToHotspot(id);
     }
@@ -619,7 +668,7 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
         if (member && panel === 'member') {
             if (state.member !== member) {
                 commit(chooseWorldMember(state, member));
-                engine.setAppearance(appearance(member));
+                showAppearance(member);
                 feedback.textContent = '';
             }
             closePanel();
@@ -645,6 +694,9 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
             showPanel('member');
         else if (id === 'close-panel')
             closePanel();
+        else if (id === 'open-wardrobe' && (panel === 'wardrobe' || panel === 'shelves')) {
+            requestAction('world-wardrobe', state.member);
+        }
         else if (id === 'interact' && nearby && !panel)
             engine.interact();
         else if (id === 'replay' && panel === 'member') {
@@ -685,6 +737,7 @@ export function mountWorld(lang, requestAction, sound = true, setSound) {
     room.addEventListener('pointerup', enterAudio, { capture: true, signal: listeners.signal });
     room.addEventListener('click', enterAudio, { capture: true, signal: listeners.signal });
     room.addEventListener('keydown', enterAudio, { capture: true, signal: listeners.signal });
+    showAppearance(state.member);
     refresh();
     updateMarkers();
     return () => {

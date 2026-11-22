@@ -38,8 +38,9 @@ function shortcut(id, name, count = '') {
     <i class="el-arrow" aria-hidden="true"></i>
   </button>`;
 }
-export function renderLobby(lang, count, total, hasReplay, resumeLabel = '') {
+export function renderLobby(lang, count, total, hasReplay, resumeLabel = '', photoCount = 0) {
     const label = copy[lang];
+    const albumCount = photoCount ? (lang === 'ru' ? 'Фото · ' : 'Foto · ') + photoCount : count + ' / ' + total;
     const portraits = lineup.map(member => `<span class="el-portrait">
     <img src="art/world/hero-${member}.webp" alt="" width="256" height="410">
   </span>`).join('');
@@ -67,7 +68,7 @@ export function renderLobby(lang, count, total, hasReplay, resumeLabel = '') {
         ${shortcut('city', label.city)}
         ${shortcut('pets', label.pets)}
         ${shortcut('studio', label.studio)}
-        ${shortcut('album', label.album, `<span class="el-count">${count} / ${total}</span>`)}
+        ${shortcut('album', label.album, `<span class="el-count">${albumCount}</span>`)}
       </div>
     </nav>
     ${hasReplay ? `<button type="button" class="el-replay" data-act="replay">

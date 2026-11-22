@@ -1,0 +1,133 @@
+.hongdae-shell {
+  --street-night: #20152b;
+  --street-panel: #302039;
+  --street-line: #805779;
+  --street-pink: #ffd2e6;
+  --street-light: #fff5ed;
+  --street-muted: #dfc3d9;
+  color: var(--street-light);
+  min-width: 0;
+}
+
+.hongdae-shell [hidden] { display: none !important; }
+.hongdae-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.hongdae-heading h2 { margin: 0; font-size: clamp(27px, 8.8vw, 42px); }
+.hongdae-cast {
+  padding: 4px 8px 4px 4px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 46px;
+  gap: 7px;
+  border-radius: 9px;
+  border: 1px solid var(--street-line);
+  background: var(--street-panel);
+  text-align: start;
+}
+.hongdae-cast > img { display: block; border-radius: 5px; background: #4d3153; object-fit: cover; object-position: center 12%; }
+.hongdae-cast > span { display: grid; gap: 1px; line-height: 1.12; }
+.hongdae-cast strong { font-size: 13px; }
+.hongdae-cast small { font-size: 11px; color: var(--street-muted); }
+.hongdae-cast > span:last-child { color: var(--street-pink); font-size: 19px; }
+
+.hongdae-board {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: clamp(325px, 53svh, 490px);
+  border: 1px solid var(--street-line);
+  border-radius: 14px;
+  background: var(--street-night);
+  box-shadow: 0 10px 34px #11091c91;
+}
+.hongdae-board canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; user-select: none; }
+.hongdae-board canvas:focus-visible { outline: 2px solid var(--street-pink); outline-offset: -3px; }
+.hongdae-markers, .hongdae-controls { position: absolute; pointer-events: none; }
+.hongdae-markers { inset: 0; }
+.hongdae-controls { display: flex; justify-content: space-between; align-items: end; gap: 10px; inset: auto 12px 12px; }
+.hongdae-controls .world-stick {
+  width: 78px;
+  height: 78px;
+  background: #291630bd;
+  border-color: #f9c8e6ca;
+}
+.hongdae-controls .world-stick > span { font-size: 71px; }
+.hongdae-interact {
+  min-height: 46px;
+  max-width: calc(100% - 90px);
+  padding: 8px 12px;
+  border: 1px solid #fff0f9;
+  border-radius: 8px;
+  color: #2d1930;
+  background: var(--street-pink);
+  box-shadow: 0 3px 0 #945076;
+  font-size: 14px;
+  font-weight: 800;
+  pointer-events: auto;
+}
+.hongdae-stop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-width: 0;
+  min-height: 46px;
+  gap: 5px;
+  padding: 4px 5px;
+  border: 1px solid var(--street-line);
+  border-radius: 8px;
+  background: var(--street-panel);
+  font-size: 12px;
+  line-height: 1.15;
+  font-weight: 760;
+}
+.hongdae-stop span:first-child { color: var(--street-pink); font-size: 17px; line-height: 1; }
+.hongdae-markers .hongdae-stop {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: max-content;
+  max-width: 122px;
+  padding-inline: 10px;
+  pointer-events: auto;
+  isolation: isolate;
+}
+.hongdae-markers .hongdae-stop::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 8px 0;
+  border: 1px solid #ebb3d7bc;
+  border-radius: 7px;
+  background: #26162be8;
+  box-shadow: 0 3px 10px #170e25ad;
+}
+.hongdae-stop[data-hongdae-go="booth"] { color: #33182e; background: var(--street-pink); border-color: #fff0f9; }
+.hongdae-stop[data-hongdae-go="booth"] span:first-child { color: #7b3b68; }
+.hongdae-markers .hongdae-stop[data-hongdae-go] { background: transparent; border-color: transparent; }
+.hongdae-markers .hongdae-stop[data-hongdae-go="booth"]::before { background: var(--street-pink); border-color: #fff0f9; }
+.hongdae-board[data-hongdae-playing] .hongdae-stop[data-hongdae-go="records"]::before { animation: hongdae-melody .55s ease-in-out 2; }
+@keyframes hongdae-melody {
+  50% { box-shadow: 0 0 0 5px #ffe6954d, 0 0 18px #ffe695b5; border-color: #ffe695; }
+}
+.hongdae-destinations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
+.hongdae-guide, .hongdae-status { margin: 7px 1px 0; color: var(--street-muted); font-size: 12px; line-height: 1.33; }
+.hongdae-status:not(:empty) { color: #ffe4a9; font-weight: 700; }
+.hongdae-status:empty { display: none; }
+
+@media (max-width: 359px) {
+  .hongdae-board { height: clamp(295px, 51svh, 400px); }
+  .hongdae-controls { inset: auto 9px 9px; }
+  .hongdae-controls .world-stick { width: 68px; height: 68px; }
+  .hongdae-controls .world-stick > span { font-size: 62px; }
+}
+
+@media (orientation: landscape) and (max-height: 470px) {
+  .hongdae-heading { margin-bottom: 6px; }
+  .hongdae-board { height: clamp(170px, calc(100svh - 150px), 310px); }
+  .hongdae-controls .world-stick { width: 62px; height: 62px; }
+  .hongdae-controls .world-stick > span { font-size: 56px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hongdae-board[data-hongdae-playing] .hongdae-stop[data-hongdae-go="records"]::before { animation: none; border-color: #ffe695; }
+}

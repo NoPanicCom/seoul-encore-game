@@ -1,7 +1,9 @@
 import { items, passes, trips } from './story.js';
 import { beatAt, beatCount, beatMs, cardIds, windowMs } from './rules.js';
 import { melody, previewIntro, silence } from './sound.js';
-import { renderWorld, mountWorld, worldAlbum, worldChallenge } from './world.js';
+import { renderWorld, mountWorld, worldAlbum, worldChallenge, selectBackstageMember } from './world.js';
+import { renderHongdae, mountHongdae } from './hongdae.js';
+import { renderBooth, mountBooth, boothAlbum, boothPhotoCount } from './booth.js';
 import { renderPerformance } from './performance.js';
 import { renderLobby } from './lobby.js';
 import { renderPets, petAction, petAlbum, petTourNote, openPet, openPetLobby } from './pets.js';
@@ -36,11 +38,14 @@ catch {
 } }
 if (read('lang') === 'tr')
     lang = 'tr';
-let page = location.hash === '#play' ? 'world' : 'home';
-let unmountWorld;
+let page = 'home';
+let tripMember = 'lisa';
+let unmountScene;
 let role = 'ari';
 let remaining = 0;
 const memberIds = { Jisoo: 'jisoo', Jennie: 'jennie', 'Rosé': 'rose', Lisa: 'lisa' };
+const previousPhotoMember = read('lastPhotoMember');
+tripMember = Object.values(memberIds).find(member => member === previousPhotoMember) ?? 'lisa';
 let petBack = 'home';
 let studioBack = 'home';
 let studioMember = 'Lisa';
@@ -68,8 +73,8 @@ let frame = 0;
 let hits = new Set();
 let viewing = false;
 let feedback = '';
-function pass() {
-    const p = passes[role];
+function pass(id = role) {
+    const p = passes[id];
     if (!p)
         throw new Error('pass');
     return p;
@@ -90,14 +95,55 @@ function checkpoint(next) {
     saveCityCheckpoint();
 }
 function go(next) {
-    if (next === 'world' || page === 'world')
-        history.replaceState(null, '', location.pathname + location.search + (next === 'world' ? '#play' : ''));
+    const hash = sceneHash(next);
+    if (location.hash !== hash)
+        history.replaceState(null, '', location.pathname + location.search + hash);
     stop();
     page = next;
     feedback = '';
     checkpoint(next);
     draw();
     window.scrollTo(0, 0);
+}
+function isTravelWardrobe() { return studioBack === 'world' || studioBack === 'hongdae'; }
+function sceneHash(next) {
+    if (next === 'world')
+        return '#play';
+    if (next === 'hongdae' || next === 'booth')
+        return '#' + next + '/' + tripMember;
+    if (next === 'album' && albumSection === 'hongdae')
+        return '#hongdae-album/' + tripMember;
+    if (next === 'studio' && isTravelWardrobe())
+        return '#wardrobe/' + studioBack + '/' + tripMember;
+    return '';
+}
+function restoreScene() {
+    const [place, first, second] = location.hash.slice(1).split('/');
+    if (place === 'play')
+        return 'world';
+    const key = place === 'wardrobe' ? second : first;
+    const member = Object.values(memberIds).find(value => value === key);
+    if (!member)
+        return 'home';
+    tripMember = member;
+    if (place === 'hongdae' || place === 'booth')
+        return place;
+    if (place === 'hongdae-album') {
+        albumSection = 'hongdae';
+        return 'album';
+    }
+    if (place === 'wardrobe' && (first === 'world' || first === 'hongdae')) {
+        studioBack = first;
+        studioMember = pass(member).person;
+        return 'studio';
+    }
+    return 'home';
+}
+function openTravelWardrobe(member, from) {
+    tripMember = member;
+    studioMember = pass(member).person;
+    studioBack = from;
+    go('studio');
 }
 function action(id, label, style = 'primary') { return `<button class="${style}" data-act="${id}">${label}</button>`; }
 function photo(file, alt = '', cls = '') { return `<img class="${cls}" src="art/${file}.webp" alt="${alt}">`; }
@@ -106,7 +152,7 @@ function home() {
     const progress = resumePoint();
     const p = progress ? passes[progress.role] : null;
     const resumeLabel = p ? t('Turneme dön', 'Продолжить тур') + ' · ' + p.job[lang] : '';
-    return renderLobby(lang, album.length, Object.keys(passes).length, hasEncoreReplay(), resumeLabel);
+    return renderLobby(lang, album.length, Object.keys(passes).length, hasEncoreReplay(), resumeLabel, boothPhotoCount());
 }
 const memberRoles = ['lisa', 'jisoo', 'jennie', 'rose'];
 const stylistRoles = ['ari', 'mina', 'soyeon', 'yuna'];
@@ -140,10 +186,12 @@ function clockPage() {
 function studioScreen() {
     const choose = studioBack === 'home'
         ? `<div class="segmented">${Object.keys(memberIds).map(name => action('artist-' + name, name, name === studioMember ? 'chosen' : '')).join('')}</div>` : '';
-    return choose + renderStudio(lang, studioMember);
+    const travelExit = isTravelWardrobe() ? action('trip-street', t('Pixel ile Hongdae’ye çık', 'На прогулку с Пикселем'), 'trip-exit') : '';
+    return choose + renderStudio(lang, studioMember) + travelExit;
 }
 function cityScreen() {
-    return renderCity(lang, role, cityMode !== 'tour');
+    const walk = cityMode === 'free' ? action('trip-street', '<strong>Hongdae</strong><span>' + t('Pixel ile fotoğraf yürüyüşü', 'Фотопрогулка с Пикселем') + '</span>', 'trip-invite') : '';
+    return walk + renderCity(lang, role, cityMode !== 'tour');
 }
 function brief() {
     const p = pass();
@@ -197,20 +245,24 @@ function ending() {
   ${action('pet-visit', t('Konserden sonra eve uğra', 'Навестить питомца после шоу'))}${action('afterparty', t('Ertesi gün · Turneye devam', 'На следующий день · Продолжить тур'), 'secondary')}${action('clipday', t('Klip çekim gününe katıl', 'Остаться на съёмки клипа'), 'secondary')}${action('album', albumTitle(), 'secondary')}${action('start', t('Başka bir kartla oyna', 'Играть с другим пропуском'), 'secondary')}`;
 }
 function albumPage() {
-    const tabs = [['concert', t('Konser', 'Концерт')], ['pets', t('Patiler', 'Питомцы')], ['city', t('Şehir', 'Город')], ['studio', t('Stil', 'Стиль')], ['crew', t('Ekip', 'Команда')], ['world', t('Kulis', 'Гримёрка')]];
+    const tabs = [['concert', t('Konser', 'Концерт')], ['pets', t('Patiler', 'Питомцы')], ['city', t('Şehir', 'Город')], ['hongdae', t('Fotokabin', 'Фотобудка')], ['studio', t('Stil', 'Стиль')], ['crew', t('Ekip', 'Команда')], ['world', t('Kulis', 'Гримёрка')]];
     const concertCards = `<div class="album">${album.map(id => {
         const p = passes[id];
         if (!p)
             throw new Error(id);
         return action('card-' + id, `${photo(memoryLook(id))}<span>${p.person} · ${p.job[lang]}</span>`, 'collect');
     }).join('')}</div>${album.length ? '' : `<p class="intro">${t('İlk konserini bitirince fotoğraf kartın buraya gelecek.', 'Заверши концерт, чтобы получить первую фотокарточку.')}</p>`}${hasEncoreReplay() ? action('replay', t('Son konseri yeniden izle', 'Посмотреть запись концерта'), 'secondary') : ''}${action('start', t('Kulis kartı seç', 'Выбрать пропуск'))}`;
-    const sections = { concert: () => concertCards, pets: () => petAlbum(lang), studio: () => studioAlbum(lang), city: () => cityAlbum(lang), crew: () => crewAlbum(lang), world: () => {
+    const sections = { hongdae: () => boothAlbum(lang) + action('trip-street', t('Hongdae’ye dön', 'Вернуться в Хондэ'), 'trip-exit'), concert: () => concertCards, pets: () => petAlbum(lang), studio: () => studioAlbum(lang), city: () => cityAlbum(lang), crew: () => crewAlbum(lang), world: () => {
             const cards = worldAlbum(lang);
             return (cards.length ? '<div class="world-album">' + cards.map(card => `<figure class="world-album-card"><img src="${card.image}" alt=""><figcaption><strong>${card.title}</strong><small>${card.subtitle}</small></figcaption></figure>`).join('') + '</div>' : '<p>' + t('Kulis provasını tamamlayınca ilk hatıran buraya gelir.', 'Закончи репетицию за кулисами, и здесь появится твоя карточка.') + '</p>') + action('world', t('Kulise gir', 'Войти за кулисы'));
         } };
     return `<h2>${albumTitle()}</h2><div class="segmented">${tabs.map(([id, name]) => action('section-' + id, String(name), albumSection === id ? 'chosen' : '')).join('')}</div>${sections[albumSection]?.() ?? concertCards}`;
 }
 function back() {
+    if (page === 'album' && albumSection === 'hongdae' || page === 'booth')
+        return 'hongdae';
+    if (page === 'hongdae')
+        return 'world';
     if (page === 'pets')
         return petBack;
     if (page === 'studio')
@@ -230,15 +282,24 @@ function back() {
     return 'home';
 }
 function draw() {
-    unmountWorld?.();
-    unmountWorld = undefined;
+    unmountScene?.();
+    unmountScene = undefined;
     app.dataset.page = page;
     document.documentElement.lang = lang;
-    const screens = { home, world: () => renderWorld(lang), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
-    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${page === 'home' || page === 'world' ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
+    const screens = { home, world: () => renderWorld(lang), hongdae: () => renderHongdae(lang, tripMember), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
+    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'world', 'hongdae', 'booth'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
     element('feedback').textContent = feedback;
     if (page === 'world') {
-        unmountWorld = mountWorld(lang, (id, member) => {
+        unmountScene = mountWorld(lang, (id, member) => {
+            tripMember = member;
+            if (id === 'world-exit-city') {
+                go('hongdae');
+                return;
+            }
+            if (id === 'world-wardrobe') {
+                openTravelWardrobe(member, 'world');
+                return;
+            }
             if (id !== 'world-enter-concert')
                 return;
             role = member;
@@ -252,6 +313,30 @@ function draw() {
             hits.clear();
             go('stage');
         }, sound, enabled => { sound = enabled; save('sound', enabled ? 'on' : 'off'); });
+    }
+    else if (page === 'hongdae') {
+        unmountScene = mountHongdae(lang, tripMember, (id, member) => {
+            if (id === 'wardrobe') {
+                openTravelWardrobe(member, 'hongdae');
+                return;
+            }
+            if (id === 'back') {
+                selectBackstageMember(member);
+                go('world');
+                return;
+            }
+            go('booth');
+        });
+    }
+    else if (page === 'booth') {
+        unmountScene = mountBooth(lang, tripMember, id => {
+            if (id === 'album') {
+                albumSection = 'hongdae';
+                go('album');
+            }
+            else
+                go('hongdae');
+        });
     }
 }
 function message(tr, ru) { feedback = t(tr, ru); element('feedback').textContent = feedback; }
@@ -277,6 +362,7 @@ function finish(free) {
     go('show');
 }
 function collectCard() {
+    save('lastAlbum', 'concert');
     album = cardIds([...(cardIds(read('album'))), ...album, role].join(','));
     save('album', album.join(','));
     save('signal.' + role, forecast);
@@ -361,6 +447,19 @@ app.addEventListener('click', e => {
         draw();
         return;
     }
+    if (act === 'trip-street') {
+        if (page === 'studio' && studioBack === 'world') {
+            selectBackstageMember(tripMember);
+            go('world');
+            const exit = app.querySelector('[data-world-action="walk-exit-city"]');
+            if (!exit)
+                throw new Error('Missing backstage street exit');
+            exit.click();
+        }
+        else
+            go('hongdae');
+        return;
+    }
     if (act === 'world') {
         go('world');
         return;
@@ -370,7 +469,7 @@ app.addEventListener('click', e => {
         return;
     }
     if (act === 'album') {
-        albumSection = 'concert';
+        albumSection = boothPhotoCount() > 0 && read('lastAlbum') !== 'concert' ? 'hongdae' : 'concert';
         go('album');
         return;
     }
@@ -597,8 +696,10 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && pag
     stop();
     draw();
 } });
+window.addEventListener('encore:photo-saved', () => {
+    save('lastAlbum', 'hongdae');
+    save('lastPhotoMember', tripMember);
+});
+page = restoreScene();
 draw();
-window.addEventListener('hashchange', () => { if (location.hash === '#play' && page !== 'world')
-    go('world');
-else if (!location.hash && page === 'world')
-    go('home'); });
+window.addEventListener('hashchange', () => go(restoreScene()));

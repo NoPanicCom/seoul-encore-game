@@ -36,7 +36,7 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  height: clamp(334px, 56svh, 552px);
+  height: clamp(234px, 49svh, 552px);
   background: #372744 url('art/world/backstage.webp') right 55% / auto 100% no-repeat;
   border: 1px solid #9b6b8c;
   border-radius: 14px;
@@ -168,6 +168,29 @@
   color: var(--world-lime);
 }
 .world-spot.world-destination .world-spot-pin { width: 5px; height: 5px; background: var(--world-lime); box-shadow: 0 0 6px var(--world-lime); }
+.world-spot.world-city-door, .world-spot.world-city-door:focus-visible {
+  z-index: 2;
+  width: 46px;
+  min-height: 62px;
+  justify-items: stretch;
+  align-content: start;
+  padding: 5px 2px;
+  border: 2px solid #e9c390;
+  border-radius: 5px 5px 0 0;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(110deg, #503947, #362538);
+  box-shadow: inset 0 0 0 3px #211927, 2px 4px 5px #200e1a9c;
+}
+.world-city-door > span { color: #2e1d25; background: #edca96; border-radius: 2px; font-size: 10px; }
+.world-city-door::after {
+  content: '';
+  position: absolute;
+  inset: 30px 6px auto auto;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fff0c7;
+}
 .world-room-inventory {
   position: absolute;
   bottom: 103px;
@@ -179,6 +202,7 @@
   color: #fff3fa;
   font-size: 12px;
   font-weight: 750;
+  pointer-events: none;
 }
 .world-room-inventory > span { margin-right: 3px; color: #ffbedd; }
 .world-held {
@@ -231,20 +255,31 @@
 .world-checklist li[data-world-done="true"] { background: #344328; border-color: #7b8c62; color: #effacd; }
 .world-feedback { margin-block: 8px 0; color: #f7d0e6; font-size: 13px; }
 .world-feedback:empty { display: none; }
-.world-map { margin: 5px 0 0; }
-.world-map summary {
-  display: list-item;
+.world-room-feedback {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  inset-inline: 8px;
   width: fit-content;
-  min-height: 44px;
-  align-content: center;
-  cursor: pointer;
-  color: var(--world-muted);
-  font-size: 13px;
-  font-weight: 750;
+  max-width: calc(100% - 16px);
+  margin: 0 auto;
+  padding: 6px 10px;
+  border: 1px solid #d8a7cd;
+  border-radius: 6px;
+  background: #24162df5;
+  pointer-events: none;
 }
-.world-map p { margin: 0 0 8px; font-size: 13px; color: var(--world-muted); }
-.world-map-grid { display: flex; gap: 6px; flex-wrap: wrap; }
-.world-map-grid .world-button { flex: 1 1 130px; }
+.world-room-feedback:empty { display: block; padding: 0; border: 0; }
+.world-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.world-actions .world-button { padding-inline: 5px; font-size: 13px; }
+.world-next-action { border-color: var(--world-lime); color: var(--world-lime); }
+.world-city-action { border-color: #edca96; color: #26182b; background: #edca96; }
+.world-sound { margin-top: 7px; }
 .world-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .world-dialog {
   box-sizing: border-box;
@@ -302,16 +337,21 @@
 @media (max-width: 365px) {
   .world-heading { gap: 5px; margin-bottom: 8px; }
   .world-member { gap: 4px; padding-right: 6px; font-size: 13px; }
-  .world-board { height: clamp(320px, 52svh, 443px); }
+  .world-board { height: clamp(224px, 46svh, 443px); }
   .world-journal { padding: 9px; }
   .world-stick { width: 72px; height: 72px; }
   .world-stick > span { font-size: 66px; }
   .world-spot { max-width: 106px; font-size: 10px; }
 }
 @media (orientation: landscape) and (max-height: 470px) {
+  #app[data-page="world"] > header { height: 44px; }
+  #app[data-page="world"] > main { padding-block-start: 8px; }
+  .world-shell { display: grid; grid-template-columns: minmax(0, 1fr) minmax(148px, 35%); gap: 0 8px; }
+  .world-heading, .world-journal { grid-column: 1 / -1; }
   .world-heading { margin-bottom: 7px; }
   .world-heading h2 { font-size: 25px; }
-  .world-board { height: clamp(140px, calc(100svh - 145px), 280px); }
+  .world-board { height: clamp(155px, calc(100svh - 113px), 270px); }
+  .world-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; margin-top: 0; }
   .world-stick { width: 64px; height: 64px; }
   .world-stick > span { font-size: 58px; }
   .world-stick > i { width: 31px; height: 31px; }

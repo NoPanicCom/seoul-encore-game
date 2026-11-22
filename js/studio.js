@@ -119,7 +119,7 @@ function parseCard(value) {
         return items ? { kind, items } : null;
     }
     if (kind === 'set' && ids.length === 2) {
-        const member = memberId(ids[0] ?? '');
+        const member = studioMemberId(ids[0] ?? '');
         const outfit = outfitSets.find(set => set.id === ids[1]);
         if (member && outfit)
             return { kind, member, outfit };
@@ -127,8 +127,8 @@ function parseCard(value) {
     return null;
 }
 const copy = (lang, names) => names[lang === 'tr' ? 0 : 1];
-function memberId(name) {
-    const normalized = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+export function studioMemberId(name) {
+    const normalized = name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     return Object.keys(memberNames).find((key) => normalized === key) ?? null;
 }
 const storagePrefix = 'encore1.studio.';
@@ -182,11 +182,27 @@ function chosenLook(member, phase) {
 }
 /** The concert uses the chosen finale portrait, or the chosen rehearsal portrait when there is no finale. */
 export function stageLook(memberName, phase) {
-    const member = memberId(memberName);
+    const member = studioMemberId(memberName);
     if (!member)
         return null;
     const selected = phase ? chosenLook(member, phase) : chosenLook(member, 'final') ?? chosenLook(member, 'rehearsal');
     return selected ? `studio/${member}-${selected.id}` : null;
+}
+export function studioTravelSelection(member) {
+    const saved = read(`travel.${member}`);
+    if (saved) {
+        const [kind, id, ...extra] = saved.split(',');
+        if (kind === 'look' && id !== undefined && extra.length === 0 && looks.some(look => look.id === id)) {
+            return { kind, id };
+        }
+        const card = parseCard(saved);
+        if (card?.kind === 'set' && card.member === member)
+            return { kind: 'set', id: card.outfit.id };
+        if (card?.kind === 'mix')
+            return { kind: 'mix', pieces: card.items.map(item => item.id) };
+    }
+    const previous = chosenLook(member, 'final') ?? chosenLook(member, 'rehearsal');
+    return previous ? { kind: 'look', id: previous.id } : null;
 }
 let mode = 'looks';
 let phase = 'rehearsal';
@@ -209,7 +225,7 @@ function isPhase(value) {
 export function studioAction(action, memberName) {
     if (!action.startsWith('studio-'))
         return false;
-    const member = memberId(memberName);
+    const member = studioMemberId(memberName);
     if (!member)
         return false;
     const [, verb, ...args] = action.split('-');
@@ -224,6 +240,15 @@ export function studioAction(action, memberName) {
     }
     if (verb === 'wear' && looks.some(look => look.id === value && look.phase === phase)) {
         save(`look.${member}.${phase}`, value);
+        save(`travel.${member}`, `look,${value}`);
+        return true;
+    }
+    if (verb === 'wear' && value === 'mix' && mode === 'mix') {
+        save(`travel.${member}`, ['mix', ...mixIds()].join(','));
+        return true;
+    }
+    if (verb === 'wear' && value === 'set' && mode === 'sets') {
+        save(`travel.${member}`, ['set', member, outfit.id].join(','));
         return true;
     }
     if (verb === 'slot' && isSlot(value)) {
@@ -295,7 +320,11 @@ function saveButton(lang, kind, saved) {
     const label = saved ? ['✓ Albüme kaydedildi', '✓ Сохранено в альбоме'] : ['Albüme kaydet', 'Сохранить в альбом'];
     return `<button type="button" class="studio-save" data-act="studio-save-${kind}"${saved ? ' disabled' : ''}>${copy(lang, label)}</button>`;
 }
-function renderMix(lang) {
+function travelButton(lang, kind, wearing) {
+    const label = wearing ? ['✓ Gezi kombinin', '✓ Образ для прогулки'] : ['Gezide giy', 'Надеть на прогулку'];
+    return control(`wear-${kind}`, copy(lang, label), 'studio-save', wearing);
+}
+function renderMix(lang, member) {
     const ids = mixIds();
     const items = lookupMix(ids);
     if (!items)
@@ -314,6 +343,7 @@ function renderMix(lang) {
     ${garments(collection, slot).map(item => control(`piece-${item.id}`, picture(item.id) +
         `<span>${copy(lang, item.label)}</span>`, 'studio-piece', mix[slot] === item.id)).join('')}
   </div>
+  ${travelButton(lang, 'mix', read(`travel.${member}`) === ['mix', ...ids].join(','))}
   ${saveButton(lang, 'mix', archive().includes(['mix', ...ids].join(',')))}`;
 }
 function renderSets(lang, member) {
@@ -326,6 +356,7 @@ function renderSets(lang, member) {
     ${outfitSets.map(entry => control(`set-${entry.id}`, picture(`${member}-set-${entry.id}`) +
         `<span>${copy(lang, entry.names[member])}</span>`, 'studio-piece', entry.id === outfit.id)).join('')}
   </div>
+  ${travelButton(lang, 'set', read(`travel.${member}`) === ['set', member, outfit.id].join(','))}
   ${saveButton(lang, 'set', archive().includes(['set', member, outfit.id].join(',')))}`;
 }
 function storageNotice(lang) {
@@ -335,10 +366,10 @@ function storageNotice(lang) {
     ])}</p>` : '';
 }
 export function renderStudio(lang, memberName) {
-    const member = memberId(memberName);
+    const member = studioMemberId(memberName);
     if (!member)
         return `<p role="status">${copy(lang, ['Gardırop için bir üye seç.', 'Выбери участницу для примерки.'])}</p>`;
-    const content = mode === 'looks' ? renderLooks(lang, member) : mode === 'mix' ? renderMix(lang) : renderSets(lang, member);
+    const content = mode === 'looks' ? renderLooks(lang, member) : mode === 'mix' ? renderMix(lang, member) : renderSets(lang, member);
     const modeOptions = ['looks', 'mix', 'sets'];
     return `<section class="studio" aria-label="${copy(lang, ['Gardırop', 'Гардероб'])}">
     <div class="studio-title"><h2>${copy(lang, ['Gardırop', 'Гардероб'])}</h2><span>${memberNames[member]}</span></div>
