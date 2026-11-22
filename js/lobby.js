@@ -78,6 +78,7 @@ export function renderLobby(lang, count, total, hasReplay, resumeLabel = '', pho
         ${shortcut('album', label.album, `<span class="el-count">${albumCount}</span>`)}
       </div>
     </nav>
+    <button type="button" class="el-role-select secondary" data-act="official-home">${lang === 'ru' ? '♫ Официальные клипы BLACKPINK' : '♫ BLACKPINK’in resmî klipleri'}</button>
     ${hasReplay ? `<button type="button" class="el-replay" data-act="replay">
       <span class="el-replay-icon" aria-hidden="true"></span>
       <strong>${label.replay}</strong>

@@ -1,0 +1,119 @@
+#official-show {
+  display: grid;
+  gap: 12px;
+}
+
+#official-show h2 {
+  margin: 4px 0 0;
+  max-width: 20ch;
+  font-size: clamp(29px, 8vw, 46px);
+  line-height: 1.04;
+}
+
+.official-lisa-intro {
+  margin: 0;
+  color: var(--dim);
+}
+
+.official-tracks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.official-tracks button {
+  min-height: 44px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.official-tracks [aria-pressed="true"] {
+  border-color: var(--pink);
+  background: var(--pink);
+  color: var(--ink);
+}
+
+.official-poster {
+  position: relative;
+  isolation: isolate;
+  margin: 0;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.official-poster-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 56%;
+}
+
+.official-poster-cast {
+  position: absolute;
+  inset-inline-start: 11%;
+  bottom: 24%;
+  width: 78%;
+  aspect-ratio: 720 / 268;
+  overflow: hidden;
+  filter: drop-shadow(0 4px 3px #351933aa);
+}
+
+.official-poster-cast img {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.official-stage.live-stage { padding: 0; }
+
+.official-stage .live-set {
+  height: clamp(195px, 32svh, 280px);
+  margin: 0;
+}
+
+.official-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 70px;
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: var(--pink);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.official-link strong {
+  display: block;
+  font-size: 20px;
+}
+
+.official-link-icon {
+  flex: none;
+  padding-left: 12px;
+  border-left: 1px dashed #a57989;
+  font-size: 27px;
+  line-height: 1.3;
+}
+
+.official-actions { display: grid; gap: 8px; }
+.official-actions button { margin: 0; }
+#official-show .official-actions .primary {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--paper);
+}

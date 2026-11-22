@@ -35,7 +35,7 @@ export const passes = {
         result: line('Yan spot hazır. Rosé döndükçe gümüş yıldızlar görünüyor.', 'Боковой свет готов. При каждом повороте звёзды мерцают.'),
         cue: line('Gümüş adımlar', 'Серебряные шаги'), finale: line('Rosé ilk adımını attı. Gümüş çizmeler Yuna’nın seçtiği ışıkta yıldız gibi parladı.', 'Розэ сделала первый шаг. Серебряные сапоги засверкали в свете, который выбрала Юна.') },
     lisa: { name: 'Lisa', person: 'Lisa', photo: 'lisa', card: 'lisa', job: stage,
-        intro: line('Kulaklığında Jun’un sesi var. “Lisa, sıradaki sensin!” Mikrofon henüz gelmedi. Nasıl açılış yaparsın?', 'В наушнике голос Джуна. «Лиса, твой выход!» Микрофон ещё в пути. Как начнёшь?'),
+        intro: line('Kulaklığında Jun’un sesi var. “Lisa, sıradaki sensin!” Mikrofon kayıp. Sen dansa başla, menajer yedeği getirecek.', 'В наушнике голос Джуна. «Лиса, твой выход!» Микрофон пропал. Начинай танцевать, а менеджер принесёт запасной.'),
         choices: [line('Dansla başla', 'Начать с танца'), line('Boş mikrofona seslen', 'Спеть без микрофона')], correct: 0,
         hint: line('Mikrofonu beklerken ilk sekiz sayıyı ayakların taşıyabilir.', 'Пока несут микрофон, первые восемь счётов можно станцевать.'),
         result: line('İlk adım senin. Ekip mikrofonu sahne kenarına getirdi.', 'Первый шаг за тобой. Команда принесла микрофон к краю сцены.'),
