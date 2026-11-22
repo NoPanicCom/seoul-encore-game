@@ -109,7 +109,7 @@
 @keyframes hongdae-melody {
   50% { box-shadow: 0 0 0 5px #ffe6954d, 0 0 18px #ffe695b5; border-color: #ffe695; }
 }
-.hongdae-destinations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
+.hongdae-destinations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
 .hongdae-guide, .hongdae-status { margin: 7px 1px 0; color: var(--street-muted); font-size: 12px; line-height: 1.33; }
 .hongdae-status:not(:empty) { color: #ffe4a9; font-weight: 700; }
 .hongdae-status:empty { display: none; }
@@ -131,3 +131,5 @@
 @media (prefers-reduced-motion: reduce) {
   .hongdae-board[data-hongdae-playing] .hongdae-stop[data-hongdae-go="records"]::before { animation: none; border-color: #ffe695; }
 }
+
+@media (orientation:landscape) and (max-height:470px){.hongdae-destinations{grid-template-columns:repeat(4,minmax(0,1fr))}}

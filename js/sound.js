@@ -54,7 +54,7 @@ export async function previewIntro(intro) {
             feedback.textContent = document.documentElement.lang === 'ru' ? 'Звуковой предпросмотр недоступен.' : 'Ses önizlemesi açılamadı.';
     }
 }
-export async function melody(intro) {
+export async function melody(intro, fanMix = false) {
     const note = await instrument();
     if (!note)
         return;
@@ -64,10 +64,21 @@ export async function melody(intro) {
     if (intro === 'drums')
         for (let i = 0; i < 3; i++)
             note(150, i * .18, .14, 'sine', .64, .33);
+    const chords = [[146.83, 174.61, 220], [116.54, 146.83, 174.61], [130.81, 164.81, 196]];
     for (const [i, pitch] of pitches.slice(0, beatCount).entries()) {
         const time = (i + 1) * beatMs / 1000;
         note(pitch, time, .34, 'triangle', .54);
-        note(pitch / 4, time, .32, 'sine', .72);
+        const chord = chords[Math.floor(i / 4)];
+        if (fanMix && chord) {
+            const offbeat = time + beatMs / 2000;
+            note(chord[0] / 2, time, .35, 'sine', .68);
+            for (const tone of chord)
+                note(tone * 2, offbeat, .21, 'triangle', .15);
+            if (i % 2 === 1)
+                note(198, time, .09, 'triangle', .38, .48);
+        }
+        else
+            note(pitch / 4, time, .32, 'sine', .72);
         note(136, time, .18, 'sine', .85, .34);
         note(2200, time + .32, .04, 'triangle', .12, .48);
         if (i % 2 === 1)

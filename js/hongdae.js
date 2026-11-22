@@ -21,10 +21,11 @@ const copy = {
 };
 const destinations = {
     back: { label: ['Kulis', 'Гримёрка'], action: ['Kulise dön', 'В гримёрку'], icon: '↶' },
+    minho: { label: ['Minho’nun dükkânı', 'Магазин Минхо'], action: ['Dükkâna gir', 'Войти в магазин'], icon: '✧' },
     records: { label: ['Plakçı', 'Пластинки'], action: ['Ezgi çal', 'Сыграть мелодию'], icon: '♫' },
     booth: { label: ['Fotokabin', 'Фотобудка'], action: ['Fotokabine gir', 'Войти в фотобудку'], icon: '▣' },
 };
-const stops = ['back', 'records', 'booth'];
+const stops = ['back', 'minho', 'records', 'booth'];
 const isDestination = (id) => stops.some(stop => stop === id);
 export const hongdaeScene = {
     width: 1440,
@@ -40,9 +41,14 @@ export const hongdaeScene = {
             approach: { x: 142, y: 622 }, radius: 56,
         },
         {
-            id: 'records', position: { x: 674, y: 580 }, marker: { x: 674, y: 292 },
+            id: 'records', position: { x: 865, y: 580 }, marker: { x: 888, y: 380 },
             hitbox: { x: 265, y: 242, width: 751, height: 338 },
-            approach: { x: 674, y: 622 }, radius: 62,
+            approach: { x: 865, y: 622 }, radius: 62,
+        },
+        {
+            id: 'minho', position: { x: 672, y: 581 }, marker: { x: 651, y: 240 },
+            hitbox: { x: 590, y: 236, width: 179, height: 346 },
+            approach: { x: 672, y: 600 }, radius: 42,
         },
         {
             id: 'booth', position: { x: 1224, y: 580 }, marker: { x: 1224, y: 199 },
@@ -165,7 +171,7 @@ export function mountHongdae(lang, member, onAction) {
                 engine.pulseHotspot(id);
                 playRecords();
             }
-            else if (id === 'booth' || id === 'back') {
+            else if (id === 'booth' || id === 'back' || id === 'minho') {
                 onAction(id, member);
             }
         },

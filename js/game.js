@@ -4,6 +4,7 @@ import { melody, previewIntro, silence } from './sound.js';
 import { renderWorld, mountWorld, worldAlbum, worldChallenge, selectBackstageMember } from './world.js';
 import { renderHongdae, mountHongdae } from './hongdae.js';
 import { renderBooth, mountBooth, boothAlbum, boothPhotoCount } from './booth.js';
+import { stickId, renderMinho, renderLightResult, lightBeat } from './lightstick.js';
 import { renderPerformance } from './performance.js';
 import { renderLobby } from './lobby.js';
 import { renderPets, petAction, petAlbum, petTourNote, openPet, openPetLobby } from './pets.js';
@@ -66,10 +67,12 @@ function memoryLook(id) {
 }
 let sound = read('sound') !== 'off';
 let album = cardIds(read('album'));
+let lightstick = stickId(read('lightstick'));
 let playing = false;
 let epoch = 0;
 let start = 0;
 let frame = 0;
+let glowTimer = 0;
 let hits = new Set();
 let viewing = false;
 let feedback = '';
@@ -79,7 +82,7 @@ function pass(id = role) {
         throw new Error('pass');
     return p;
 }
-function stop() { epoch++; playing = false; cancelAnimationFrame(frame); silence(); }
+function stop() { window.clearTimeout(glowTimer); epoch++; playing = false; cancelAnimationFrame(frame); silence(); }
 const checkpoints = ['city', 'brief', 'item', 'cue', 'crew', 'stage'];
 function resumePoint() {
     const [id, point, days] = (read('checkpoint') ?? '').split('|');
@@ -109,7 +112,9 @@ function isTravelWardrobe() { return studioBack === 'world' || studioBack === 'h
 function sceneHash(next) {
     if (next === 'world')
         return '#play';
-    if (next === 'hongdae' || next === 'booth')
+    if (next === 'light-result')
+        return '#lightshow/' + tripMember;
+    if (next === 'minho' || next === 'lightshow' || next === 'hongdae' || next === 'booth')
         return '#' + next + '/' + tripMember;
     if (next === 'album' && albumSection === 'hongdae')
         return '#hongdae-album/' + tripMember;
@@ -126,7 +131,9 @@ function restoreScene() {
     if (!member)
         return 'home';
     tripMember = member;
-    if (place === 'hongdae' || place === 'booth')
+    if (place === 'lightshow')
+        return lightstick ? 'lightshow' : 'minho';
+    if (place === 'minho' || place === 'hongdae' || place === 'booth')
         return place;
     if (place === 'hongdae-album') {
         albumSection = 'hongdae';
@@ -206,13 +213,16 @@ function cuePage() {
 }
 function stage() {
     const p = pass();
-    const performer = memberIds[p.person] ?? 'lisa';
-    return `<div class="stage live-stage" data-playing="${playing}">${renderPerformance(performer, lang, playing, worldChallenge(performer, 'light'))}${stageLook(p.person, 'rehearsal') ? photo(stageLook(p.person, 'rehearsal') ?? p.card, p.person, 'rhythm-look') : ''}<span class="kicker">SEOUL LIVE</span><h2>${p.cue[lang]}</h2><p>${p.result[lang]}</p><div class="dots" aria-hidden="true">${'<i class="dot"></i>'.repeat(beatCount)}</div>
+    const fromShop = page === 'lightshow';
+    const performer = fromShop ? tripMember : (memberIds[p.person] ?? 'lisa');
+    const title = fromShop ? t('Tribünün ışığı sende', 'Зажги трибуны') : p.cue[lang];
+    const description = fromShop ? t('Yıldız halkaya gelince çubuğuna dokun.', 'Когда звезда дойдёт до кольца, коснись лайтстика.') : p.result[lang];
+    return `<div class="stage live-stage" data-playing="${playing}">${renderPerformance(performer, lang, playing, worldChallenge(performer, 'light'), lightstick)}${!fromShop && stageLook(p.person, 'rehearsal') ? photo(stageLook(p.person, 'rehearsal') ?? p.card, p.person, 'rhythm-look') : ''}<span class="kicker">SEOUL LIVE</span><h2>${title}</h2><p>${description}</p><div class="dots" aria-hidden="true">${'<i class="dot"></i>'.repeat(beatCount)}</div>
   <button id="pad" class="disc" data-act="${playing ? 'tap' : 'play'}">${playing ? t('Dokun', 'Нажми') : t('Başlat ▶', 'Старт ▶')}</button>
-  <p id="count" class="mono">0 / ${beatCount}</p></div>
-  <p class="intro">${t('İç halka büyüyüp kenara vardığında dokun. Kaçırırsan sıradaki vuruştan devam et.', 'Нажимай, когда кольцо дорастёт до края. Если пропустишь, лови следующий удар.')}</p>
+  <p id="count" class="mono">0 / ${beatCount}</p>${lightstick ? '<p class="light-feedback" id="light-feedback" role="status"></p>' : ''}</div>
+  ${fromShop ? '' : '<p class="intro">' + t('İç halka büyüyüp kenara vardığında dokun. Kaçırırsan sıradaki vuruştan devam et.', 'Нажимай, когда кольцо дорастёт до края. Если пропустишь, лови следующий удар.') + '</p>'}
   ${playing ? action('pause', t('Duraklat', 'Пауза'), 'secondary') : action('sound', (sound ? '♫ ' : '○ ') + (sound ? t('Ses açık', 'Звук включён') : t('Ses kapalı', 'Звук выключен')), 'secondary')}
-  ${playing ? '' : action('relax', t('Süre tutmadan finali izle', 'Посмотреть финал без таймера'), 'secondary')}`;
+  ${playing || fromShop ? '' : action('relax', t('Süre tutmadan finali izle', 'Посмотреть финал без таймера'), 'secondary')}`;
 }
 function memories() {
     const note = read('note.' + role + '.' + lang);
@@ -261,6 +271,10 @@ function albumPage() {
 function back() {
     if (page === 'album' && albumSection === 'hongdae' || page === 'booth')
         return 'hongdae';
+    if (page === 'minho' || page === 'light-result')
+        return 'hongdae';
+    if (page === 'lightshow')
+        return 'minho';
     if (page === 'hongdae')
         return 'world';
     if (page === 'pets')
@@ -286,8 +300,8 @@ function draw() {
     unmountScene = undefined;
     app.dataset.page = page;
     document.documentElement.lang = lang;
-    const screens = { home, world: () => renderWorld(lang), hongdae: () => renderHongdae(lang, tripMember), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
-    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'world', 'hongdae', 'booth'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
+    const screens = { home, world: () => renderWorld(lang), minho: () => renderMinho(lang, lightstick), lightshow: stage, 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick), hongdae: () => renderHongdae(lang, tripMember), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
+    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'world', 'hongdae', 'booth', 'minho', 'light-result'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${page === 'lightshow' ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}<div id="feedback" class="notice" role="status"></div></main>`;
     element('feedback').textContent = feedback;
     if (page === 'world') {
         unmountScene = mountWorld(lang, (id, member) => {
@@ -325,7 +339,7 @@ function draw() {
                 go('world');
                 return;
             }
-            go('booth');
+            go(id === 'minho' ? 'minho' : 'booth');
         });
     }
     else if (page === 'booth') {
@@ -349,6 +363,10 @@ function chooseFinale() {
     return 'solo';
 }
 function finish(free) {
+    if (page === 'lightshow') {
+        go('light-result');
+        return;
+    }
     forecast = chooseFinale();
     lastFree = free;
     const looks = {};
@@ -404,7 +422,7 @@ async function play() {
         button.disabled = true;
     if (sound) {
         try {
-            await melody(cityProgress().intro);
+            await melody(cityProgress().intro, page === 'lightshow');
         }
         catch {
             if (token === epoch) {
@@ -445,6 +463,25 @@ app.addEventListener('click', e => {
         save('lang', lang);
         feedback = '';
         draw();
+        return;
+    }
+    if (act === 'stick-concert' && lightstick && (page === 'minho' || page === 'light-result')) {
+        hits.clear();
+        go('lightshow');
+        return;
+    }
+    if (act === 'back-shop') {
+        go('minho');
+        return;
+    }
+    if (page === 'minho' && act.startsWith('stick-')) {
+        const choice = stickId(act.slice(6));
+        if (choice) {
+            lightstick = choice;
+            save('lightstick', choice);
+            draw();
+            app.querySelector('[data-act="stick-' + choice + '"]')?.focus({ preventScroll: true });
+        }
         return;
     }
     if (act === 'trip-street') {
@@ -664,10 +701,20 @@ app.addEventListener('click', e => {
     }
     if (act === 'tap') {
         const i = beatAt(performance.now() - start);
-        if (i !== null && !hits.has(i)) {
+        if (playing && i !== null && !hits.has(i)) {
             hits.add(i);
+            const set = app.querySelector('.live-set');
+            if (set && lightstick) {
+                lightBeat(set, hits.size);
+                window.clearTimeout(glowTimer);
+                glowTimer = window.setTimeout(() => { delete set.dataset.pulse; }, 530);
+                element('light-feedback').textContent = t('Tam ritminde!', 'Точно в такт!');
+            }
             element('note-rail').dataset.hit = String(i % 2);
             element('count').textContent = hits.size + ' / ' + beatCount;
+        }
+        else if (playing && i === null && lightstick) {
+            element('light-feedback').textContent = t('Sıradaki yıldızı yakala.', 'Поймай следующую звезду.');
         }
         return;
     }
@@ -692,7 +739,7 @@ app.addEventListener('click', e => {
         go('ending');
     }
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && page === 'stage') {
+document.addEventListener('visibilitychange', () => { if (document.hidden && (page === 'stage' || page === 'lightshow')) {
     stop();
     draw();
 } });
