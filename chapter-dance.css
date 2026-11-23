@@ -539,3 +539,19 @@
 @media (prefers-reduced-motion: reduce) {
   .chapter-dance .cd-floor .cd-body { animation: none; }
 }
+
+.chapter-recording-card{position:relative}
+.chapter-recording-card .chapter-dance-card{margin:0}
+.chapter-recording-open{position:absolute;inset:0;width:100%;height:100%;display:flex;align-items:flex-start;justify-content:flex-end;padding:12px;border:0;background:transparent;border-radius:inherit;color:white}
+.chapter-recording-open span{background:#291628eb;border:1px solid #f6bcd8;border-radius:99px;padding:6px 11px;font-weight:750}
+.chapter-recording-open:focus-visible{outline:3px solid #ffbddb;outline-offset:2px}
+.chapter-replay-controls{display:grid;gap:8px;padding:12px}
+.chapter-replay-frame>.cd-timeline{margin:12px}
+.chapter-replay-audience{position:absolute;inset:auto 0 0;height:8%;display:flex;align-items:end;justify-content:space-around;pointer-events:none;overflow:hidden}
+.chapter-replay-audience i{width:4px;height:76%;border-radius:5px;background:var(--wand);box-shadow:0 0 8px var(--wand);transform-origin:bottom;animation:chapter-wand-sway 1.16s ease-in-out infinite alternate}
+.chapter-replay-audience i:nth-child(2n){height:50%;animation-delay:-.55s}
+.chapter-replay-audience i:nth-child(3n){height:90%;animation-delay:-1s}
+@keyframes chapter-wand-sway{from{transform:rotate(-16deg)}to{transform:rotate(18deg)}}
+.chapter-replay:not([data-replay="playing"]) *{animation-play-state:paused!important}
+@media(prefers-reduced-motion:reduce){.chapter-replay-audience i{animation:none}}
+@media(prefers-reduced-motion:no-preference){.chapter-replay .cd-stage .cd-dancer>.cd-body{animation-duration:1.16s;animation-iteration-count:2}}

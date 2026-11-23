@@ -31,11 +31,13 @@ function asset(value) {
 function validLook(raw) {
     return isRecord(raw) && (raw.outfit === 'sofia' || isAsset(raw.outfit)) &&
         typeof raw.light === 'string' && /^(?:[a-z0-9-]{1,32}|#[0-9a-f]{6})$/i.test(raw.light) &&
+        (raw.wandColor === undefined || raw.wandColor === null || (typeof raw.wandColor === 'string' && /^#[0-9a-f]{6}$/i.test(raw.wandColor))) &&
         (raw.playerName === undefined || (typeof raw.playerName === 'string' && raw.playerName.trim().length > 0 && raw.playerName.length <= 48)) &&
         (raw.pieces === undefined || (Array.isArray(raw.pieces) && raw.pieces.length <= 12 && raw.pieces.every(isAsset)));
 }
 function copyLook(look) {
     return { outfit: look.outfit, light: look.light,
+        ...(look.wandColor !== undefined ? { wandColor: look.wandColor } : {}),
         ...(look.pieces ? { pieces: [...look.pieces] } : {}),
         ...(look.playerName ? { playerName: look.playerName.trim() } : {}) };
 }
@@ -321,6 +323,13 @@ function rehearsal(state, lang, look) {
     }
     return `${room}<div class="cd-controls">${timeline(state.finalMove, state.taught, lang)}${controls}</div>`;
 }
+function duetStage(look, lang, show, sync, finale, badge, crowd = '') {
+    return `<div class="cd-floor cd-stage" style="--cd-light:${lightColor(look.light)}">
+    <i class="cd-light" aria-hidden="true"></i>${cast(artists, sync, lang)}
+    <div class="cd-pair">${dancer('nari', sync, lang)}${dancer('sofia', show, lang, look)}</div>
+     ${finale ? glitter : ''}<span class="cd-live-chip"><i></i> ${badge}</span>${crowd}
+  </div>`;
+}
 function live(state, lang, look) {
     if (!state.finalMove)
         return '';
@@ -330,13 +339,19 @@ function live(state, lang, look) {
     const show = state.shown ?? 'idle';
     const sync = state.mistake ? 'idle' : show;
     const prompt = next ? `${state.mistake ? copy.retry : copy.cue} · ${copy.moves[next]}` : copy.finish;
-    return `<div class="cd-floor cd-stage" style="--cd-light:${lightColor(look.light)}">
-    <i class="cd-light" aria-hidden="true"></i>${cast(artists, sync, lang)}
-    <div class="cd-pair">${dancer('nari', sync, lang)}${dancer('sofia', show, lang, look)}</div>
-    ${next ? '' : glitter}<span class="cd-live-chip"><i></i> LIVE</span>
-  </div><div class="cd-controls">${timeline(state.finalMove, state.step, lang)}
+    return duetStage(look, lang, show, sync, !next, 'LIVE') + `<div class="cd-controls">${timeline(state.finalMove, state.step, lang)}
     <p class="cd-cue" role="status">${prompt}</p>${next ? moveButtons('move', sequence, copy) : action('bow', copy.bow, 'cd-action')}
   </div>`;
+}
+export function renderChapterReplayFrame(card, lang, index) {
+    const move = card.choreography[index];
+    if (!move)
+        throw new RangeError('Invalid choreography step');
+    // Older cards saved the lighting of the stage before the wand had its own field.
+    const color = card.wandColor === undefined ? lightColor(card.light) : card.wandColor;
+    const crowd = color ? `<div class="chapter-replay-audience" style="--wand:${color}" aria-hidden="true">${'<i></i>'.repeat(15)}</div>` : '';
+    return duetStage(card, lang, move, move, index === card.choreography.length - 1, lang === 'ru' ? 'ПОВТОР' : 'TEKRAR', crowd)
+        + timeline(card.choreography[2], index, lang);
 }
 function photoControls(state, lang, look, now) {
     const copy = labels[lang];

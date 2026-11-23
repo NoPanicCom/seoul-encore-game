@@ -2,6 +2,7 @@ import { createChapterDance, restoreChapterDance, renderChapterDance, renderChap
 import { chapterHongdaeAlbum, resetChapterHongdae } from './chapter-hongdae.js';
 import { travelLook } from './travel-look.js';
 import { studioMemberId } from './studio.js';
+import { stickColor } from './lightstick.js';
 import { yunaCue } from './yuna-light.js';
 import { worldAudio } from './world-audio.js';
 const memory = new Map();
@@ -29,12 +30,15 @@ function newId() { return Math.random().toString(36).slice(2) + Date.now().toStr
 const object = (v) => v !== null && typeof v === 'object';
 function album() {
     const cards = read(albumKey);
-    return Array.isArray(cards) ? cards.filter((c) => object(c) && typeof c.id === 'string' && isChapterDanceSnapshot(c.card)) : [];
+    return Array.isArray(cards) ? cards.filter((c) => object(c) && typeof c.id === 'string' && /^[a-z0-9]{5,40}$/.test(c.id) && isChapterDanceSnapshot(c.card)) : [];
+}
+export function chapterRecording(id) {
+    return album().find(entry => entry.id === id) ?? null;
 }
 export function chapterAlbum(lang) {
     const cards = album();
     const title = lang === 'ru' ? 'Наша сцена' : 'Bizim sahnemiz';
-    return '<section class="chapter-scrapbook"><h3>' + title + '</h3>' + (cards.length ? cards.map(entry => renderChapterDanceCard(entry.card, lang)).join('') : '<p>' + (lang === 'ru' ? 'После выступления с Нари сделай снимок на память.' : 'Nari’yle sahneye çıktıktan sonra hatıra fotoğrafını çek.') + '</p>') + chapterHongdaeAlbum(lang) + '</section>';
+    return '<section class="chapter-scrapbook"><h3>' + title + '</h3>' + (cards.length ? cards.map(entry => `<div class="chapter-recording-card">${renderChapterDanceCard(entry.card, lang)}<button class="chapter-recording-open" data-act="chapter-watch-${entry.id}" type="button"><span>▶ ${lang === 'ru' ? 'Смотреть танец' : 'Dansı izle'}</span></button></div>`).join('') : '<p>' + (lang === 'ru' ? 'После выступления с Нари сделай снимок на память.' : 'Nari’yle sahneye çıktıktan sonra hatıra fotoğrafını çek.') + '</p>') + chapterHongdaeAlbum(lang) + '</section>';
 }
 export function resetChapter(role) {
     write(keyFor(role), { id: newId(), dance: createChapterDance() });
@@ -58,7 +62,7 @@ export function chapterSession(role) {
         const costume = member ? travelLook(member) : null;
         const spot = role === 'yuna' ? yunaCue() : null;
         const light = spot?.startsWith('pearl') ? 'white' : spot?.startsWith('cyan') ? '#9de7ff' : spot?.startsWith('rose') ? 'pink' : stick === 'white-star' ? 'white' : stick === 'jisoo-cone' || stick === 'moon' ? 'lavender' : stick === 'star' ? 'gold' : 'pink';
-        return { outfit: costume?.asset ?? (role === 'sofia' || role === 'blink' ? 'sofia' : 'walk/cast-' + role), pieces: costume?.pieces ?? [], light };
+        return { outfit: costume?.asset ?? (role === 'sofia' || role === 'blink' ? 'sofia' : 'walk/cast-' + role), pieces: costume?.pieces ?? [], light, wandColor: stick ? stickColor(stick) : null };
     }
     return { id, dance, persist, look };
 }

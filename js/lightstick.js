@@ -11,6 +11,7 @@ const sticks = {
 export function stickId(value) {
     return value && isShopStick(value) ? value : value === 'heart' || value === 'moon' || value === 'star' ? value : null;
 }
+export function stickColor(id) { return sticks[id].color; }
 export function stickName(id, lang) { return sticks[id][lang]; }
 const wandArt = (id) => `art/lightsticks/${id}.webp`;
 const audienceStyle = (id) => `--stick:${sticks[id].color};--wand-art:url('${wandArt(id)}')`;

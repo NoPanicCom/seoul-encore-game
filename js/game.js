@@ -1,7 +1,8 @@
 import { renderLisaMic, mountLisaMic, resetLisaMic, lisaMicTaken, setLisaMicSoundEnabled } from './lisa-mic.js';
 import { renderOfficialShow, mountOfficialShow } from './official-show.js';
 import { initConcertTrack, activeConcertTrack, renderConcertTrack, mountConcertTrack, playConcertTrack, stopConcertTrack, setConcertTrackSound, concertTrackElapsed, isConcertTrackPlaying } from './concert-track.js';
-import { chapterAlbum, resetChapter } from './chapter.js';
+import { renderChapterReplay, mountChapterReplay } from './chapter-replay.js';
+import { chapterAlbum, chapterRecording, resetChapter } from './chapter.js';
 import { items, passes, trips } from './story.js';
 import { beatAt, beatCount, beatMs, cardIds, windowMs } from './rules.js';
 import { worldAudio } from './world-audio.js';
@@ -71,6 +72,7 @@ function lisaSongMode() {
 }
 let walkRole = null;
 let chapterRole = 'sofia';
+let selectedRecording = null;
 function selectChapter(id) {
     chapterRole = isRole(id) ? id : 'sofia';
     walkRole = chapterRole === 'sofia' ? null : chapterRole;
@@ -116,6 +118,8 @@ function changeSound(enabled) {
     worldAudio.setEnabled(sound);
     setConcertTrackSound(sound);
     setLisaMicSoundEnabled(sound);
+    if (sound && page === 'chapter-replay' && app.querySelector('[data-replay="playing"]'))
+        void worldAudio.enter();
     if (sound && ['chapter', 'walk', 'world', 'hongdae', 'manager-mic'].includes(page))
         void worldAudio.enter();
     const button = app.querySelector('header [data-act="sound"]');
@@ -220,6 +224,8 @@ function go(next) {
 }
 function isTravelWardrobe() { return studioBack === 'world' || studioBack === 'hongdae'; }
 function sceneHash(next) {
+    if (next === 'chapter-replay' && selectedRecording)
+        return '#chapter-replay/' + chapterRole + '/' + selectedRecording.id;
     if (next === 'chapter')
         return '#two-days/' + chapterRole;
     if (next === 'chapter-crew')
@@ -286,8 +292,13 @@ function sceneHash(next) {
 function restoreScene() {
     ariVenue = null;
     const [place, first, second] = location.hash.slice(1).split('/');
-    if (['two-days', 'chapter-album', 'chapter-room', 'chapter-crew'].includes(place ?? '')) {
+    if (['two-days', 'chapter-replay', 'chapter-album', 'chapter-room', 'chapter-crew'].includes(place ?? '')) {
         selectChapter(first ?? (place === 'chapter-album' ? read('chapter-last') ?? 'sofia' : 'sofia'));
+        if (place === 'chapter-replay') {
+            albumSection = 'chapter';
+            selectedRecording = chapterRecording(second ?? '');
+            return selectedRecording ? 'chapter-replay' : 'album';
+        }
         if (place === 'chapter-album') {
             albumSection = 'chapter';
             return 'album';
@@ -694,6 +705,8 @@ function albumPage() {
     return `<h2>${albumTitle()}</h2><div class="segmented">${tabs.map(([id, name]) => action('section-' + id, String(name), albumSection === id ? 'chosen' : '')).join('')}</div>${sections[albumSection]?.() ?? concertCards}`;
 }
 function back() {
+    if (page === 'chapter-replay')
+        return 'album';
     if (page === 'chapter-crew' || (page === 'album' && albumSection === 'chapter'))
         return 'chapter';
     if (page === 'official-show')
@@ -748,14 +761,16 @@ function draw() {
     app.dataset.page = page;
     document.documentElement.lang = lang;
     const trackPanel = ['home', 'time'].includes(page) || (!playing && ['stage', 'lightshow', 'secret'].includes(page));
-    const screens = { chapter: renderSeoulWalk, 'chapter-crew': () => renderCrewGame(lang, role), 'official-show': officialShow, 'lisa-mic': () => renderLisaMic(lang), 'manager-practice': () => renderCrewGame(lang, 'manager', true), 'manager-mic': () => renderManagerMic(lang), 'ari-change': () => ariBackstage(lang), 'yuna-rehearsal': () => yunaRehearsal(lang), 'soyeon-change': () => velvetBackstage(lang), 'soyeon-stairs': () => velvetStairs(lang), 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${listening ? t('Sahne ışıkları söndü. Seul’den iyi geceler!', 'Свет на сцене погас. Спокойной ночи, Сеул!') : t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт') + ' · ' + hits.size + ' / ' + beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
-    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button type="button" class="audio-switch" data-act="sound" aria-pressed="${sound}">${sound ? '♫ ' : '○ '}${soundLabel()}</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'chapter', 'walk', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result', 'fan-replay'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(['official-show', 'lisa-mic', 'lightshow', 'secret'].includes(page)) ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}${trackPanel ? renderConcertTrack(lang) : ''}<div id="feedback" class="notice" role="status"></div></main>`;
+    const screens = { 'chapter-replay': () => renderChapterReplay(lang), chapter: renderSeoulWalk, 'chapter-crew': () => renderCrewGame(lang, role), 'official-show': officialShow, 'lisa-mic': () => renderLisaMic(lang), 'manager-practice': () => renderCrewGame(lang, 'manager', true), 'manager-mic': () => renderManagerMic(lang), 'ari-change': () => ariBackstage(lang), 'yuna-rehearsal': () => yunaRehearsal(lang), 'soyeon-change': () => velvetBackstage(lang), 'soyeon-stairs': () => velvetStairs(lang), 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${listening ? t('Sahne ışıkları söndü. Seul’den iyi geceler!', 'Свет на сцене погас. Спокойной ночи, Сеул!') : t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт') + ' · ' + hits.size + ' / ' + beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
+    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button type="button" class="audio-switch" data-act="sound" aria-pressed="${sound}">${sound ? '♫ ' : '○ '}${soundLabel()}</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'chapter', 'chapter-replay', 'walk', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result', 'fan-replay'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(['official-show', 'lisa-mic', 'lightshow', 'secret'].includes(page)) ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}${trackPanel ? renderConcertTrack(lang) : ''}<div id="feedback" class="notice" role="status"></div></main>`;
     if (!tracksReady)
         app.querySelectorAll('[data-act="play"],[data-act="listen"],[data-act^="watch-fan-"]').forEach(button => button.disabled = true);
     element('feedback').textContent = feedback;
     if (trackPanel)
         unmountTrackPanel = mountConcertTrack(app, lang, draw);
-    if (page === 'lisa-mic')
+    if (page === 'chapter-replay' && selectedRecording)
+        unmountScene = mountChapterReplay(app, selectedRecording.card, lang, sound);
+    else if (page === 'lisa-mic')
         unmountScene = mountLisaMic(app, lang);
     else if (page === 'official-show')
         unmountScene = mountOfficialShow(app);
@@ -1150,9 +1165,20 @@ app.addEventListener('click', e => {
         go('chapter');
         return;
     }
+    if (page === 'album' && albumSection === 'chapter' && act.startsWith('chapter-watch-')) {
+        selectedRecording = chapterRecording(act.slice('chapter-watch-'.length));
+        if (selectedRecording) {
+            go('chapter-replay');
+            app.querySelector('[data-replay-toggle]')?.focus({ preventScroll: true });
+        }
+        return;
+    }
     if (act === 'chapter-album') {
+        const focusId = page === 'chapter-replay' ? selectedRecording?.id : null;
         albumSection = 'chapter';
         go('album');
+        if (focusId)
+            app.querySelector('[data-act="chapter-watch-' + focusId + '"]')?.focus();
         return;
     }
     if (act === 'official-home' && page === 'home') {
