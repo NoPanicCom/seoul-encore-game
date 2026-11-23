@@ -1,3 +1,6 @@
+import { chapterSession, mountChapterDancePanel } from './chapter.js';
+import { mountChapterHongdae, chapterHongdaeProgress } from './chapter-hongdae.js';
+import { loadTravelLook, travelLook, drawWalkingTravelLook } from './travel-look.js';
 import { ariPhase } from './ari-bag.js';
 import { createWorldEngine } from './world-engine.js';
 import { mountNariDuet } from './nari-duet.js';
@@ -7,7 +10,7 @@ import { yunaDressed, yunaCue } from './yuna-light.js';
 import { passes } from './story.js';
 import { studioMemberId, studioTravelSelection } from './studio.js';
 const titles = {
-    street: ['Улица в Сеуле', 'Seul sokağı'], hall: ['Холл YG', 'YG koridoru'], dance: ['Танцзал', 'Dans odası'],
+    hongdae: ['Хондэ', 'Hongdae'], street: ['Улица в Сеуле', 'Seul sokağı'], hall: ['Холл YG', 'YG koridoru'], dance: ['Танцзал', 'Dans odası'],
     studio: ['Студия звука', 'Ses stüdyosu'], plaza: ['Площадь арены', 'Arena meydanı'], hotel: ['Номер Софии', 'Sofia’nın otel odası'],
 };
 function door(id, label, x, foot = 525, sign = 380) {
@@ -25,6 +28,7 @@ const nari = {
     sheet: { frameWidth: 224, frameHeight: 224, rows: { south: 0 }, idleColumn: 0, walkColumns: [0] },
 };
 const rooms = {
+    hongdae: [door('street', street, 115, 585, 410), door('chapter-minho', ['Магазин Минхо', 'Minho’nun dükkânı'], 556, 536, 308), door('chapter-pixel', ['Фотобудка', 'Fotokabin'], 965, 551, 365)],
     street: [door('hotel', ['Отель', 'Otel'], 150), door('hall', ['YG Entertainment', 'YG Entertainment'], 620), door('plaza', ['К арене →', 'Arena yolu →'], 1110, 610, 470)],
     hall: [door('street', street, 90, 623, 485), door('dance', titles.dance, 365), door('studio', titles.studio, 925)],
     dance: [door('hall', hall, 55, 565, 420), tile('pad0', ['←', '←'], 425, 625), tile('pad1', ['★', '★'], 640, 560), tile('pad2', ['→', '→'], 850, 650), nari],
@@ -34,8 +38,9 @@ const rooms = {
 };
 const route = [0, 2, 1, 0, 2, 1];
 const roomKey = (value) => Object.prototype.hasOwnProperty.call(titles, value);
-const nextDoor = { dance: 'hall', hall: 'street', street: 'plaza', plaza: 'gate', hotel: 'street', studio: 'hall' };
+const nextDoor = { hongdae: 'street', dance: 'hall', hall: 'street', street: 'plaza', plaza: 'gate', hotel: 'street', studio: 'hall' };
 const directions = {
+    hongdae: ['Нари: Через улицу выйдем к арене.', 'Nari: Sokağa çıkıp arenaya yürüyebiliriz.'],
     dance: ['Нари: Идём через холл!', 'Nari: Koridordan geçelim!'],
     hall: ['Нари: Выход на улицу слева.', 'Nari: Sokak çıkışı solda.'],
     street: ['Нари: Видишь огни справа? Нам к арене!', 'Nari: Sağdaki ışıkları görüyor musun? Arena o tarafta!'],
@@ -48,21 +53,22 @@ const sofiaKey = 'encore1.sofia-walk.v1';
 const roleKey = (id) => 'encore1.role-walk.' + id + '.v1';
 const memories = new Map();
 export function beginRoleWalk(id, days) { save(roleKey(id), { ...fresh(), days, arrival: false }); }
-function load(key) {
+function load(key, chapter = false) {
+    const initial = () => chapter ? { ...fresh(), room: 'hotel', arrival: false, x: 450, y: 655 } : fresh();
     const memory = memories.get(key);
     let raw;
     try {
         raw = localStorage.getItem(key);
     }
     catch {
-        return memory ?? fresh();
+        return memory ?? initial();
     }
     if (!raw)
-        return memory ?? fresh();
+        return memory ?? initial();
     const [place, days, arrival, danced, step, x, y, duo, invite] = raw.split('|');
     if (!place || !roomKey(place) || !['0', '1', '2'].includes(days ?? '') || !['0', '1'].includes(arrival ?? '') || !['0', '1'].includes(danced ?? '') ||
         !/^[0-6]$/.test(step ?? '') || !x || !y || !Number.isFinite(Number(x)) || !Number.isFinite(Number(y)))
-        return fresh();
+        return initial();
     const invitation = invite === 'offered' || invite === 'together' || (invite === 'onstage' && place === 'plaza') || invite === 'performed' ? invite : 'none';
     return { invitation, room: place, days: Number(days), arrival: arrival === '1', danced: danced === '1', step: Number(step), duo: duo && /^[0-3]$/.test(duo) ? Number(duo) : 0, x: Math.max(26, Math.min(1174, Number(x))), y: Math.max(510, Math.min(754, Number(y))) };
 }
@@ -74,14 +80,15 @@ function save(key, s) {
     catch { /* Keep progress in this tab. */ }
 }
 export function renderSeoulWalk() { return '<section class="walk-host"></section>'; }
-export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast) {
+export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast, chapterOptions) {
     const root = document.querySelector('.walk-host');
     if (!root)
         throw new Error('Missing walking world');
     const host = root;
     const say = (words) => words[lang === 'ru' ? 0 : 1];
-    const key = cast ? roleKey(cast.id) : sofiaKey;
-    const state = load(key);
+    const chapter = chapterOptions ? chapterSession(cast?.id ?? 'sofia') : null;
+    const key = chapter ? 'encore.chapter-walk.' + chapter.id : cast ? roleKey(cast.id) : sofiaKey;
+    const state = load(key, !!chapter);
     const part = cast ? passes[cast.id] : undefined;
     const name = part ? (part.name === 'BLINK' ? 'BLINK' : part.item || studioMemberId(cast?.id ?? '') ? part.name : part.job[lang]) : say(['София', 'Sofia']);
     const member = studioMemberId(part?.person ?? '');
@@ -94,6 +101,10 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
         sheet: { frameWidth: 192, frameHeight: 192, rows: { south: 0, east: 1, north: 2 }, idleColumn: 0, walkColumns: [1, 2, 0, 3] } } :
         artist ? { image: 'art/world/' + artist + '.webp', width: 129, height: 161, speed: 410, sheet: { frameWidth: 128, frameHeight: 160, rows: { south: 0, west: 1, north: 2 }, idleColumn: 0, walkColumns: [1, 2, 3], anchor: { x: 64, y: 150 } } } :
             { image: 'art/walk/cast-' + cast.id + '.webp', width: 126, height: 163, speed: 410, sheet: { frameWidth: 144, frameHeight: 192, rows: { south: 0, west: 1, north: 2 }, idleColumn: 0, walkColumns: [1, 2, 3, 0], anchor: { x: 72, y: 188 }, articulated: true } };
+    const outfit = chapter && artist ? travelLook(artist) : null;
+    let loadedOutfit = null;
+    if (outfit && !outfit.asset.startsWith('world/'))
+        void loadTravelLook(outfit).then(value => { loadedOutfit = value; }).catch(() => { });
     let equipped = chosen;
     let leaveRoom = () => { };
     let notice = '';
@@ -104,7 +115,16 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
         const room = state.room;
         const together = state.invitation === 'together' || state.invitation === 'onstage';
         const spots = rooms[room].filter(s => s.id !== 'nari' || !together);
-        if (cast && room === 'hall' && part) {
+        if (chapter && room === 'street')
+            spots.push(door('hongdae', titles.hongdae, 860, 575, 354));
+        if (chapter && room === 'dance')
+            for (let i = spots.length - 1; i >= 0; i--) {
+                if (spots[i]?.id.startsWith('pad'))
+                    spots.splice(i, 1);
+            }
+        if (chapter && room === 'hongdae')
+            spots.push(door('plaza', ['К арене →', 'Arena yolu →'], 1162, 657, 488));
+        if (cast && room === 'hall' && part && (!chapter || costumeRoom || cast.id !== 'blink')) {
             const entrance = door('role-room', costumeRoom ? ['Гримёрка ' + ruMember, 'Giyinme odası · ' + part.person] : ['Задание · ' + name, 'Görev · ' + name], 650, 531, 351);
             if (part.item && member) {
                 entrance.image = 'art/world/hero-' + member + '.webp';
@@ -116,22 +136,40 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
         if (cast?.id === 'yuna' && room === 'dance') {
             spots.push(door('light-desk', ['Пульт света', 'Spot masası'], 1030, 545, 375));
         }
-        const scene = { width: 1200, height: 800, background: 'art/walk/' + (room === 'dance' ? 'mirrored-studio' : room) + '.webp', spawn: { x: state.x, y: state.y }, walkable: { x: 25, y: 510, width: 1150, height: 245 }, obstacles: [], hotspots: spots };
+        const scene = { width: 1200, height: 800, background: room === 'hongdae' ? 'art/world/hongdae.webp' : 'art/walk/' + (room === 'dance' ? 'mirrored-studio' : room) + '.webp', spawn: { x: state.x, y: state.y }, walkable: { x: 25, y: 510, width: 1150, height: 245 }, obstacles: [], hotspots: spots };
         const day = () => state.days === 0 ? say(['Сегодня концерт', 'Bugün konser var']) : state.days === 1 ? say(['Концерт завтра', 'Konser yarın']) : say(['До концерта 2 дня', 'Konsere 2 gün var']);
         const roleTip = cast?.id === 'lisa' ? say(['Твой выход на арене. Пройди через площадь и подойди к воротам сцены.', 'Sahne sırası sende. Meydandan geçip arenanın kapısına yürü.']) : cast?.id === 'manager' ? say(['Пройди через площадь к арене. Команда ждёт тебя за кулисами.', 'Meydandan geçip arenaya yürü. Ekip seni kuliste bekliyor.']) : cast?.id === 'ari' && ariPhase() === 'packed' ? say(['Чехол уже за кулисами. Через площадь ты попадёшь на концерт.', 'Kılıf artık kuliste. Meydandan geçip konsere yürü.']) : cast?.id === 'yuna' && yunaDressed() ? (yunaCue() ? say(['Свет для Розэ готов. Иди через площадь к арене!', 'Rosé’nin ışığı hazır. Meydandan geçip arenaya yürü!']) : say(['Зайди в танцзал YG и подойди к пульту света.', 'YG dans odasına gir ve spot masasına yürü.'])) : costumeRoom && part ? (dressed ? say(['Костюм для ' + ruMember + ' готов. Встретимся на арене!', 'Konser kıyafeti hazır. ' + part.person + ' seni arenada bekliyor!']) : room === 'hall' ? say(['Подойди к гримёрке, чтобы выбрать костюм для ' + ruMember + '.', part.person + ' için kostüm seçmek üzere giyinme odasına yürü.']) : say(['Войди в YG и приготовь костюм для ' + ruMember + '.', 'YG’ye gir ve ' + part.person + ' için konser kıyafetini seç.'])) : say(['В холле YG тебя ждёт задание.', 'Görevin YG koridorunda seni bekliyor.']);
-        const tip = () => together ? say(directions[room]) : cast && (room === 'street' || room === 'hall') ? roleTip : room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
+        const chapterTip = () => {
+            if (together)
+                return say(directions[room]);
+            if (room === 'plaza')
+                return chapter?.dance.phase === 'lesson' || chapter?.dance.phase === 'choose' ? say(['Перед концертом загляни к Нари в танцзал YG.', 'Konserden önce YG dans odasında Nari’ye uğra.']) : say(['Твоя сцена за воротами арены.', 'Sahnen arena kapısının ardında.']);
+            if (room === 'hongdae')
+                return chapterHongdaeProgress(cast?.id ?? 'sofia').found ? say(['Пиксель ждёт в фотобудке. У Минхо можно взять лайтстик.', 'Pixel fotokabinde bekliyor. Minho’da lightstick seçebilirsin.']) : say(['Из фотобудки слышно «мяу». А в витрине Минхо зажглись лайтстики.', 'Fotokabinden bir miyavlama geliyor. Minho’nun vitrininde lightstick’ler yanıyor.']);
+            if (room === 'hotel')
+                return say(['Нари ждёт в YG. Выйди из отеля и найди дверь танцзала.', 'Nari YG’de bekliyor. Otelden çık ve dans odasının kapısını bul.']);
+            if (room === 'hall')
+                return say(['За левой дверью слышна музыка Нари.', 'Soldaki kapıdan Nari’nin müziği geliyor.']);
+            if (room === 'dance')
+                return say(['Подойди к Нари. Вместе вы придумаете финальный шаг.', 'Nari’ye yaklaş. Dansın son adımını birlikte oluşturacaksınız.']);
+            if (room === 'street')
+                return say(['Дверь YG под вывеской. Дорога направо ведёт в Хондэ и к арене.', 'YG kapısı tabelanın altında. Sağdaki yol Hongdae’ye ve arenaya çıkıyor.']);
+            return roleTip;
+        };
+        const tip = () => chapter ? chapterTip() : together ? say(directions[room]) : cast && (room === 'street' || room === 'hall') ? roleTip : room === 'dance' ? (state.step === route.length ? say(['Связка готова!', 'Koreografi hazır!']) : say(['Подойди к Нари для дуэта или танцуй по меткам.', 'Düet için Nari’ye yaklaş. Tek başına dans etmek için işaretlere bas.'])) :
             room === 'hall' ? say(['Дверь танцзала слева, студия справа.', 'Dans odası solda, ses stüdyosu sağda.']) :
                 room === 'street' ? say(['Тяни джойстик или коснись тротуара. Вход в YG под вывеской.', 'Yön kolunu sürükle veya kaldırıma dokun. YG girişi tabelanın altında.']) :
                     room === 'plaza' ? say(['Подойди к воротам, чтобы попасть на концерт.', 'Konsere girmek için kapıya yürü.']) :
                         room === 'studio' ? say(['Найди синтезатор и сыграй мелодию.', 'Synth’in yanına yürü ve melodini çal.']) : say(['У кровати можно отдохнуть до следующего дня.', 'Yatağın yanına gidip ertesi güne geçebilirsin.']);
-        host.innerHTML = `<div class="walk-title"><h2>${(room === 'hotel' && cast ? say(['Отель', 'Otel']) : say(titles[room]))}</h2><span data-day></span></div>
+        host.innerHTML = `${chapter ? `<div class="chapter-ribbon"><span>${say(['Два дня в Сеуле', 'Seul’de İki Gün'])}</span><button type="button" data-chapter-open-album>${say(['Мой альбом', 'Albümüm'])} ↗</button></div>` : ''}<div class="walk-title"><h2>${(room === 'hotel' && cast ? say(['Отель', 'Otel']) : say(titles[room]))}</h2><span data-day></span></div>
       <div class="walk-board hongdae-board" data-walk-room="${room}" data-walk-role="${cast?.id ?? 'sofia'}" data-with-nari="${together}"><canvas tabindex="0" aria-label="${(room === 'hotel' && cast ? say(['Отель', 'Otel']) : say(titles[room]))}"></canvas>
       <div class="walk-pins">${spots.map(s => `<button class="walk-pin ${s.id.startsWith('pad') ? 'floor-pin' : ''} ${together && s.id === nextDoor[room] ? 'nari-route' : ''}" data-walk-to="${s.id}" aria-label="${s.id.startsWith('pad') ? say(['Танцевальная метка', 'Dans işareti']) + ' ' : ''}${say(s.label)}">${say(s.label)}</button>`).join('')}</div>
       <div class="walk-bottom"><div class="world-stick" aria-label="${say(['Джойстик', 'Yön kolu'])}"><span aria-hidden="true">＋</span><i></i></div><button class="walk-use" hidden></button></div>
       <div class="walk-panel" hidden></div></div>
       <div class="walk-trail"><span>${name}${together ? say([' + Нари', ' + Nari']) : ''}</span><div class="trail-line"><i class="you-dot"></i>${spots.map(s => `<b style="left:${s.position.x / 12}%"></b>`).join('')}</div><span>✦</span></div>
       <p class="walk-tip" role="status"></p>
-      ${room === 'dance' && !together ? '<div class="dance-steps"></div>' : ''}
+       ${room === 'dance' && !together && !chapter ? '<div class="dance-steps"></div>' : ''}
+      ${chapter && chapter.dance.phase === 'complete' ? `<div class="chapter-end"><button data-chapter-finale>${say(['Вернуться к финальному кадру', 'Final karesine dön'])}</button><button data-chapter-restart>${say(['Начать новую поездку', 'Yeni yolculuğa başla'])}</button></div>` : ''}
       ${state.arrival && room === 'street' ? `<button class="walk-arrival">${state.days === 2 ? say(['Начать за день до концерта', 'Konsere bir gün kala başla']) : say(['Начать за два дня', 'İki gün kala başla'])}</button>` : ''}`;
         const get = (q) => {
             const el = host.querySelector(q);
@@ -159,7 +197,44 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
             save(key, state);
             renderRoom();
         }
+        function chapterDance(live) {
+            if (!chapter || !chapterOptions || open)
+                return;
+            open = true;
+            engine.setPaused(true);
+            if (live)
+                get('h2').textContent = say(['Сцена арены', 'Arena sahnesi']);
+            host.classList.add('chapter-panel-open');
+            panel.classList.add('chapter-panel');
+            panel.hidden = false;
+            endDuet = mountChapterDancePanel(panel, lang, chapter, equipped, live, {
+                ready: () => {
+                    if (!state.danced && state.days > 0)
+                        --state.days;
+                    state.danced = true;
+                    acceptInvitation();
+                },
+                close: () => {
+                    endDuet?.();
+                    endDuet = undefined;
+                    if (live && state.invitation === 'onstage')
+                        state.invitation = chapter.dance.phase === 'complete' ? 'performed' : 'together';
+                    panel.classList.remove('chapter-panel');
+                    host.classList.remove('chapter-panel-open');
+                    get('h2').textContent = say(titles[room]);
+                    save(key, state);
+                    nearNari = true;
+                    panelClose();
+                    refresh();
+                },
+                album: chapterOptions.album, concert
+            });
+        }
         function meetNari() {
+            if (chapter) {
+                chapterDance(false);
+                return;
+            }
             if (state.invitation === 'offered') {
                 panelShow(`<h3>${say(['Приглашение Нари', 'Nari’nin daveti'])}</h3><p>${say(['Пойдём со мной на мой первый концерт? Станцуем наш танец!', 'İlk konserime benimle gelir misin? Birlikte bizim dansı yapalım!'])}</p>
           <button class="duet-next" data-invite>${say(['Пойдём вместе!', 'Birlikte gidelim!'])}</button>
@@ -279,6 +354,19 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
         function arrive(id) {
             if (open)
                 return;
+            if (chapter && (id === 'chapter-pixel' || id === 'chapter-minho')) {
+                open = true;
+                engine.setPaused(true);
+                host.classList.add('chapter-panel-open');
+                panel.hidden = false;
+                panel.classList.add('chapter-panel');
+                const look = chapter.look(equipped);
+                endDuet = mountChapterHongdae(panel, { lang, days: state.days, role: cast?.id ?? 'sofia', outfit: look.outfit === 'sofia' ? 'walk/sofia' : look.outfit, activity: id === 'chapter-pixel' ? 'pixel' : 'minho', chosen: equipped, owned,
+                    equip: item => { equipped = item; equip(item); worldAudio.cue('delivery'); },
+                    close: () => { endDuet?.(); endDuet = undefined; panel.classList.remove('chapter-panel'); host.classList.remove('chapter-panel-open'); panelClose(); refresh(); }
+                });
+                return;
+            }
             if (roomKey(id)) {
                 destination(id);
                 return;
@@ -304,6 +392,19 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
             }
             if (id === 'gate') {
                 worldAudio.cue('curtain');
+                if (chapter) {
+                    if (['lesson', 'choose'].includes(chapter.dance.phase)) {
+                        notice = say(['Нари ещё в танцзале YG. Загляни к ней перед нашим выходом.', 'Nari hâlâ YG’nin dans odasında. Sahne öncesi yanına uğra.']);
+                        refresh();
+                        return;
+                    }
+                    state.days = 0;
+                    state.invitation = 'onstage';
+                    save(key, state);
+                    refresh();
+                    chapterDance(true);
+                    return;
+                }
                 if (together) {
                     state.days = 0;
                     state.invitation = 'onstage';
@@ -353,6 +454,12 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
             onProximityChange(id) { use.hidden = !id || id.startsWith('pad'); use.textContent = say(spots.find(s => s.id === id)?.label ?? ['', '']); },
             onAssetError: () => { status.textContent = say(['Не удалось загрузить сцену. Обнови страницу.', 'Sahne yüklenemedi. Sayfayı yenile.']); },
             onFrame() {
+                if (loadedOutfit) {
+                    const look = loadedOutfit;
+                    loadedOutfit = null;
+                    player.draw = (ctx, size, direction, gait) => drawWalkingTravelLook(ctx, look, size.height, direction, gait);
+                    engine.setAppearance(player);
+                }
                 const p = engine.getPosition(), c = engine.getCamera(), now = performance.now();
                 board.dataset.playerX = p.x.toFixed(1);
                 board.dataset.playerY = p.y.toFixed(1);
@@ -408,7 +515,7 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
                     worldAudio.groove(beat++);
                     nextBeat = now + 520;
                 }
-                if (room === 'dance' && state.step < route.length && !open && now > resetAfter) {
+                if (!chapter && room === 'dance' && state.step < route.length && !open && now > resetAfter) {
                     const target = spots.find(s => s.id === 'pad' + route[state.step]);
                     if (target && Math.hypot(target.approach.x - p.x, target.approach.y - p.y) < 34) {
                         resetAfter = now + 180;
@@ -428,6 +535,18 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
             if (!button)
                 return;
             const id = button.dataset.walkTo;
+            if (button.hasAttribute('data-chapter-open-album')) {
+                chapterOptions?.album();
+                return;
+            }
+            if (button.hasAttribute('data-chapter-restart')) {
+                chapterOptions?.restart();
+                return;
+            }
+            if (button.hasAttribute('data-chapter-finale')) {
+                chapterDance(true);
+                return;
+            }
             if (button.classList.contains('walk-arrival')) {
                 state.days = state.days === 1 ? 2 : 1;
                 save(key, state);
@@ -479,9 +598,13 @@ export function mountSeoulWalk(lang, sound, chosen, owned, equip, concert, cast)
         }, listen);
         window.addEventListener('pagehide', () => save(key, state), listen);
         canvas.focus({ preventScroll: true });
-        leaveRoom = () => { endDuet?.(); host.classList.remove('in-duet'); window.clearTimeout(curtainTimer); window.clearTimeout(poseTimer); const p = engine.getPosition(); state.x = p.x; state.y = p.y; save(key, state); engine.destroy(); controller.abort(); };
-        if (state.invitation === 'onstage')
-            startDuet(true);
+        leaveRoom = () => { endDuet?.(); host.classList.remove('in-duet', 'chapter-panel-open'); window.clearTimeout(curtainTimer); window.clearTimeout(poseTimer); const p = engine.getPosition(); state.x = p.x; state.y = p.y; save(key, state); engine.destroy(); controller.abort(); };
+        if (state.invitation === 'onstage') {
+            if (chapter)
+                chapterDance(true);
+            else
+                startDuet(true);
+        }
     }
     worldAudio.setEnabled(sound);
     renderRoom();

@@ -1,0 +1,279 @@
+.walk-panel.chapter-hongdae-panel {
+  inset: 8px;
+  z-index: 4;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  border-radius: 13px;
+  border-color: #d6a4bf;
+  background: #24182b;
+  color: #fff0ec;
+}
+
+.chapter-hongdae {
+  min-height: 100%;
+  background: radial-gradient(ellipse at top right, #542d53, #25192d 68%);
+}
+
+.chapter-hongdae-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 5px 12px;
+  background: #2c1c33f5;
+  border-bottom: 1px solid #a97099;
+}
+
+.chapter-hongdae-head h3 {
+  margin: 0;
+  line-height: 1.13;
+  font-size: clamp(1.04rem, 4.5vw, 1.42rem);
+  letter-spacing: -.025em;
+}
+.chapter-hongdae-head h3:focus { outline: none; }
+
+.chapter-hongdae-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px 13px;
+}
+
+.chapter-hongdae-body p {
+  margin: 0;
+  line-height: 1.28;
+  font-size: .88rem;
+}
+
+.chapter-hongdae-body p:empty { display: none; }
+
+.chapter-hongdae-button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  border: 1px solid #fff3e2;
+  background: #fce1ad;
+  color: #3b253b;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.chapter-hongdae-button:disabled {
+  border-color: #9c7a94;
+  background: #49344d;
+  color: #e0c5d9;
+  cursor: default;
+}
+
+.chapter-hongdae-head .chapter-hongdae-button {
+  flex: none;
+  background: #442942;
+  border: 1px solid #ebacc4;
+  color: #ffe7f2;
+  font-size: .82rem;
+}
+
+.chapter-hongdae-curtain {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: clamp(124px, 23svh, 220px);
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid #dea9c9;
+  border-radius: 11px;
+  background:
+    linear-gradient(0deg, #251728bf, transparent 55%),
+    url("art/world/hongdae.webp") 94% 44% / cover;
+}
+
+.chapter-hongdae-curtain::before,
+.chapter-hongdae-curtain::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  width: 36%;
+  background:
+    linear-gradient(0deg, #6728525b, #86386918 55%, #ffd5df29),
+    repeating-linear-gradient(85deg, #d85f98 0%, #9c346d 11%, #75305f 19%, #d85f98 24%);
+  box-shadow: 0 0 26px #210d25b5;
+}
+.chapter-hongdae-curtain::before { inset-inline-start: 0; border-end-end-radius: 70% 11%; }
+.chapter-hongdae-curtain::after { inset-inline-end: 0; border-end-start-radius: 70% 11%; }
+
+.chapter-hongdae-picture {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  isolation: isolate;
+  aspect-ratio: 1.55;
+  background: linear-gradient(0deg, #4f286594, #93f3ef2e), url("art/world/hongdae.webp") 78% 56% / cover;
+  border: 1px solid #dfacd9;
+  border-radius: 7px;
+}
+
+.chapter-hongdae-picture[data-chapter-frame=jump] {
+  background: linear-gradient(0deg, #4d3769a6, #fef39f55), url("art/walk/plaza.webp") 55% 50% / cover;
+}
+.chapter-hongdae-picture[data-chapter-frame=heart] {
+  background: linear-gradient(0deg, #701f66a8, #ff91cf7d), url("art/world/hongdae.webp") 97% 50% / cover;
+}
+
+.chapter-hongdae-preview {
+  width: min(100%, 360px);
+  margin-inline: auto;
+}
+
+.chapter-hongdae-actor,
+.chapter-hongdae-pixel {
+  position: absolute;
+  bottom: 3%;
+  left: 15%;
+  display: block;
+  height: 94%;
+  max-width: 63%;
+  aspect-ratio: 1;
+  background-size: contain;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 2px 3px #341d40ac);
+}
+.chapter-hongdae-actor[data-chapter-sprite=sofia] {
+  background-size: 300% 200%;
+  background-position: 0 100%;
+}
+.chapter-hongdae-actor[data-chapter-sprite=cast] {
+  background-size: 400% 300%;
+  background-position: 0 0;
+}
+.chapter-hongdae-actor[data-chapter-sprite=outfit] {
+  border: 1px solid #ffd8ef;
+  border-radius: 40% 40% 6px 6px;
+  background-position: center top;
+  background-size: cover;
+}
+[data-chapter-frame=jump] .chapter-hongdae-actor[data-chapter-sprite=sofia] { background-position: 50% 100%; }
+[data-chapter-frame=heart] .chapter-hongdae-actor[data-chapter-sprite=sofia] { background-position: 100% 100%; }
+[data-chapter-frame=jump] .chapter-hongdae-actor[data-chapter-sprite=cast] { background-position: 33.333% 0; }
+[data-chapter-frame=heart] .chapter-hongdae-actor[data-chapter-sprite=cast] { background-position: 66.666% 0; }
+
+.chapter-hongdae-pixel {
+  left: auto;
+  right: 11%;
+  bottom: 5%;
+  height: 53%;
+  background: url("art/world/pixel.webp") 0 0 / 400% 100% no-repeat;
+}
+[data-chapter-frame=jump] .chapter-hongdae-pixel { background-position: 66.666% 0; }
+[data-chapter-frame=heart] .chapter-hongdae-pixel { background-position: 100% 0; }
+
+.chapter-hongdae-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: #49344f;
+  color: #fff1e5;
+}
+.chapter-hongdae-progress > span { color: #f6d2eb; }
+.chapter-hongdae-notice { color: #fce3aa; font-weight: 700; }
+
+.chapter-hongdae-frames,
+.chapter-hongdae-album > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.chapter-hongdae-frame {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  width: 100%;
+  min-height: 68px;
+  padding: 3px 3px 5px;
+  background: #edcfe8;
+  color: #38223d;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+  font-size: clamp(.65rem, 2.7vw, .86rem);
+}
+
+.chapter-hongdae-frame[aria-pressed=true] {
+  background: #fee7aa;
+  border-color: #fff8d8;
+}
+
+.chapter-hongdae-keepsake {
+  min-width: 0;
+  margin: 0;
+  padding: 5px;
+  border-radius: 7px;
+  background: #ffe6ec;
+  color: #3a2337;
+}
+
+.chapter-hongdae-keepsake figcaption {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  padding: 5px 3px 2px;
+  font-size: .8rem;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.chapter-hongdae-body > .chapter-hongdae-keepsake {
+  width: min(100%, 280px);
+  margin-inline: auto;
+}
+
+.chapter-hongdae-album { margin-block: 13px; }
+.chapter-hongdae-album h3 { margin: 0 0 6px; color: #ffe1ed; }
+
+.chapter-hongdae-shop-image {
+  min-height: 96px;
+  height: clamp(96px, 16svh, 150px);
+  padding-inline: 8px;
+  overflow: hidden;
+  border: 1px solid #c887ae;
+  border-radius: 9px;
+  background: url("art/world/minho-shop.webp") center 46% / cover;
+}
+.chapter-hongdae-shop-image img {
+  display: block;
+  height: 100%;
+  width: auto;
+  object-fit: cover;
+  border-inline: 2px solid #ffd0e4b0;
+}
+.chapter-hongdae-dialogue {
+  border-inline-start: 3px solid #f3bcdb;
+  padding-inline-start: 8px;
+}
+
+.chapter-hongdae .stick-item .wand-art {
+  height: clamp(42px, 9svh, 85px);
+}
+.chapter-hongdae .stick-item strong { font-size: clamp(.66rem, 2.8vw, .84rem); }
+
+@media (max-width: 360px) {
+  .chapter-hongdae-album > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (orientation: landscape) and (max-height: 490px) {
+  .chapter-hongdae-preview { width: min(100%, 190px); }
+}

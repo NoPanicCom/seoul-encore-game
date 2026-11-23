@@ -1,6 +1,7 @@
 import { renderLisaMic, mountLisaMic, resetLisaMic, lisaMicTaken, setLisaMicSoundEnabled } from './lisa-mic.js';
 import { renderOfficialShow, mountOfficialShow } from './official-show.js';
 import { initConcertTrack, activeConcertTrack, renderConcertTrack, mountConcertTrack, playConcertTrack, stopConcertTrack, setConcertTrackSound, concertTrackElapsed, isConcertTrackPlaying } from './concert-track.js';
+import { chapterAlbum, resetChapter } from './chapter.js';
 import { items, passes, trips } from './story.js';
 import { beatAt, beatCount, beatMs, cardIds, windowMs } from './rules.js';
 import { worldAudio } from './world-audio.js';
@@ -69,6 +70,17 @@ function lisaSongMode() {
     return activeConcertTrack() ? 'rhythm' : 'official';
 }
 let walkRole = null;
+let chapterRole = 'sofia';
+function selectChapter(id) {
+    chapterRole = isRole(id) ? id : 'sofia';
+    walkRole = chapterRole === 'sofia' ? null : chapterRole;
+    role = walkRole ?? 'blink';
+    actor = pass().person;
+    tripMember = memberIds[actor] ?? 'lisa';
+    cityMode = 'free';
+    clipDay = false;
+    save('chapter-last', chapterRole);
+}
 let drawn = false;
 let remaining = 0;
 const memberIds = { Jisoo: 'jisoo', Jennie: 'jennie', 'Rosé': 'rose', Lisa: 'lisa' };
@@ -104,7 +116,7 @@ function changeSound(enabled) {
     worldAudio.setEnabled(sound);
     setConcertTrackSound(sound);
     setLisaMicSoundEnabled(sound);
-    if (sound && ['walk', 'world', 'hongdae', 'manager-mic'].includes(page))
+    if (sound && ['chapter', 'walk', 'world', 'hongdae', 'manager-mic'].includes(page))
         void worldAudio.enter();
     const button = app.querySelector('header [data-act="sound"]');
     if (button) {
@@ -163,7 +175,7 @@ function stylistConcert(stylist) {
     return role === stylist && (walkedToConcert ? walkRole === stylist && arenaEntrance === 'walk' : cityMode === 'tour');
 }
 function stylistFitting(stylist) {
-    return studioMember === passes[stylist]?.person && role === stylist && (studioBack === 'walk' || studioBack === 'brief' || studioBack === 'city' || studioBack === 'item');
+    return studioMember === passes[stylist]?.person && role === stylist && (studioBack === 'walk' || studioBack === 'chapter' || studioBack === 'brief' || studioBack === 'city' || studioBack === 'item');
 }
 function managerConcert(dest) {
     if (role !== 'manager' || (dest !== 'stage' && dest !== 'lightshow'))
@@ -208,6 +220,14 @@ function go(next) {
 }
 function isTravelWardrobe() { return studioBack === 'world' || studioBack === 'hongdae'; }
 function sceneHash(next) {
+    if (next === 'chapter')
+        return '#two-days/' + chapterRole;
+    if (next === 'chapter-crew')
+        return '#chapter-crew/' + chapterRole;
+    if (next === 'album' && albumSection === 'chapter')
+        return '#chapter-album/' + chapterRole;
+    if (studioBack === 'chapter' && (next === 'studio' || next === 'yuna-rehearsal'))
+        return '#chapter-room/' + chapterRole + '/' + next;
     if (next === 'official-show')
         return '#official-show/' + officialOrigin;
     if (next === 'lisa-mic' || lisaConcert(next))
@@ -266,6 +286,21 @@ function sceneHash(next) {
 function restoreScene() {
     ariVenue = null;
     const [place, first, second] = location.hash.slice(1).split('/');
+    if (['two-days', 'chapter-album', 'chapter-room', 'chapter-crew'].includes(place ?? '')) {
+        selectChapter(first ?? (place === 'chapter-album' ? read('chapter-last') ?? 'sofia' : 'sofia'));
+        if (place === 'chapter-album') {
+            albumSection = 'chapter';
+            return 'album';
+        }
+        if (place === 'chapter-room' && walkRole) {
+            studioBack = 'chapter';
+            studioMember = actor;
+            return second === 'yuna-rehearsal' && role === 'yuna' && yunaDressed() ? 'yuna-rehearsal' : 'studio';
+        }
+        if (place === 'chapter-crew' && hasCrewGame(role))
+            return 'chapter-crew';
+        return 'chapter';
+    }
     if (place === 'official-show' && first === 'home') {
         officialOrigin = 'home';
         return 'official-show';
@@ -520,13 +555,13 @@ function clockPage() {
     return `<section class="drawn-pass" data-role="${role}">${role === 'blink' ? '<span aria-hidden="true">♥</span>' : photo(role === 'light' ? 'light' : p.photo, '')}<div><small>${t('Senin rolün', 'Твоя роль')}</small><h2>${roleFamily(role) === 'team' && role !== 'blink' ? p.job[lang] : p.name}</h2><b>${roleFamily(role) === 'team' && role !== 'blink' ? 'BLACKPINK' : label}</b><p>${p.intro[lang]}</p></div></section>
   ${role === 'lisa' ? '<div class="lisa-music-choices" role="group" aria-label="BLACKPINK"><h3>' + t('Mikrofonu aldığında', 'Когда возьмёшь микрофон') + '</h3>' + ['official', 'rhythm'].map(mode => '<button class="option" data-act="lisa-mode-' + mode + '" aria-pressed="' + (lisaSongMode() === mode) + '">' + (mode === 'official' ? t('Resmî klibi seç · YouTube', 'Выбрать клип · YouTube') : t('Ritim oyununda söyle', 'Вступить в песню в ритм-игре')) + '</button>').join('') + '</div>' : ''}
   <h2>${t('Seul’e ne zaman gelelim?', 'Когда приедем в Сеул?')}</h2><p class="intro">${t('Seul’e erken gelirsen YG’ye yürüyüp konser için hazırlanabilirsin.', 'Приезжай заранее, чтобы прогуляться до YG и подготовиться к концерту.')}</p>
-  <div class="stack">${drawn ? '' : action('enter-role-city', t('Bu karakterle Seul’de yürü', 'Гулять по Сеулу за этого героя'), 'primary')}${[t('İki gün önce · Şehri gez', 'За два дня · Погулять'), t('Bir gün önce · Son prova', 'За день · Репетиция'), t('Doğrudan konsere', 'Сразу на концерт')].map((label, i) => action('days-' + (2 - i), label + ' →', 'option')).join('')}</div>`;
+  <div class="stack">${action('chapter-role', t('Seul’de İki Gün · ' + p.name, 'Два дня в Сеуле · ' + p.name), 'chapter-role-button')}${drawn ? '' : action('enter-role-city', t('Bu karakterle Seul’de yürü', 'Гулять по Сеулу за этого героя'), 'primary')}${[t('İki gün önce · Şehri gez', 'За два дня · Погулять'), t('Bir gün önce · Son prova', 'За день · Репетиция'), t('Doğrudan konsere', 'Сразу на концерт')].map((label, i) => action('days-' + (2 - i), label + ' →', 'option')).join('')}</div>`;
 }
 function studioScreen() {
     const choose = studioBack === 'home'
         ? `<div class="segmented">${Object.keys(memberIds).map(name => action('artist-' + name, name, name === studioMember ? 'chosen' : '')).join('')}</div>` : '';
     const travelExit = isTravelWardrobe() ? action('trip-street', t('Pixel ile Hongdae’ye çık', 'На прогулку с Пикселем'), 'trip-exit') : '';
-    const costume = studioBack === 'walk' ? concertCostume(studioMember) : '';
+    const costume = studioBack === 'walk' || studioBack === 'chapter' ? concertCostume(studioMember) : '';
     if (stylistFitting('ari'))
         return ariFitting(lang) + renderStudio(lang, studioMember);
     if (stylistFitting('yuna'))
@@ -540,8 +575,9 @@ function studioScreen() {
         const attach = ready ? '' : `<button type="button" class="primary" data-act="fasten-jacket" ${under ? '' : 'disabled'}>${t('Pembe ceketi giydir', 'Надеть розовый жакет')}</button>`;
         return `<section class="mina-fitting"><div class="fitting-cue">${ready ? showFigure() : under}<p>${cue}</p></div></section>` + renderStudio(lang, studioMember, attach);
     }
-    const fitting = studioBack === 'walk' ? `<div class="fitting-cue">${costume}<p>${costume ? t(studioMember + ' bu kıyafetle sahneye çıkacak.', studioMember + ' выйдет на сцену в этом образе.') : t(studioMember + ' için sahne kostümünü seç.', 'Подбери сценический костюм для ' + studioMember + '.')}</p></div>` : '';
-    return choose + fitting + renderStudio(lang, studioMember) + travelExit;
+    const fitting = studioBack === 'walk' || studioBack === 'chapter' ? `<div class="fitting-cue">${costume}<p>${costume ? t(studioMember + ' bu kıyafetle sahneye çıkacak.', studioMember + ' выйдет на сцену в этом образе.') : t(studioMember + ' için sahne kostümünü seç.', 'Подбери сценический костюм для ' + studioMember + '.')}</p></div>` : '';
+    const chapterEntry = (studioBack === 'home' || isTravelWardrobe()) ? action('chapter-artist', t(studioMember + ' ile Seul’de İki Gün', 'Два дня в Сеуле · ' + studioMember), 'chapter-role-button') : '';
+    return choose + fitting + renderStudio(lang, studioMember) + travelExit + chapterEntry;
 }
 function cityScreen() {
     const route = cityMode === 'tour' ? (stylistRoles.includes(role) ? action('studio', t(actor + ' için kostüm hazırla', 'Подготовить костюм для ' + actor), 'walk-entry secondary') : '') : action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary');
@@ -643,7 +679,7 @@ function ending() {
   ${action('pet-visit', t('Konserden sonra eve uğra', 'Навестить питомца после шоу'))}${action('afterparty', t('Ertesi gün · Turneye devam', 'На следующий день · Продолжить тур'), 'secondary')}${action('clipday', t('Klip çekim gününe katıl', 'Остаться на съёмки клипа'), 'secondary')}${action('album', albumTitle(), 'secondary')}${action('start', t('Başka bir kartla oyna', 'Играть с другим пропуском'), 'secondary')}`;
 }
 function albumPage() {
-    const tabs = [['concert', t('Konser', 'Концерт')], ['pets', t('Patiler', 'Питомцы')], ['city', t('Şehir', 'Город')], ['hongdae', t('Fotokabin', 'Фотобудка')], ['studio', t('Stil', 'Стиль')], ['crew', t('Ekip', 'Команда')], ['world', t('Kulis', 'Гримёрка')]];
+    const tabs = [['concert', t('Konser', 'Концерт')], ['chapter', t('Seul’de İki Gün', 'Два дня в Сеуле')], ['pets', t('Patiler', 'Питомцы')], ['city', t('Şehir', 'Город')], ['hongdae', t('Fotokabin', 'Фотобудка')], ['studio', t('Stil', 'Стиль')], ['crew', t('Ekip', 'Команда')], ['world', t('Kulis', 'Гримёрка')]];
     const special = fanCards();
     const concertCards = `${special.length ? '<div class="foil-album">' + special.map(id => secretPhotocard(lang, id, true)).join('') + '</div>' : ''}<div class="album">${album.map(id => {
         const p = passes[id];
@@ -651,13 +687,15 @@ function albumPage() {
             throw new Error(id);
         return action('card-' + id, `${photo(memoryLook(id))}<span>${p.person} · ${p.job[lang]}</span>`, 'collect');
     }).join('')}</div>${album.length || special.length ? '' : `<p class="intro">${t('İlk konserini bitirince fotoğraf kartın buraya gelecek.', 'Заверши концерт, чтобы получить первую фотокарточку.')}</p>`}${hasEncoreReplay() ? action('replay', t('Son konseri yeniden izle', 'Посмотреть запись концерта'), 'secondary') : ''}${action('start', t('Kulis kartı seç', 'Выбрать пропуск'))}`;
-    const sections = { hongdae: () => boothAlbum(lang) + action('trip-street', t('Hongdae’ye dön', 'Вернуться в Хондэ'), 'trip-exit'), concert: () => concertCards, pets: () => petAlbum(lang), studio: () => studioAlbum(lang), city: () => cityAlbum(lang), crew: () => crewAlbum(lang), world: () => {
+    const sections = { chapter: () => chapterAlbum(lang) + action('chapter-return', t('Yolculuğuma dön', 'Вернуться в путешествие'), 'secondary'), hongdae: () => boothAlbum(lang) + action('trip-street', t('Hongdae’ye dön', 'Вернуться в Хондэ'), 'trip-exit'), concert: () => concertCards, pets: () => petAlbum(lang), studio: () => studioAlbum(lang), city: () => cityAlbum(lang), crew: () => crewAlbum(lang), world: () => {
             const cards = worldAlbum(lang);
             return (cards.length ? '<div class="world-album">' + cards.map(card => `<figure class="world-album-card"><img src="${card.image}" alt=""><figcaption><strong>${card.title}</strong><small>${card.subtitle}</small></figcaption></figure>`).join('') + '</div>' : '<p>' + t('Kulis provasını tamamlayınca ilk hatıran buraya gelir.', 'Закончи репетицию за кулисами, и здесь появится твоя карточка.') + '</p>') + action('world', t('Kulise gir', 'Войти за кулисы'));
         } };
     return `<h2>${albumTitle()}</h2><div class="segmented">${tabs.map(([id, name]) => action('section-' + id, String(name), albumSection === id ? 'chosen' : '')).join('')}</div>${sections[albumSection]?.() ?? concertCards}`;
 }
 function back() {
+    if (page === 'chapter-crew' || (page === 'album' && albumSection === 'chapter'))
+        return 'chapter';
     if (page === 'official-show')
         return officialOrigin === 'home' ? 'home' : walkedToConcert ? 'walk' : 'brief';
     if (page === 'lisa-mic')
@@ -710,8 +748,8 @@ function draw() {
     app.dataset.page = page;
     document.documentElement.lang = lang;
     const trackPanel = ['home', 'time'].includes(page) || (!playing && ['stage', 'lightshow', 'secret'].includes(page));
-    const screens = { 'official-show': officialShow, 'lisa-mic': () => renderLisaMic(lang), 'manager-practice': () => renderCrewGame(lang, 'manager', true), 'manager-mic': () => renderManagerMic(lang), 'ari-change': () => ariBackstage(lang), 'yuna-rehearsal': () => yunaRehearsal(lang), 'soyeon-change': () => velvetBackstage(lang), 'soyeon-stairs': () => velvetStairs(lang), 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${listening ? t('Sahne ışıkları söndü. Seul’den iyi geceler!', 'Свет на сцене погас. Спокойной ночи, Сеул!') : t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт') + ' · ' + hits.size + ' / ' + beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
-    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button type="button" class="audio-switch" data-act="sound" aria-pressed="${sound}">${sound ? '♫ ' : '○ '}${soundLabel()}</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'walk', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result', 'fan-replay'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(['official-show', 'lisa-mic', 'lightshow', 'secret'].includes(page)) ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}${trackPanel ? renderConcertTrack(lang) : ''}<div id="feedback" class="notice" role="status"></div></main>`;
+    const screens = { chapter: renderSeoulWalk, 'chapter-crew': () => renderCrewGame(lang, role), 'official-show': officialShow, 'lisa-mic': () => renderLisaMic(lang), 'manager-practice': () => renderCrewGame(lang, 'manager', true), 'manager-mic': () => renderManagerMic(lang), 'ari-change': () => ariBackstage(lang), 'yuna-rehearsal': () => yunaRehearsal(lang), 'soyeon-change': () => velvetBackstage(lang), 'soyeon-stairs': () => velvetStairs(lang), 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${listening ? t('Sahne ışıkları söndü. Seul’den iyi geceler!', 'Свет на сцене погас. Спокойной ночи, Сеул!') : t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт') + ' · ' + hits.size + ' / ' + beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
+    app.innerHTML = `<header><button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button><button type="button" class="audio-switch" data-act="sound" aria-pressed="${sound}">${sound ? '♫ ' : '○ '}${soundLabel()}</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${['home', 'chapter', 'walk', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result', 'fan-replay'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(['official-show', 'lisa-mic', 'lightshow', 'secret'].includes(page)) ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}${trackPanel ? renderConcertTrack(lang) : ''}<div id="feedback" class="notice" role="status"></div></main>`;
     if (!tracksReady)
         app.querySelectorAll('[data-act="play"],[data-act="listen"],[data-act^="watch-fan-"]').forEach(button => button.disabled = true);
     element('feedback').textContent = feedback;
@@ -741,7 +779,8 @@ function draw() {
         unmountScene = mountJacketDrag(app, () => { if (hangJacket())
             draw(); });
     }
-    else if (page === 'walk') {
+    else if (page === 'walk' || page === 'chapter') {
+        const inChapter = page === 'chapter';
         unmountScene = mountSeoulWalk(lang, sound, lightstick, ownedSticks, buyOrEquip, () => {
             role = walkRole ?? 'blink';
             actor = pass().person;
@@ -753,9 +792,14 @@ function draw() {
             arenaEntrance = 'walk';
             walkedToConcert = true;
             go(lightstick ? 'lightshow' : 'stage');
-        }, walkRole ? { id: walkRole, openWardrobe: () => { studioBack = 'walk'; studioMember = actor; go('studio'); },
-            lightDesk: () => { studioMember = actor; studioBack = 'walk'; go(yunaDressed() ? 'yuna-rehearsal' : 'studio'); },
+        }, walkRole ? { id: walkRole, openWardrobe: () => { studioBack = inChapter ? 'chapter' : 'walk'; studioMember = actor; go('studio'); },
+            lightDesk: () => { studioMember = actor; studioBack = inChapter ? 'chapter' : 'walk'; go(yunaDressed() ? 'yuna-rehearsal' : 'studio'); },
             mission: () => {
+                if (inChapter && hasCrewGame(role)) {
+                    resetCrewGame(role);
+                    go('chapter-crew');
+                    return;
+                }
                 if (walkRole === 'manager') {
                     resetCrewGame('manager');
                     cityMode = 'free';
@@ -765,7 +809,7 @@ function draw() {
                     cityMode = 'tour';
                     go('brief');
                 }
-            } } : undefined);
+            } } : undefined, inChapter ? { album: () => { albumSection = 'chapter'; go('album'); }, restart: () => { resetChapter(chapterRole); go('chapter'); } } : undefined);
     }
     else if (page === 'fan-replay' && replay) {
         unmountScene = mountFanReplay(app, replay, sound, lang);
@@ -1096,6 +1140,21 @@ app.addEventListener('click', e => {
         draw();
         return;
     }
+    if (act === 'chapter-artist' && page === 'studio') {
+        selectChapter(memberIds[studioMember] ?? 'sofia');
+        go('chapter');
+        return;
+    }
+    if (act === 'chapter' || act === 'chapter-role' || act === 'chapter-return') {
+        selectChapter(act === 'chapter-role' ? role : act === 'chapter-return' ? chapterRole : read('chapter-last') ?? 'sofia');
+        go('chapter');
+        return;
+    }
+    if (act === 'chapter-album') {
+        albumSection = 'chapter';
+        go('album');
+        return;
+    }
     if (act === 'official-home' && page === 'home') {
         officialOrigin = 'home';
         go('official-show');
@@ -1224,6 +1283,8 @@ app.addEventListener('click', e => {
     }
     if (act.startsWith('section-')) {
         albumSection = act.slice(8);
+        if (albumSection === 'chapter')
+            chapterRole = read('chapter-last') ?? 'sofia';
         go('album');
         return;
     }
@@ -1581,6 +1642,10 @@ app.addEventListener('click', e => {
     }
     const crewRole = clipDay ? 'director' : role;
     if (act === 'crew-continue' && isCrewGameComplete(crewRole)) {
+        if (page === 'chapter-crew') {
+            go('chapter');
+            return;
+        }
         if (page === 'manager-practice') {
             go('walk');
             return;

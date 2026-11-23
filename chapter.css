@@ -1,0 +1,20 @@
+.el-chapter{position:relative;isolation:isolate;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;width:100%;min-height:104px;text-align:left;color:#fff4ec;border:1px solid #b88283;border-radius:14px;overflow:hidden;padding:18px;margin:12px 0 4px;background:#392330}
+.el-chapter:before{content:'';position:absolute;z-index:-1;inset:0;background:linear-gradient(90deg,#241022ec 4%,#3a1936a8 56%,#2e1c3880),url('art/walk/street.webp') center 48%/cover}
+.el-chapter-copy{display:grid;gap:3px;text-shadow:0 2px 6px #271322}
+.el-chapter-copy strong{font:800 clamp(24px,6vw,35px)/1.05 system-ui;letter-spacing:-.035em}
+.el-chapter-copy small{color:#ffe4eb;font:600 14px/1.4 system-ui}
+.el-chapter-arrow{display:grid;place-items:center;border:1px solid #ffcec5;border-radius:50%;width:42px;height:42px;color:#311525;background:#ffe0c9;font-size:23px}
+.chapter-role-button,.chapter-end button,.chapter-dance-nav button{min-height:44px;padding:9px 14px;color:#251829;background:#ffd6dc;border:1px solid #cba8ba;border-radius:10px;font-weight:750}
+#app[data-page=chapter]{width:min(100%,940px);background:#19171f}
+#app[data-page=chapter] main{padding:6px clamp(8px,2vw,20px) 16px}
+.chapter-ribbon{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#f4b6ca;font-size:14px;font-weight:750}
+.chapter-ribbon button,.chapter-dance-nav .chapter-leave{min-height:44px;background:transparent;color:#f7d7e4;padding:6px 12px}
+.chapter-panel.walk-panel{inset:0;padding:clamp(10px,2vw,18px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;background:#241925;border:0;z-index:6;scrollbar-width:thin}
+.chapter-panel-open .walk-bottom,.chapter-panel-open .walk-pins{visibility:hidden}
+.chapter-panel-open .walk-board{touch-action:pan-y}
+.chapter-dance-nav,.chapter-end{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:10px 0 0}
+.chapter-dance-nav p{flex:1 0 100%;margin:0;text-align:center}
+.chapter-scrapbook{display:grid;gap:12px}
+@media (max-width:360px){#app[data-page=chapter] header{padding-inline:8px}#app[data-page=chapter] .audio-switch{padding-inline:6px;margin-inline:auto 4px}}
+
+.chapter-panel-open .walk-tip,.chapter-panel-open .walk-trail{display:none}
