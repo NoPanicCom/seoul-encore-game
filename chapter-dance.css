@@ -103,6 +103,16 @@
   justify-content: space-around;
 }
 
+.cd-stage:not(.cd-viewfinder) .cd-cast {
+  inset-block-end: 38%;
+  height: min(59%, 34cqi);
+}
+
+.cd-stage:not(.cd-viewfinder) .cd-pair {
+  inset-inline: 22%;
+  height: 51%;
+}
+
 .cd-dancer {
   position: relative;
   height: 100%;
@@ -144,6 +154,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cd-stage:not(.cd-viewfinder) .cd-cast figcaption {
+  inset-block: -4px auto;
+  transform: translate(-50%, -28%);
 }
 
 .cd-cast .cd-body {
