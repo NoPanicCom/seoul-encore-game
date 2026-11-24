@@ -153,6 +153,7 @@
 }
 .sumi-order, .sumi-result { display: grid; gap: 8px; }
 .sumi-speech { display: grid; gap: 3px; }
+.sumi-order[data-phase="ordering"] .sumi-speech { padding: 9px 10px; border-left: 2px solid #ffd4ad85; border-radius: 5px; background: #fde0dc0b; }
 .sumi-name { color: #ffd4ad; font: 800 12px/1.2 system-ui, sans-serif; }
 .sumi-line { color: #fff0fa; font: 650 14px/1.36 system-ui, sans-serif; }
 .sumi-welcome-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
@@ -201,7 +202,7 @@
 .sumi-glass[data-fill="stir"] .sumi-milk { height: 82%; }
 .sumi-glass[data-stirs="1"] .sumi-puree { height: 38%; background: linear-gradient(169deg, #ffdce7, #eb6491); }
 .sumi-glass[data-stirs="2"] .sumi-puree { height: 67%; background: linear-gradient(164deg, #ffcadc, #e8719d); }
-.sumi-glass[data-fill="served"] .sumi-milk {
+.sumi-glass:is([data-fill="tray"], [data-fill="delivered"]) .sumi-milk {
   height: 84%;
   background: radial-gradient(circle at 62% 21%, #ffe9ef 1px, transparent 2px),
     radial-gradient(circle at 33% 45%, #fff0f2 1px, transparent 2px),
@@ -236,4 +237,4 @@
 }
 .sumi-berry::before { position: absolute; inset: -16% 6% auto; height: 33%; border-radius: 80% 30%; background: #85bb6e; content: ""; }
 .sumi-saucer { position: absolute; z-index: 0; inset: auto 13% 10%; height: 10%; border-radius: 50%; background: #d292ba78; }
-.sumi-glass[data-fill="served"] .sumi-straw, .sumi-glass[data-fill="served"] .sumi-berry { display: block; }
+.sumi-glass:is([data-fill="tray"], [data-fill="delivered"]) :is(.sumi-straw, .sumi-berry) { display: block; }

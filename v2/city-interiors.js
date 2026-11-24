@@ -1,5 +1,6 @@
 import {SUMI_CAFE_ID} from './city-grid.js';
 import {createSumi} from './sumi-model.js';
+import {createSumiDelivery, SUMI_DELIVERY_LAYOUT} from './sumi-delivery-scene.js';
 
 const WIDTH = 8.28;
 const DEPTH = 7.43;
@@ -411,6 +412,31 @@ function pixelStool(s) {
   s.block(x,z,.52,.52);
 }
 
+function strawberryTableMarker(s) {
+  const {table, tableApproach} = SUMI_DELIVERY_LAYOUT;
+  const x = table.x + .20;
+  const z = table.z - .18;
+  const yaw = .66;
+  const center = table.y + .15;
+  const place = (dx,dy,dz) => [
+    x + Math.cos(yaw)*dx + Math.sin(yaw)*dz,
+    center + dy,
+    z - Math.sin(yaw)*dx + Math.cos(yaw)*dz,
+  ];
+  s.box('#ab7458',x,table.y+.023,z,.34,.046,.22,yaw);
+  s.box('#76504b',x,center,z,.40,.28,.035,yaw);
+  s.box('#f5d5b8',...place(0,0,.023),.35,.23,.013,yaw);
+  s.orb('#b85567',...place(0,-.009,.036),.139,.119,.022,yaw,.15);
+  s.orb('#c77579',...place(0,-.038,.038),.105,.106,.022,yaw,-.20);
+  for(const [dx,dy] of [[-.029,.012],[.018,.016],[.011,-.023],[-.015,-.047]]) {
+    s.bud('#f5d7a6',...place(dx,dy,.050),.010,.015,.009,yaw,-.43);
+  }
+  for(const [dx,angle] of [[-.027,.63],[0,.09],[.030,-.62]]) {
+    s.bud('#71805a',...place(dx,.063,.047),.028,.056,.018,yaw,angle);
+  }
+  s.torus('#f4c1bd',tableApproach.x,.015,tableApproach.z,.51,.062,.51);
+}
+
 function sumiCafe(s, cafeName) {
   const walnut='#7d5146';
   const clay='#b36f58';
@@ -460,20 +486,24 @@ function sumiCafe(s, cafeName) {
   strawberryGlass(s,1.40,top,-2.52);
   pixelStool(s);
 
+  const {table: deliveryTable, chair: deliveryChair} = SUMI_DELIVERY_LAYOUT;
   for (const side of [-1,1]) {
-    const x=side*2.72;
+    const x=side < 0 ? deliveryTable.x : 2.72;
     sofa(s,x,-.79,1.63,side<0?'#bd8f79':'#bb876f');
-    const h=table(s,x,.28,1.04,.71,.71,walnut);
-    cup(s,x-.17,h,.25,ceramic,.12);
-    strawberryGlass(s,x+.19,h,.24);
-    flowers(s,x+.31,h,.51,.29,'#d98b8e');
-    seat(s,x,1.04,Math.PI,'#c68e71');
+    const h=table(s,x,deliveryTable.z,1.04,.71,.71,walnut);
+    if (side > 0) {
+      cup(s,x-.17,h,.25,ceramic,.12);
+      strawberryGlass(s,x+.19,h,.24);
+      flowers(s,x+.31,h,.51,.29,'#d98b8e');
+    }
+    seat(s,x,deliveryChair.z,Math.PI,'#c68e71');
     plant(s,side*3.52,-2.27,.78,'#92a077');
     frame(s,side*2.68,1.97,BACK+.153,1.01,.69,side+1);
     s.cylinder(walnut,side*2.64,2.92,-.71,.046,.38,.046);
     s.cone('#d6a05f',side*2.64,2.73,-.71,.42,.23,.42);
     s.orb(IVORY,side*2.64,2.601,-.71,.26,.11,.26);
   }
+  strawberryTableMarker(s);
   for (const x of [-.95,0,.95]) {
     s.cylinder(walnut,x,2.96,-2.53,.038,.34,.038);
     s.cone('#dfaf77',x,2.756,-2.53,.31,.17,.31);
@@ -914,7 +944,12 @@ export function createInterior(B, scene, anchor, building) {
     highlight: mix(wall, IVORY, .56),
     deep: mix(room, INK, .67),
   });
+  const walkable = (x,z,radius) => {
+    if (x < BOUNDS.minX+radius || x > BOUNDS.maxX-radius || z < BOUNDS.minZ+radius || z > BOUNDS.maxZ-radius) return false;
+    return s.hitboxes.every(hit => x <= hit.minX-radius || x >= hit.maxX+radius || z <= hit.minZ-radius || z >= hit.maxZ+radius);
+  };
   let sumi;
+  let delivery;
   try {
     fixtureWall(s, sumiAddress);
     decorators[sumiAddress ? 'slats' : edition.trim](s);
@@ -928,7 +963,9 @@ export function createInterior(B, scene, anchor, building) {
     s.torus(s.display,0,.016,STATION_Z,.65,.070,.65);
     s.box(s.accent,0,.012,STATION_Z,.17,.020,.17,0,.785);
     s.ready();
+    if (sumiAddress) delivery = createSumiDelivery(B, scene, root, walkable);
   } catch (error) {
+    delivery?.dispose();
     sumi?.dispose();
     s.dispose();
     throw error;
@@ -939,14 +976,12 @@ export function createInterior(B, scene, anchor, building) {
     spawn: SPAWN,
     exit: EXIT,
     activity: {x:0, z:STATION_Z, id:building.type},
-    ...(sumi ? {updateSumi: sumi.update, pixelPerch: PIXEL_PERCH} : {}),
+    ...(sumi ? {updateSumi: sumi.update, pixelPerch: PIXEL_PERCH, sumiDelivery: delivery} : {}),
     bounds: BOUNDS,
     cameraWalls: CAMERA_WALLS,
-    walkable(x,z,radius) {
-      if (x < BOUNDS.minX+radius || x > BOUNDS.maxX-radius || z < BOUNDS.minZ+radius || z > BOUNDS.maxZ-radius) return false;
-      return s.hitboxes.every(hit => x <= hit.minX-radius || x >= hit.maxX+radius || z <= hit.minZ-radius || z >= hit.maxZ+radius);
-    },
+    walkable,
     dispose() {
+      delivery?.dispose();
       sumi?.dispose();
       s.dispose();
     },

@@ -21,7 +21,14 @@ const phrases = {
     cityObjective: 'Найди кафе Суми на карте',
     followTarget: 'Иди к отмеченной двери',
     sumiTalk: 'Поговорить',
-    sumiCounter: 'Подойди к Суми за стойкой',
+    sumiCounter: 'Приготовь напиток с Суми',
+    sumiArriving: 'Гость идёт к стойке',
+    sumiOrdering: 'Подойди к гостю у стойки',
+    sumiCarrying: 'Неси поднос к столику с клубникой',
+    sumiDelivered: 'Гость получил клубничное молоко',
+    takeGuestOrder: 'Заказ',
+    serveGuest: 'Подать',
+    guestReceipt: 'К гостю',
     interiorObjective: 'Подойди к месту задания',
     cityRoute: 'У указателя CITY — вход в кварталы',
     cityError: 'Не удалось открыть локацию. Попробуй ещё раз.',
@@ -192,7 +199,14 @@ const phrases = {
     cityObjective: 'Haritada Sumi’nin kafesini bul',
     followTarget: 'İşaretlediğin kapıya yürü',
     sumiTalk: 'Konuş',
-    sumiCounter: 'Tezgâhtaki Sumi’ye yaklaş',
+    sumiCounter: 'İçeceği Sumi’yle hazırla',
+    sumiArriving: 'Müşteri tezgâha geliyor',
+    sumiOrdering: 'Tezgâhtaki müşteriye yaklaş',
+    sumiCarrying: 'Tepsiyi çilek işaretli masaya götür',
+    sumiDelivered: 'Çilekli süt müşteriye ulaştı',
+    takeGuestOrder: 'Siparişi al',
+    serveGuest: 'Servis et',
+    guestReceipt: 'Müşteri',
     interiorObjective: 'Etkinlik noktasına yaklaş',
     cityRoute: 'CITY tabelasından mahallelere geç',
     cityError: 'Mekân açılamadı. Tekrar dene.',
@@ -474,8 +488,10 @@ const cityUi=createCityActivities({
   onSumiAction:action=>{
     if (!world?.setSumiAction(action)) return;
     if (action==='greet') audio.cue('pixel');
-    if (action==='serve') audio.cue('delivery');
   },
+  onSumiAccept:()=>world.acceptSumiOrder(),
+  onSumiPickup:()=>world.pickupSumiDrink(),
+  onSumiReplay:()=>world.restartSumiVisit(),
   onTarget:building=>{cityTarget=building; paintMission();},
 });
 const inCity=()=>area==='city' || area==='interior';
@@ -522,7 +538,16 @@ function hongdaeContext() {
   if (spot==='city-exit') return {label:cityReturn==='street'?'exitToYG':'exitCity',icon:'↩'};
   if (spot==='room-exit') return {label:'exitRoom',icon:'↩'};
   if (area==='city' && spot?.startsWith('door:')) return {label:'doorAction',icon:'⌂'};
-  if (area==='interior' && spot===`activity:${SUMI_CAFE_ID}`) return {label:'sumiTalk',icon:'♡'};
+  if (area==='interior' && (spot==='sumi-table' || spot===`activity:${SUMI_CAFE_ID}`)) {
+    const phase=world?.sumiDeliveryState();
+    if (spot==='sumi-table') {
+      if (phase==='carrying') return {label:'serveGuest',icon:'♡'};
+      if (phase==='delivered') return {label:'guestReceipt',icon:'♡'};
+    } else if (phase==='ordering') return {label:'takeGuestOrder',icon:'☕'};
+    else if (phase==='preparing') return {label:'sumiTalk',icon:'♡'};
+    else if (phase==='delivered') return {label:'sumiTalk',icon:'♡'};
+    return null;
+  }
   if (area==='interior' && spot?.startsWith('activity:')) return {label:'activityAction',icon:'✦'};
   if (area === 'street' && spot === 'hongdae-enter') return hongdaeActions[spot];
   if (inHongdae() && spot === 'hongdae-exit') return hongdaeActions[spot];
@@ -602,7 +627,12 @@ function paintMission() {
   if (area==='city') objective=cityTarget?'followTarget':'cityObjective';
   if (area==='interior') objective='interiorObjective';
   let objectiveText=building?.name ?? (context?.shelf ? stickName(context.shelf,lang) : words(objective));
-  if (area==='interior' && building?.id===SUMI_CAFE_ID && !context) objectiveText=words('sumiCounter');
+  const sumiPhase=area==='interior' && building?.id===SUMI_CAFE_ID ? world?.sumiDeliveryState() : null;
+  if (sumiPhase) {
+    game.dataset.sumiDelivery=sumiPhase;
+    const hint={arriving:'sumiArriving',ordering:'sumiOrdering',preparing:'sumiCounter',carrying:'sumiCarrying',delivered:'sumiDelivered'};
+    objectiveText=words(hint[sumiPhase]);
+  } else delete game.dataset.sumiDelivery;
   setText('objective',objectiveText);
   rehearsal.hidden = journey() || !nearNari || inHongdae() || Boolean(context);
   startConcert.hidden = !journey() || !nearNari || inHongdae() || Boolean(context);
@@ -1144,8 +1174,18 @@ async function actInCity() {
   const at=spot;
   const building=cityBuilding();
   resetControls();
+  if (at==='sumi-table' && building?.id===SUMI_CAFE_ID) {
+    if (world.deliverSumiDrink()) {
+      audio.cue('delivery');
+      cityUi.finishSumiDelivery(building);
+    } else if (world.sumiDeliveryState()==='delivered') cityUi.play(building,'delivered');
+    return;
+  }
   if(at?.startsWith('activity:') && building) {
-    cityUi.play(building);
+    if (building.id===SUMI_CAFE_ID) {
+      const phase=world.sumiDeliveryState();
+      if (phase==='ordering' || phase==='preparing' || phase==='delivered') cityUi.play(building,phase);
+    } else cityUi.play(building);
     return;
   }
   hongdaePending=true;
@@ -1466,6 +1506,7 @@ async function load() {
 
   try {
     world = await createWorld(canvas, {
+      onSumiState:()=>paintMission(),
       onArea(next) {
         area = next;
         game.dataset.area = area;
@@ -1501,6 +1542,10 @@ async function load() {
         if (entry.searchParams.get('visit') === 'sumi') cityTarget=getBuilding(SUMI_CAFE_ID);
         await enterHongdae('city-gate');
         if (spot==='city-enter' || spot==='street-city-enter') await actInCity();
+        if (area==='city' && cityTarget?.id===SUMI_CAFE_ID) {
+          world.faceCityDoor(SUMI_CAFE_ID);
+          paintCityTarget();
+        }
       } else if (entry.searchParams.get('start') === 'hongdae') {
         const destination = entry.searchParams.get('at') === 'booth' ? 'booth' : 'gate';
         entry.searchParams.delete('start');

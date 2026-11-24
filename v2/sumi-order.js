@@ -1,10 +1,15 @@
 const phrase = (ru, tr) => ({ru, tr});
 
-export const SUMI_STAMP = 'sumi-order-v1';
+export const SUMI_PREPARATION_STAMP = 'sumi-order-v1';
+export const SUMI_STAMP = 'sumi-delivery-v2';
 export const SUMI_ORDER_TITLE = phrase('Клубничное молоко с Суми', 'Sumi ile çilekli süt');
 
 const text = {
   sumi: phrase('Суми', 'Sumi'),
+  customer: phrase('Гость', 'Müşteri'),
+  ordering: phrase('Привет, София! Мне, пожалуйста, стакан клубничного молока.', 'Merhaba Sofia! Bir bardak çilekli süt alabilir miyim?'),
+  accept: phrase('Принять заказ', 'Siparişi al'),
+  acceptError: phrase('Подожди, пока гость подойдёт к кассе.', 'Müşterinin kasaya yaklaşmasını bekle.'),
   welcome: phrase(
     'Привет, София! Приготовим клубничное молоко вместе? Я сделаю пюре, а ты поможешь с ягодами и молоком.',
     'Merhaba Sofia! Birlikte çilekli süt yapalım mı? Ben püreyi hazırlayayım, sen meyve ve sütle yardım et.',
@@ -19,8 +24,13 @@ const text = {
   milkWrong: phrase('Для этого напитка нужно холодное молоко.', 'Bu içecek için soğuk süt gerekiyor.'),
   stir: phrase('Я придержу стакан. Перемешай напиток три раза.', 'Bardağı ben tutayım. İçeceği üç kez karıştır.'),
   stirAction: phrase('Перемешать', 'Karıştır'),
-  served: phrase('Наше клубничное молоко готово!', 'Çilekli sütümüz hazır!'),
-  serveNote: phrase('Суми украсила стакан свежей клубникой.', 'Sumi bardağı taze çilekle süsledi.'),
+  tray: phrase('Я украсила стакан. Возьми поднос и отнеси его к столику с клубникой.', 'Bardağı süsledim. Tepsiyi alıp çilek işaretli masaya götür.'),
+  pickup: phrase('Взять поднос', 'Tepsiyi al'),
+  pickupError: phrase('Поднос пока у кассы. Попробуй взять его ещё раз.', 'Tepsi hâlâ tezgahta. Yeniden almayı dene.'),
+  delivered: phrase('Заказ доставлен', 'Sipariş teslim edildi'),
+  thanks: phrase('Спасибо, София! Клубничное молоко получилось чудесным.', 'Teşekkür ederim Sofia! Çilekli süt harika olmuş.'),
+  replay: phrase('Принять новый заказ', 'Yeni sipariş al'),
+  replayError: phrase('Новый заказ пока недоступен. Попробуй ещё раз.', 'Yeni sipariş henüz hazır değil. Yeniden dene.'),
   drinkAlt: phrase('Стакан розового клубничного молока с ягодой на краю', 'Kenarında çilek olan bir bardak pembe çilekli süt'),
   saved: phrase('Заказ добавлен в паспорт.', 'Sipariş pasaporta eklendi.'),
   savedAgain: phrase('Отметка о заказе уже есть в паспорте.', 'Bu siparişin damgası zaten pasaportunda.'),
@@ -36,13 +46,16 @@ const text = {
 const fruit = [['blueberry', '🫐'], ['strawberry', '🍓'], ['banana', '🍌']];
 const drinks = [['tea', '☕'], ['water', '💧'], ['milk', '🥛']];
 
-export function createSumiOrder({locale, element, button, onAction, onSave, onChange, completed}) {
-  let phase = 'welcome';
+export function createSumiOrder({
+  locale, element, button, onAction, onAccept, onPickup, onReplay, onExit, onSave, onChange, completed, initialPhase,
+}) {
+  let phase = initialPhase === 'ordering' ? 'ordering' : 'welcome';
   let greeted = false;
   let stirs = 0;
   let feedback = '';
   let saved = completed;
   let wasCompleted = completed;
+  let resumePhase = null;
 
   const words = key => text[key][locale()];
   const change = (selector) => onChange(selector);
@@ -52,7 +65,7 @@ export function createSumiOrder({locale, element, button, onAction, onSave, onCh
     figure.id = 'sumi-drink';
     figure.dataset.fill = phase;
     figure.dataset.stirs = String(stirs);
-    if (phase === 'served') {
+    if (phase === 'tray' || phase === 'delivered') {
       figure.setAttribute('role', 'img');
       figure.setAttribute('aria-label', words('drinkAlt'));
     } else {
@@ -66,8 +79,9 @@ export function createSumiOrder({locale, element, button, onAction, onSave, onCh
 
   function dialogue() {
     const speech = element('div', 'sumi-speech');
-    const speaker = element('b', 'sumi-name', words('sumi'));
+    const speaker = element('b', 'sumi-name', words(phase === 'ordering' ? 'customer' : 'sumi'));
     const line = element('p', 'sumi-line', words(phase));
+    if (phase === 'ordering') line.id = 'sumi-customer-order';
     speech.append(speaker, line);
     return speech;
   }
@@ -88,26 +102,31 @@ export function createSumiOrder({locale, element, button, onAction, onSave, onCh
     panel.dataset.phase = phase;
     panel.dataset.greeted = String(greeted);
 
-    if (phase === 'served') {
+    if (phase === 'delivered') {
       const result = element('div', 'sumi-result');
       result.id = 'sumi-result';
       result.dataset.saved = String(saved);
       const layout = element('div', 'sumi-progress-hero');
       const copy = element('div', 'sumi-result-copy');
-      copy.append(element('h3', 'sumi-result-title', words('served')), element('p', 'city-message', words('serveNote')));
+      const speaker = element('b', 'sumi-name', words('customer'));
+      const thanks = element('p', 'sumi-line', words('thanks'));
+      thanks.id = 'sumi-customer-thanks';
+      copy.append(element('h3', 'sumi-result-title', words('delivered')), speaker, thanks);
       layout.append(makeGlass(), copy);
       const status = element('p', 'city-message sumi-status', words(feedback));
       status.id = 'sumi-feedback';
       status.setAttribute('role', 'status');
       result.append(layout, status);
-      if (saved) result.append(button('sumi-replay', 'city-secondary', words('another')));
+      if (saved) result.append(button('sumi-replay', 'city-secondary', words('replay')));
       else result.append(button('sumi-retry-save', 'city-primary', words('retrySave')));
       panel.append(result);
       return panel;
     }
 
     const line = dialogue();
-    if (phase === 'welcome') {
+    if (phase === 'ordering') {
+      panel.append(line, button('sumi-accept', 'city-primary', words('accept')));
+    } else if (phase === 'welcome') {
       const tools = element('div', 'sumi-welcome-actions');
       const greet = button('sumi-greet', 'city-secondary', words('greet'));
       greet.disabled = greeted;
@@ -117,7 +136,9 @@ export function createSumiOrder({locale, element, button, onAction, onSave, onCh
       const layout = element('div', 'sumi-progress-hero');
       layout.append(makeGlass(), line);
       panel.append(layout);
-      if (phase === 'stir') {
+      if (phase === 'tray') {
+        panel.append(button('sumi-pickup', 'city-primary', words('pickup')));
+      } else if (phase === 'stir') {
         const stir = button('', 'city-primary', `${words('stirAction')} · ${stirs}/3`);
         stir.dataset.sumiIngredient = 'stir';
         panel.append(stir);
@@ -153,7 +174,18 @@ export function createSumiOrder({locale, element, button, onAction, onSave, onCh
 
   function handleClick(chosen) {
     const ingredient = chosen.dataset.sumiIngredient;
-    if (chosen.id === 'sumi-greet' && phase === 'welcome' && !greeted) {
+    if (chosen.id === 'sumi-accept' && phase === 'ordering') {
+      if (onAccept?.() === true) {
+        phase = resumePhase ?? 'welcome';
+        resumePhase = null;
+        feedback = '';
+        if (preparing()) onAction?.('prepare');
+        change(phase === 'welcome' ? '#sumi-greet' : phase === 'tray' ? '#sumi-pickup' : '[data-sumi-ingredient]');
+      } else {
+        feedback = 'acceptError';
+        change('#sumi-accept');
+      }
+    } else if (chosen.id === 'sumi-greet' && phase === 'welcome' && !greeted) {
       greeted = true;
       feedback = 'greeted';
       onAction?.('greet');
@@ -184,23 +216,79 @@ export function createSumiOrder({locale, element, button, onAction, onSave, onCh
     } else if (phase === 'stir' && ingredient === 'stir') {
       stirs++;
       if (stirs === 3) {
-        phase = 'served';
-        onAction?.('serve');
-        save();
+        phase = 'tray';
+        change('#sumi-pickup');
       } else {
         change('[data-sumi-ingredient]');
       }
-    } else if (phase === 'served' && chosen.id === 'sumi-retry-save' && !saved) {
+    } else if (phase === 'tray' && chosen.id === 'sumi-pickup') {
+      if (onPickup?.() === true) {
+        phase = 'carrying';
+        onExit();
+      } else {
+        feedback = 'pickupError';
+        change('#sumi-pickup');
+      }
+    } else if (phase === 'delivered' && chosen.id === 'sumi-retry-save' && !saved) {
       save();
-    } else if (phase === 'served' && chosen.id === 'sumi-replay' && saved) {
-      phase = 'welcome';
-      stirs = 0;
-      greeted = false;
-      feedback = '';
-      onAction?.('idle');
-      change('#sumi-start');
+    } else if (phase === 'delivered' && chosen.id === 'sumi-replay' && saved) {
+      if (onReplay?.() === true) {
+        phase = 'ordering';
+        stirs = 0;
+        greeted = false;
+        feedback = '';
+        resumePhase = null;
+        onExit();
+      } else {
+        feedback = 'replayError';
+        change('#sumi-replay');
+      }
     }
   }
 
-  return {render, handleClick, finished: () => phase === 'served'};
+  function deliver() {
+    if (phase === 'delivered') {
+      change(saved ? '#sumi-replay' : '#sumi-retry-save');
+      return;
+    }
+    phase = 'delivered';
+    stirs = 3;
+    onAction?.('serve');
+    save();
+  }
+
+  const preparing = () => ['fruit', 'milk', 'stir', 'tray'].includes(phase);
+  function sync(visit) {
+    if (visit === 'ordering' && phase !== 'ordering') {
+      if (phase === 'welcome' || preparing()) resumePhase = phase;
+      else if (phase === 'carrying') resumePhase = 'tray';
+      else {
+        resumePhase = null;
+        stirs = 0;
+        greeted = false;
+      }
+      phase = 'ordering';
+      feedback = '';
+    } else if (visit === 'preparing') {
+      if (phase === 'ordering' || phase === 'delivered') {
+        if (phase === 'delivered') {
+          stirs = 0;
+          greeted = false;
+          resumePhase = null;
+        }
+        phase = resumePhase ?? 'welcome';
+        resumePhase = null;
+        feedback = '';
+      } else if (phase === 'carrying') {
+        phase = 'tray';
+        feedback = '';
+      }
+    }
+  }
+
+  return {
+    render, handleClick, deliver, sync,
+    finished: () => phase === 'delivered',
+    resume: () => onAction?.(preparing() ? 'prepare' : 'idle'),
+  };
 }

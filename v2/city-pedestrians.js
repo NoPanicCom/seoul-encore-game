@@ -1,4 +1,4 @@
-import { CITY_BLOCKS, walkable } from './city-grid.js';
+import { CITY_BLOCKS, CITY_ENTRY, getBuilding, SUMI_CAFE_ID, walkable } from './city-grid.js';
 
 const MAX_RESIDENTS = 8;
 const SPAWN_DISTANCE = 29;
@@ -6,6 +6,8 @@ const KEEP_DISTANCE = 30;
 const BODY_RADIUS = .23;
 const PLAYER_CLEARANCE = .55;
 const TAU = 2 * Math.PI;
+const SUMI_GUEST_SEED = 45;
+const AWAY_FROM_STREET = { x: Infinity, z: Infinity };
 
 const LOOKS = [
   { kind: 'coat', jacket: '8671C2', shirt: 'F0C1D9', trousers: '4F456F', shoe: 'D1C1E8', hair: '493449', skin: 'E5AB91', bag: 'F1A3BB' },
@@ -147,7 +149,22 @@ function createRig(B, scene, anchor, material, look, seed) {
   // Each resident is a single skinned mesh. One weighted joint per vertex keeps the gait cheap.
   const hipPos = new B.Vector3(0, .79, 0);
   const turn = (joint, x, y = 0, z = 0) => joint.setYawPitchRoll(y, x, z, B.Space.LOCAL);
-  function pose(phase, walking, time) {
+  function pose(phase, walking, time, action = 'stand') {
+    if (action === 'sit' || action === 'thanks') {
+      hipPos.y = .55;
+      hips.setPosition(hipPos, B.Space.LOCAL);
+      const gratitude = action === 'thanks' ? .5 + .5 * Math.sin(time * TAU / 1.45) : 0;
+      turn(chest, .084 + gratitude * .13);
+      turn(head, -.04 + gratitude * .20, .07 * gratitude);
+      for (const { side, shoulder, elbow, hip, knee, ankle } of limbs) {
+        turn(hip, -1.46, side * .10);
+        turn(knee, 1.56);
+        turn(ankle, -.095);
+        turn(shoulder, -.31 - gratitude * .34, 0, side * .18);
+        turn(elbow, -.48 - gratitude * .58);
+      }
+      return;
+    }
     const stride = Math.sin(phase);
     const rise = Math.abs(Math.cos(phase)) * .023 * walking;
     hipPos.y = .79 + rise + Math.sin(time * 2.2) * .009 * (1 - walking);
@@ -169,6 +186,31 @@ function createRig(B, scene, anchor, material, look, seed) {
   return { mesh, pose, dispose() { mesh.dispose(); skeleton.dispose(); } };
 }
 
+function residentMaterial(B, scene) {
+  const material = new B.StandardMaterial('Seoul resident fabrics', scene);
+  material.diffuseColor = B.Color3.White();
+  material.specularColor = new B.Color3(.041, .035, .052);
+  material.sideOrientation = B.Material.CounterClockWiseSideOrientation;
+  return material;
+}
+
+export function createSumiGuest(B, scene, anchor) {
+  const material = residentMaterial(B, scene);
+  const rig = createRig(B, scene, anchor, material, LOOKS[7], SUMI_GUEST_SEED);
+  rig.mesh.metadata = { visitorId: 'sumi-guest-1' };
+  let disposed = false;
+  return {
+    mesh: rig.mesh,
+    pose: rig.pose,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      rig.dispose();
+      material.dispose();
+    },
+  };
+}
+
 const lanes = CITY_BLOCKS.flatMap((block, blockIndex) => [-1, 1].map((normal, side) => {
   const buildings = block.buildings.filter(building => building.door.nz === normal);
   const first = buildings[0], last = buildings.at(-1);
@@ -180,6 +222,9 @@ const lanes = CITY_BLOCKS.flatMap((block, blockIndex) => [-1, 1].map((normal, si
     right: last.x + last.width / 2 + .47,
   };
 }));
+
+const sumiAddress = getBuilding(SUMI_CAFE_ID);
+const sumiLane = lanes.find(lane => lane.buildings.includes(sumiAddress));
 
 function laneDistance(lane, x, z) {
   return Math.hypot(Math.max(lane.left - x, x - lane.right, 0), lane.z - z);
@@ -221,19 +266,43 @@ function residentFor(B, scene, anchor, material, lane, x, z, time) {
   return npc;
 }
 
+function startSumiGuest(B, scene, anchor, time) {
+  const rig = createSumiGuest(B, scene, anchor);
+  // Visible ahead of Sofia at the city gate, then across the boulevard and along the café pavement.
+  const x = CITY_ENTRY.x + .75;
+  const z = CITY_ENTRY.z - 2.55;
+  const edge = x < sumiLane.block.x ? sumiLane.left : sumiLane.right;
+  const yaw = Math.atan2(edge - x, 0);
+  rig.mesh.position.set(x, .004, z);
+  rig.mesh.rotation.y = yaw;
+  rig.pose(0, 0, time);
+  return {
+    rig, lane: sumiLane, x, z, yaw, target: sumiAddress,
+    phase: 'approach', to: { x: edge, z }, corner: { x: edge, z: sumiLane.z },
+    sumiGuest: true, stride: 0, speed: 1.28, effort: 0, resume: time,
+  };
+}
+
 function reached(npc, time) {
   const { phase, target } = npc;
-  if (phase === 'corner') {
+  if (phase === 'approach') {
+    npc.phase = 'corner';
+    npc.to = npc.corner;
+  } else if (phase === 'corner') {
     approachPlan(npc, target);
   } else if (phase === 'sidewalk') {
     npc.phase = 'doorway';
     npc.resume = time + .28 + (npc.lane.id % 4) * .061;
     npc.to = null;
   } else if (phase === 'enter') {
-    npc.phase = 'inside';
-    npc.resume = time + 2.8 + ((npc.lane.id + npc.count * 3) % 5) * .49;
     npc.rig.mesh.setEnabled(false);
     npc.to = null;
+    if (npc.sumiGuest) {
+      npc.phase = 'arrived';
+    } else {
+      npc.phase = 'inside';
+      npc.resume = time + 2.8 + ((npc.lane.id + npc.count * 3) % 5) * .49;
+    }
   } else if (phase === 'exit') {
     npc.count++;
     const at = npc.lane.buildings.indexOf(target);
@@ -306,13 +375,12 @@ function animateResident(npc, player, residents, dt, time) {
   npc.rig.pose(npc.stride, npc.effort, time + npc.lane.id);
 }
 
-export function createCityPedestrians(B, scene, anchor) {
+export function createCityPedestrians(B, scene, anchor, { onSumiGuestEnter } = {}) {
   if (!anchor) throw new Error('Seul sakinleri için yerel sahne kökü eksik');
-  const material = new B.StandardMaterial('Seoul resident fabrics', scene);
-  material.diffuseColor = B.Color3.White();
-  material.specularColor = new B.Color3(.041, .035, .052);
-  material.sideOrientation = B.Material.CounterClockWiseSideOrientation;
+  if (!sumiAddress || !sumiLane) throw new Error('Sumi Café sokak rotası eksik');
+  const material = residentMaterial(B, scene);
   const residents = [];
+  let sumiGuest;
   let time = 0, nextRefresh = 0;
   let lastX = Infinity, lastZ = Infinity;
   let disposed = false;
@@ -325,15 +393,23 @@ export function createCityPedestrians(B, scene, anchor) {
         residents.splice(i, 1);
       }
     }
-    if (residents.length === MAX_RESIDENTS) return;
+    const regularLimit = MAX_RESIDENTS - 1;
+    if (residents.length === regularLimit) return;
     const present = new Set(residents.map(npc => npc.lane));
-    const nearby = lanes.filter(lane => !present.has(lane))
+    const nearby = lanes.filter(lane => lane !== sumiLane && !present.has(lane))
       .map(lane => ({ lane, distance: laneDistance(lane, x, z) }))
       .filter(({ distance }) => distance < SPAWN_DISTANCE)
       .sort((a, b) => a.distance - b.distance || a.lane.id - b.lane.id);
-    for (const { lane } of nearby.slice(0, MAX_RESIDENTS - residents.length)) {
+    for (const { lane } of nearby.slice(0, regularLimit - residents.length)) {
       residents.push(residentFor(B, scene, anchor, material, lane, x, z, time));
     }
+  }
+
+  function advanceGuest(player, peers, elapsed) {
+    if (sumiGuest?.phase === 'arrived') return;
+    sumiGuest ??= startSumiGuest(B, scene, anchor, time);
+    animateResident(sumiGuest, player, peers, elapsed, time);
+    if (sumiGuest.phase === 'arrived') onSumiGuestEnter?.({ buildingId: SUMI_CAFE_ID });
   }
 
   return {
@@ -348,13 +424,25 @@ export function createCityPedestrians(B, scene, anchor) {
         lastZ = z;
       }
       const player = { x, z };
-      for (const npc of residents) animateResident(npc, player, residents, elapsed, time);
+      advanceGuest(player, residents, elapsed);
+      const peers = sumiGuest.phase === 'arrived' ? residents : [...residents, sumiGuest];
+      for (const npc of residents) animateResident(npc, player, peers, elapsed, time);
+    },
+    hasSumiGuestArrived() {
+      return sumiGuest?.phase === 'arrived';
+    },
+    advanceSumiGuest(dt) {
+      if (disposed || !Number.isFinite(dt) || dt < 0) return;
+      const elapsed = Math.min(dt, .12);
+      time += elapsed;
+      advanceGuest(AWAY_FROM_STREET, [], elapsed);
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       for (const npc of residents) npc.rig.dispose();
       residents.length = 0;
+      sumiGuest?.rig.dispose();
       material.dispose();
     },
   };

@@ -1,5 +1,5 @@
 import {CITY_BOUNDS, CITY_BUILDINGS, CITY_ROADS, CITY_TYPES, SUMI_CAFE_ID} from './city-grid.js';
-import {createSumiOrder, SUMI_ORDER_TITLE, SUMI_STAMP} from './sumi-order.js';
+import {createSumiOrder, SUMI_ORDER_TITLE, SUMI_PREPARATION_STAMP, SUMI_STAMP} from './sumi-order.js';
 
 const pair = (ru, tr) => ({ru, tr});
 const activity = (mechanic, icon, title, instruction, reward, data) =>
@@ -192,7 +192,7 @@ function readPassport(known) {
   const saved = new Set(entries.filter(id => known.has(id)));
   for (const id of known.keys()) {
     const marker = localStorage.getItem(stampKey + '.' + id);
-    if (marker === '1' || (id === SUMI_CAFE_ID && marker === SUMI_STAMP)) saved.add(id);
+    if (marker === '1' || (id === SUMI_CAFE_ID && [SUMI_PREPARATION_STAMP, SUMI_STAMP].includes(marker))) saved.add(id);
   }
   return saved;
 }
@@ -213,6 +213,7 @@ function typeLabel(building, locale) {
 
 export function createCityActivities({
   lang, onOpen, onClose, onTarget, onSumiAction,
+  onSumiAccept, onSumiPickup, onSumiReplay,
   buildings = CITY_BUILDINGS, plan = {bounds: CITY_BOUNDS, roads: CITY_ROADS},
 }) {
   const {bounds, roads} = plan;
@@ -248,6 +249,7 @@ export function createCityActivities({
 
   let mode = null;
   let round = null;
+  let sumiSession = null;
   let frame = 0;
   let revealTimer = 0;
   let position = cleanPosition(null, bounds);
@@ -536,31 +538,50 @@ export function createCityActivities({
     }
   });
 
-  function play(building) {
-    const place = known.get(building?.id);
-    if (place?.id === SUMI_CAFE_ID) {
+  function openSumi(place, phase) {
+    if (!sumiSession) {
       let completed = false;
       try {
         completed = localStorage.getItem(stampKey + '.' + place.id) === SUMI_STAMP;
       } catch (error) {
         console.warn('Seoul Encore Sumi order could not be read.', error);
       }
-      round = {
-        building: place,
-        theme: {title: SUMI_ORDER_TITLE},
-        sumi: createSumiOrder({
-          locale, element, button, completed,
-          onAction: onSumiAction,
-          onSave: () => persistStamp(place.id, SUMI_STAMP),
-          onChange(selector) {
-            renderActivity();
-            content.querySelector(selector)?.focus({preventScroll: true});
-          },
-        }),
-      };
-      open('activity');
-      onSumiAction?.('idle');
-      renderActivity();
+      sumiSession = createSumiOrder({
+        locale, element, button, completed, initialPhase: phase,
+        onAction: onSumiAction,
+        onAccept: onSumiAccept,
+        onPickup: onSumiPickup,
+        onReplay: onSumiReplay,
+        onExit: close,
+        onSave: () => persistStamp(place.id, SUMI_STAMP),
+        onChange(selector) {
+          renderActivity();
+          content.querySelector(selector)?.focus({preventScroll: true});
+        },
+      });
+    }
+    sumiSession.sync(phase);
+    round = {building: place, theme: {title: SUMI_ORDER_TITLE}, sumi: sumiSession};
+    open('activity');
+  }
+
+  function finishSumiDelivery(building) {
+    const place = known.get(building?.id);
+    if (place?.id !== SUMI_CAFE_ID) throw new RangeError('Unknown Sumi delivery building');
+    openSumi(place, 'delivered');
+    sumiSession.deliver();
+  }
+
+  function play(building, phase = 'ordering') {
+    const place = known.get(building?.id);
+    if (place?.id === SUMI_CAFE_ID) {
+      if (phase === 'delivered') {
+        finishSumiDelivery(place);
+      } else {
+        openSumi(place, phase);
+        sumiSession.resume();
+        renderActivity();
+      }
       return;
     }
     const theme = place && activities[place.type];
@@ -848,6 +869,7 @@ export function createCityActivities({
 
   return {
     play,
+    finishSumiDelivery,
     map,
     close,
     isOpen: () => dialog.open,
