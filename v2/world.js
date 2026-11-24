@@ -32,6 +32,9 @@ const NEON_MATERIAL = /tube|filament|lettering/i;
 const MODEL_URL = new URL('./models/', import.meta.url).href;
 const CITY_X = 100;
 const ROOM_X = 320;
+const SHOP_STATIONS = { intro: 'host', work: 'work', display: 'display', decision: 'host', done: 'host' };
+const SHOP_STATION_REACH = .72;
+const SHOP_DOOR_SPAWN = 2.05;
 const SUMI_ACTIONS = new Set(['idle', 'greet', 'prepare', 'serve']);
 const SUMI_THANKS_DURATION = 2.45;
 const SUMI_MODEL_PHASE = {
@@ -715,6 +718,21 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       currentSpot === `activity:${roomVisit.building.id}` && !lookPreview && !inputX && !inputY;
   }
 
+  function shopHostCamera(view, x, z, preferred, distance) {
+    const offsets = [0, -.28, .28, -.55, .55, -.82, .82, -1.09, 1.09];
+    for (const depth of [distance, distance - .55, distance - 1.04]) {
+      for (const offset of offsets) {
+        const yaw = preferred + offset;
+        const dx = Math.sin(yaw) * depth * .96;
+        const dz = Math.cos(yaw) * depth * .96;
+        if ([.54, .73, .89, 1].every(step => z + dz * step < 3.34 && view.walkable(x + dx * step, z + dz * step, .14))) {
+          return { yaw, distance: depth };
+        }
+      }
+    }
+    return { yaw: preferred, distance };
+  }
+
   function updateCamera(elapsed, cardCapture = false) {
     if (festivalView) {
       const aspect = engine.getRenderWidth() / engine.getRenderHeight();
@@ -740,16 +758,18 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     const shelfView = districtVisit && currentSpot?.startsWith('shelf-') && !orbitAdjusted && !lookPreview && !inputX && !inputY;
     const sumiView = showingSumi();
     const watchingCafe = roomVisit?.sumi && !lookPreview && !inputX && !inputY;
+    const hostView = roomVisit?.shop.dialogOpen && currentSpot === 'shop:host';
     const servingView = watchingCafe && currentSpot === 'sumi-table' && SUMI_TABLE_VIEWS.has(sumiOrder);
     const paymentView = watchingCafe && !orbitAdjusted && sumiOrder === 'paying' && roomVisit.model.sumiDelivery.state === 'paying';
     const carryView = player.carrying && !orbitAdjusted && !lookPreview;
-    const compactSumi = (sumiView || paymentView || servingView) && portrait ? clamp((800 - viewHeight) / 180, 0, 1) : 0;
+    const compactInterior = (hostView || sumiView || paymentView || servingView) && portrait ? clamp((800 - viewHeight) / 180, 0, 1) : 0;
 
-    camera.fov = servingView ? (portrait ? 1.20 : .96) : staged ? (portrait || cardCapture ? .88 : .77) :
+    camera.fov = servingView || hostView ? (portrait ? 1.20 : .96) : staged ? (portrait || cardCapture ? .88 : .77) :
       (portrait ? 1.04 + .33 * establishing + .22 * panorama + .13 * districtWide :
         .84 + .14 * establishing + .13 * panorama + .08 * districtWide);
     let distance = portrait ? 4.7 : 4.45;
     let tableYaw = 2.72;
+    let hostYaw = 0;
 
     if (staged) {
       const stage = exploration.venue === 'arena';
@@ -764,9 +784,9 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
         danceWidth / (2 * Math.tan(camera.fov / 2) * aspect));
     } else {
       const indoors = districtVisit && !cityVisit && districtArea(player.x - DISTRICT_X) === 'minho';
-      const tableAim = sumiOrder === 'delivered' ? (portrait ? .54 - .54 * compactSumi : .85) : .86;
+      const tableAim = sumiOrder === 'delivered' ? (portrait ? .54 - .54 * compactInterior : .85) : .86;
       const aimHeight = servingView ? tableAim :
-        sumiView || paymentView ? (portrait ? .64 - .64 * compactSumi : .88) : lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) :
+        hostView || sumiView || paymentView ? (portrait ? .64 - .64 * compactInterior : .88) : lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) :
           1.16 + .62 * establishing + .56 * panorama + .24 * districtWide;
       distance += (portrait ? 4.7 : 3.4) * establishing + 3.2 * panorama + 1.12 * districtWide;
       if (indoors) distance = shelfView ? 3.65 : 3.25;
@@ -779,6 +799,22 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
         distance = portrait ? 3.82 : 3.72;
         desiredFocus.set((player.x + ROOM_X + chair.x) / 2 + .10 - panelOffset * .82,
           aimHeight, (player.z + chair.z) / 2);
+      } else if (hostView) {
+        const { hostPosition } = roomVisit.shop.view;
+        const midX = (player.x - ROOM_X + hostPosition.x) / 2;
+        const midZ = (player.z + hostPosition.z) / 2;
+        const sideX = player.z - hostPosition.z;
+        const sideZ = ROOM_X + hostPosition.x - player.x;
+        // Keep both faces in view from the side of the conversation facing the room centre.
+        const inside = sideX * midX + sideZ * midZ > 0 ? -1 : 1;
+        const preferred = Math.atan2(sideX * inside - sideZ * .24, sideZ * inside + sideX * .24);
+        const panelOffset = shortLandscape ? .83 : 0;
+        const shot = shopHostCamera(roomVisit.shop.view, midX, midZ, preferred, portrait ? 3.38 : 3.12);
+        hostYaw = shot.yaw;
+        distance = shot.distance;
+        if (portrait && distance < 3.2) camera.fov = Math.min(1.48, 2 * Math.atan(3.38 * Math.tan(.60) / distance));
+        desiredFocus.set(ROOM_X + midX + Math.cos(hostYaw) * panelOffset, aimHeight,
+          midZ - Math.sin(hostYaw) * panelOffset);
       } else if (paymentView) {
         const { register } = roomVisit.model.sumiDelivery;
         distance = portrait ? 3.95 : 3.72;
@@ -797,11 +833,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       focus.z += (desiredFocus.z - focus.z) * smoothing;
       // At a jamb, interpolating between two valid positions can cross the corner.
       if (!canStep(focus.x, focus.z)) focus.copyFrom(desiredFocus);
-      const desiredYaw = servingView ? tableYaw : paymentView ? .84 : sumiView ? .72 : shelfView ? -1.34 :
+      const desiredYaw = servingView ? tableYaw : hostView ? hostYaw : paymentView ? .84 : sumiView ? .72 : shelfView ? -1.34 :
         orbitYaw + .32 * establishing - .25 * panorama - .16 * districtWide + (carryView ? .55 : 0);
       cameraYaw = blendAngle(cameraYaw, desiredYaw, smoothing);
-      const desiredPitch = servingView ? (portrait ? .34 + .12 * compactSumi : .29) :
-        sumiView || paymentView ? (portrait ? .26 + .12 * compactSumi : .18) : orbitPitch - .075 * establishing + (carryView ? .16 : 0);
+      const desiredPitch = servingView ? (portrait ? .34 + .12 * compactInterior : .29) :
+        hostView || sumiView || paymentView ? (portrait ? .26 + .12 * compactInterior : .18) : orbitPitch - .075 * establishing + (carryView ? .16 : 0);
       cameraPitch += (desiredPitch - cameraPitch) * smoothing;
     }
     if (staged) focus.copyFrom(desiredFocus);
@@ -809,6 +845,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     // Keep the table camera on the customer side of the register counter.
     const counterDirection = -Math.cos(cameraYaw) * Math.cos(cameraPitch);
     if (servingView && counterDirection > 0) distance = Math.min(distance, (focus.z + 2.08) / counterDirection);
+    if (hostView && counterDirection < 0) distance = Math.min(distance, (3.35 - focus.z) / -counterDirection);
     cameraOffset.set(
       Math.sin(cameraYaw) * Math.cos(cameraPitch) * distance,
       Math.sin(cameraPitch) * distance,
@@ -862,11 +899,16 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       const { exit, activity } = roomVisit.model;
       const x = player.x - ROOM_X;
       if (Math.hypot(x - exit.x, player.z - exit.z) <= 1.16) return 'room-exit';
-      if (Math.hypot(x - activity.x, player.z - activity.z) <= 1.18) return `activity:${roomVisit.building.id}`;
+      const atActivity = Math.hypot(x - activity.x, player.z - activity.z) <= 1.18;
       if (roomVisit.sumi) {
+        if (atActivity) return `activity:${roomVisit.building.id}`;
         const target = roomVisit.model.sumiDelivery.tableApproach;
         if (Math.hypot(x - target.x, player.z - target.z) <= .90) return 'sumi-table';
       }
+      const kind = SHOP_STATIONS[roomVisit.shop.stage];
+      const station = roomVisit.shop.view.stations[kind];
+      if (Math.hypot(x - station.x, player.z - station.z) <= SHOP_STATION_REACH) return `shop:${kind}`;
+      if (atActivity) return `activity:${roomVisit.building.id}`;
       return null;
     }
     const x = player.x - CITY_X;
@@ -877,7 +919,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   }
 
   function canStep(x, z, radius = PLAYER_RADIUS) {
-    if (roomVisit) return roomVisit.model.walkable(x - ROOM_X, z, radius);
+    if (roomVisit) return roomVisit.shop.view.walkable(x - ROOM_X, z, radius);
     if (cityVisit) return cityState.grid.walkable(x - CITY_X, z, radius);
     return districtVisit ? districtWalkable(x - DISTRICT_X, z, radius) : walkable(x, z, journey !== null);
   }
@@ -1061,7 +1103,12 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     }
     const moved = lookPreview ? 0 : move(elapsed);
     const followed = journey && !districtVisit && !cityVisit && !lookPreview ? followTrail(elapsed) : 0;
-    if (moved > .0001 || followed > .0001) showBoundaries();
+    const shop = roomVisit?.shop;
+    if (moved > .0001 || followed > .0001 || shop?.spotDirty) {
+      if (shop) shop.spotDirty = false;
+      showBoundaries();
+    }
+    shop?.view.update(elapsed, player.x - ROOM_X, player.z);
     if (roomVisit?.sumi) {
       roomVisit.sumiElapsed += elapsed;
       advanceSumiDelivery(elapsed);
@@ -1076,6 +1123,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     if (lookPreview) player.yaw = blendAngle(player.yaw, cameraYaw, elapsed ? damping(12, elapsed) : 1);
     if (!journey && nearNari) {
       nari.yaw = blendAngle(nari.yaw, Math.atan2(player.x - nari.x, player.z - nari.z), damping(9, elapsed));
+    }
+    if (shop?.dialogOpen && currentSpot === 'shop:host') {
+      const host = shop.view.hostPosition;
+      const yaw = Math.atan2(ROOM_X + host.x - player.x, host.z - player.z);
+      player.yaw = blendAngle(player.yaw, yaw, elapsed ? damping(12, elapsed) : 1);
     }
     if (roomVisit?.sumi && sumiOrder === 'cleaning' && !moved) {
       const { table } = roomVisit.model.sumiDelivery;
@@ -1242,7 +1294,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
 
   async function openRoom(building) {
     const visit = cityVisit;
-    const { createInterior } = await import('./city-interiors.js');
+    const [{ createInterior }, { createShopStoryScene }, story] = await Promise.all([
+      import('./city-interiors.js'),
+      import('./shop-story-scene.js'),
+      import('./shop-journal.js').then(({ loadShopStory }) => loadShopStory(building.id)),
+    ]);
     if (disposed) throw new Error('Sahne kapatıldı');
     if (visit !== cityVisit) return;
     if (currentSpot !== `door:${building.id}`) throw new Error('Binaya girmek için kapısına yaklaş');
@@ -1250,9 +1306,14 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     const cached = sumiCafe ? sumiInterior : null;
     const anchor = cached?.anchor ?? new B.TransformNode('Interior travel anchor', scene);
     let model;
+    let shop;
     try {
       anchor.position.x = ROOM_X;
       model = cached?.model ?? createInterior(B, scene, anchor, building);
+      shop = cached?.shop ?? {
+        story, view: createShopStoryScene(B, scene, model.root, building, model.walkable, story),
+        stage: 'intro', ending: null, lang: 'ru', spotDirty: false, dialogOpen: false,
+      };
       const sumi = sumiCafe ? model.root.getChildTransformNodes(true).find(node => node.name === 'Sumi') : null;
       if (sumiCafe && (!sumi || typeof model.updateSumi !== 'function' || !model.pixelPerch || !model.sumiDelivery)) {
         throw new Error('Sumi karşılaşması eksik');
@@ -1262,11 +1323,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       if (visit === cityVisit && currentSpot === `door:${building.id}`) {
         setLookPreview(false);
         roomVisit = {
-          building, model, anchor, walls: offsetWalls(model.cameraWalls, ROOM_X), previous: saveLocation(),
+          building, model, anchor, shop, walls: offsetWalls(model.cameraWalls, ROOM_X), previous: saveLocation(),
           sumi, sumiAction: 'idle', sumiElapsed: 0, pixelSeated: false, pixelHop: null,
         };
         if (sumi) {
-          sumiInterior = { model, anchor };
+          sumiInterior = { model, anchor, shop };
           syncSumiProp();
         }
         const spawn = model.spawn;
@@ -1282,12 +1343,14 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
         disposeRoom();
         cityState.anchor.setEnabled(true);
       } else if (!cached) {
+        shop?.view.dispose();
         model?.dispose();
         anchor.dispose();
       }
       throw error;
     }
     if (!cached) {
+      shop.view.dispose();
       model.dispose();
       anchor.dispose();
     }
@@ -1304,10 +1367,13 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   function disposeRoom() {
     const closed = roomVisit;
     roomVisit = null;
+    closed.shop.dialogOpen = false;
+    closed.shop.view.setTalking(false);
     closed.handProp?.dispose();
     syncSumiProp();
     if (closed.anchor === sumiInterior?.anchor) closed.anchor.setEnabled(false);
     else {
+      closed.shop.view.dispose();
       closed.model.dispose();
       closed.anchor.dispose();
     }
@@ -1343,6 +1409,49 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     const dz = building.door.z - player.z;
     orbitYaw = cameraYaw = Math.atan2(-dx, -dz);
     orbitAdjusted = true;
+    updateCamera(0);
+    scene.render();
+    return true;
+  }
+
+  function approachCityDoor(id) {
+    if (!cityVisit || roomVisit) return false;
+    const building = cityState.grid.getBuilding(id);
+    if (!building) return false;
+    const { x, z, nx, nz } = building.door;
+    const approachX = x + nx * SHOP_DOOR_SPAWN;
+    const approachZ = z + nz * SHOP_DOOR_SPAWN;
+    if (!cityState.grid.walkable(approachX, approachZ, PLAYER_RADIUS)) return false;
+    setLookPreview(false);
+    placeLocation(CITY_X + approachX, approachZ, Math.atan2(-nx, -nz));
+    renderTravel();
+    return true;
+  }
+
+  function shopStory() {
+    return roomVisit?.shop.story ?? null;
+  }
+
+  function shopStoryTarget() {
+    const shop = roomVisit?.shop;
+    if (!shop) return null;
+    const { x, z } = shop.view.stations[SHOP_STATIONS[shop.stage]];
+    return { x: ROOM_X + x, z, playerX: player.x, playerZ: player.z, cameraYaw };
+  }
+
+  function setShopStoryProgress(stage, ending = null, lang = 'ru') {
+    const shop = roomVisit?.shop;
+    if (!shop || (shop.stage === stage && shop.ending === ending && shop.lang === lang)) return false;
+    shop.view.setProgress(stage, ending, lang);
+    Object.assign(shop, { stage, ending, lang, spotDirty: true });
+    return true;
+  }
+
+  function setShopStoryView(open) {
+    const shop = roomVisit?.shop;
+    if (!shop || shop.dialogOpen === open) return false;
+    shop.dialogOpen = open;
+    shop.view.setTalking(open && currentSpot === 'shop:host');
     updateCamera(0);
     scene.render();
     return true;
@@ -1694,6 +1803,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     leaveBuilding,
     cityPosition,
     faceCityDoor,
+    approachCityDoor,
+    shopStory,
+    shopStoryTarget,
+    setShopStoryProgress,
+    setShopStoryView,
     setSumiAction,
     sumiDeliveryState,
     sumiRecipe,
@@ -1810,6 +1924,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       engine.stopRenderLoop();
       if (roomVisit) disposeRoom();
       if (sumiInterior) {
+        sumiInterior.shop.view.dispose();
         sumiInterior.model.dispose();
         sumiInterior.anchor.dispose();
       }

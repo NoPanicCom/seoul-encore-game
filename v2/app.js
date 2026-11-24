@@ -1,4 +1,6 @@
 import {getBuilding, CITY_TYPES, SUMI_CAFE_ID} from './city-grid.js';
+import {createShopJournal} from './shop-journal.js';
+import {createShopStoryUI} from './shop-story-ui.js';
 import {createCityActivities} from './city-activities.js';
 import {originalEncoreCues, createLisaEncore, ENCORE_BEAT_MS, createFestivalRound, FESTIVAL_BEAT_MS} from './festival-round.js';
 import {readLisaEncorePhoto, saveLisaEncorePhoto, clearInvitation, equipHongdaeStick, readDuet, readHongdaeStick, readInvitation, saveDuet, saveInvitation, savePixelPhoto, startingLook} from './album.js';
@@ -9,6 +11,15 @@ import {silentStageBreak, pauseStageMusic, resumeStageMusic, setStageSound, stag
 
 const phrases = {
   ru: {
+    storyTalk: 'Поговорить',
+    shopRoute: 'Задание в этом месте',
+    storyWork: 'За работу',
+    storyDisplay: 'Показать',
+    storyRecall: 'Вспомнить',
+    storyMeet: 'Познакомься',
+    storyGoWork: 'Иди к рабочему столу',
+    storyGoDisplay: 'Подойди к месту показа',
+    storyReturn: 'Поделись решением',
     city: 'Улицы Сеула',
     interior: 'В помещении',
     cityMap: 'Карта кварталов',
@@ -201,6 +212,15 @@ const phrases = {
     backToArena: 'Вернуться на арену',
   },
   tr: {
+    storyTalk: 'Konuş',
+    shopRoute: 'Mekândaki görev',
+    storyWork: 'İşe başla',
+    storyDisplay: 'Göster',
+    storyRecall: 'Hatırla',
+    storyMeet: 'Tanış',
+    storyGoWork: 'Çalışma tezgâhına yürü',
+    storyGoDisplay: 'Sergi alanına yürü',
+    storyReturn: 'Kararını paylaş',
     city: 'Seul sokakları',
     interior: 'İç mekân',
     cityMap: 'Mahalle haritası',
@@ -509,7 +529,41 @@ const setText = (id, value) => { byId(id).textContent = value; };
 let cityTarget=null;
 let cityReturn='hongdae';
 let directionTimer=0;
+const shopJournal = createShopJournal(() => localStorage);
+const storyStations = {intro:'host', work:'work', display:'display', decision:'host', done:'host'};
+
+function syncRoomStory() {
+  const story = area === 'interior' && world?.shopStory();
+  if (!story) return;
+  const entry = shopJournal.read(story.id);
+  world.setShopStoryProgress(entry.stage, entry.ending, lang);
+}
+
+function atStoryStation(story, stage) {
+  return area === 'interior' && world?.shopStory()?.id === story.id && spot === 'shop:' + storyStations[stage];
+}
+
+const shopUi = createShopStoryUI({
+  lang: () => lang,
+  onOpen: () => { resetControls(); world?.setShopStoryView(true); },
+  onClose: () => { world?.setShopStoryView(false); moveInput(); paintMission(); },
+  onAdvance(story, stage, ending) {
+    if (!atStoryStation(story, stage)) return null;
+    const result = shopJournal.advance(story.id, stage, ending);
+    syncRoomStory();
+    paintMission();
+    return result;
+  },
+  onRestart(story) {
+    if (!atStoryStation(story, 'done')) return null;
+    const result = shopJournal.restart(story.id);
+    syncRoomStory();
+    paintMission();
+    return result;
+  },
+});
 const cityUi=createCityActivities({
+  storyProgress:id=>shopJournal.read(id),
   lang:()=>lang,
   onOpen:()=>resetControls(),
   onClose:()=>{moveInput(); paintMission();},
@@ -523,7 +577,7 @@ const cityUi=createCityActivities({
   onTarget:building=>{cityTarget=building; paintMission();},
 });
 const inCity=()=>area==='city' || area==='interior';
-const canWalk = () => !cityUi.isOpen() && state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending && !hongdaePending;
+const canWalk = () => !cityUi.isOpen() && !shopUi.isOpen() && state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending && !hongdaePending;
 const journey = () => concertFinale !== null;
 const arenaRound = () => round?.venue === 'arena';
 const rhythmState = phase => phase === 'play' || phase === 'concert';
@@ -547,17 +601,32 @@ function cityBuilding() {
 function paintCityTarget() {
   clearTimeout(directionTimer);
   const label=byId('city-target');
-  const pos=area==='city' && state==='walk' && cityTarget && world?.cityPosition();
-  label.hidden=!pos;
-  if(!pos) return;
-  const dx=cityTarget.door.approachX-pos.x;
-  const dz=cityTarget.door.approachZ-pos.z;
-  const distance=Math.round(Math.hypot(dx,dz));
-  const right = dx*Math.cos(pos.cameraYaw) - dz*Math.sin(pos.cameraYaw);
-  const forward = -dx*Math.sin(pos.cameraYaw) - dz*Math.cos(pos.cameraYaw);
+  let dx, dz, yaw, name;
+  const story = area === 'interior' && state === 'walk' && world?.shopStory();
+  const step = story && shopJournal.read(story.id).stage;
+  const guide = story && (story.id !== SUMI_CAFE_ID || (step !== 'intro' && step !== 'done')) && world.shopStoryTarget();
+  const pos = area === 'city' && state === 'walk' && cityTarget && world?.cityPosition();
+  label.hidden = !guide && !pos;
+  if (guide) {
+    dx = guide.x - guide.playerX;
+    dz = guide.z - guide.playerZ;
+    yaw = guide.cameraYaw;
+    const stationNames = lang === 'ru' ? {work:'Рабочий стол', display:'Место показа'} :
+      {work:'Çalışma tezgâhı', display:'Sergi alanı'};
+    name = stationNames[step] || story.host[lang];
+  } else if (pos) {
+    dx = cityTarget.door.approachX - pos.x;
+    dz = cityTarget.door.approachZ - pos.z;
+    yaw = pos.cameraYaw;
+    name = cityTarget.name;
+  } else return;
+  const distance = Math.round(Math.hypot(dx,dz));
+  const right = dx*Math.cos(yaw) - dz*Math.sin(yaw);
+  const forward = -dx*Math.sin(yaw) - dz*Math.cos(yaw);
   const sector = (Math.round(Math.atan2(right,forward)/(Math.PI/4))+8)%8;
   const arrow = distance<=1 ? '⌖' : ['↑','↗','→','↘','↓','↙','←','↖'][sector];
-  label.textContent=`${arrow} ${cityTarget.name} · ${distance} ${words('meters')}`;
+  const hint = arrow + ' ' + name + ' · ' + distance + ' ' + words('meters');
+  if (label.textContent !== hint) label.textContent = hint;
   directionTimer=setTimeout(paintCityTarget,400);
 }
 
@@ -588,6 +657,13 @@ function hongdaeContext() {
   if (spot==='city-exit') return {label:cityReturn==='street'?'exitToYG':'exitCity',icon:'↩'};
   if (spot==='room-exit') return {label:'exitRoom',icon:'↩'};
   if (area==='city' && spot?.startsWith('door:')) return {label:'doorAction',icon:'⌂'};
+  if (area==='interior' && spot?.startsWith('shop:')) {
+    const story = world?.shopStory();
+    if (!story) return null;
+    const stage = shopJournal.read(story.id).stage;
+    const labels = {intro:'storyTalk', work:'storyWork', display:'storyDisplay', decision:'storyTalk', done:'storyRecall'};
+    if (atStoryStation(story, stage)) return {label:labels[stage], icon:stage === 'done' ? '☆' : '✦'};
+  }
   if (area==='interior' && (spot==='sumi-table' || spot===`activity:${SUMI_CAFE_ID}`)) {
     return sumiControl(world?.sumiDeliveryState(), spot==='sumi-table');
   }
@@ -642,7 +718,7 @@ function paintMission() {
   setText('area',type ? type[lang] : words(area));
   byId('city-map-open').hidden = !inCity() || state!=='walk';
   paintCityTarget();
-  byId('mission').setAttribute('aria-label', words(inHongdae() ? area : journey() ? 'arenaRouteLabel' : 'routeLabel'));
+  byId('mission').setAttribute('aria-label', words(area === 'interior' ? 'shopRoute' : area === 'city' ? 'city' : inHongdae() ? area : journey() ? 'arenaRouteLabel' : 'routeLabel'));
   const context = hongdaeContext();
   const direction = byId('hongdae-route');
   const purchase = context?.label === 'stickBuy';
@@ -677,6 +753,17 @@ function paintMission() {
       ({delivered:'chocolateDelivered', drinking:'chocolateDrinking'})[sumiPhase];
     objectiveText=words(chocolateHint || sumiObjectives[sumiPhase]);
   } else delete game.dataset.sumiDelivery;
+  const story = area === 'interior' && world?.shopStory();
+  if (story) {
+    const entry = shopJournal.read(story.id);
+    if (!sumiPhase || spot?.startsWith('shop:')) {
+      const host = story.host[lang];
+      const goals = {intro:words('storyMeet')+' · '+host, work:words('storyGoWork'),
+        display:words('storyGoDisplay'), decision:words('storyReturn')+' · '+host, done:story.title[lang]};
+      objectiveText = goals[entry.stage];
+      setText('area', story.title[lang]);
+    }
+  }
   setText('objective',objectiveText);
   rehearsal.hidden = journey() || !nearNari || inHongdae() || Boolean(context);
   startConcert.hidden = !journey() || !nearNari || inHongdae() || Boolean(context);
@@ -770,6 +857,8 @@ function paintLanguage() {
   const nextLanguage = lang === 'tr' ? 'Русский' : 'Türkçe';
   languageButton.setAttribute('aria-label', `${words('language')} · ${nextLanguage}`);
   languageButton.title = nextLanguage;
+  syncRoomStory();
+  shopUi.refresh();
   cityUi.refresh();
   paintSound();
   paintJacket();
@@ -1218,6 +1307,14 @@ async function actInCity() {
   const at=spot;
   const building=cityBuilding();
   resetControls();
+  if (at?.startsWith('shop:')) {
+    const story = world.shopStory();
+    if (story) {
+      const entry = shopJournal.read(story.id);
+      if (atStoryStation(story,entry.stage)) shopUi.open(story,entry);
+    }
+    return;
+  }
   const atTable = at === 'sumi-table';
   if (building?.id === SUMI_CAFE_ID && (atTable || at === `activity:${SUMI_CAFE_ID}`)) {
     const phase = world.sumiDeliveryState();
@@ -1565,6 +1662,7 @@ async function load() {
       onArea(next) {
         area = next;
         game.dataset.area = area;
+        syncRoomStory();
         nearNari = false;
         paintMission();
         if (area !== 'street') audio.cue('step');
@@ -1594,11 +1692,13 @@ async function load() {
       paintMission();
       const entry = new URL(location.href);
       if (entry.searchParams.get('start') === 'city') {
-        if (entry.searchParams.get('visit') === 'sumi') cityTarget=getBuilding(SUMI_CAFE_ID);
+        const visit = entry.searchParams.get('visit');
+        cityTarget = getBuilding(visit === 'sumi' ? SUMI_CAFE_ID : visit);
         await enterHongdae('city-gate');
         if (spot==='city-enter' || spot==='street-city-enter') await actInCity();
-        if (area==='city' && cityTarget?.id===SUMI_CAFE_ID) {
-          world.faceCityDoor(SUMI_CAFE_ID);
+        if (area === 'city' && cityTarget) {
+          if (visit === 'sumi') world.faceCityDoor(SUMI_CAFE_ID);
+          else world.approachCityDoor(cityTarget.id);
           paintCityTarget();
         }
       } else if (entry.searchParams.get('start') === 'hongdae') {
@@ -1652,7 +1752,7 @@ canvas.addEventListener('webglcontextlost', event => {
 
 document.addEventListener('keydown', event => {
   const editing = event.target instanceof Element && event.target.matches('input, textarea, select, [contenteditable]');
-  if (event.altKey || event.ctrlKey || event.metaKey || editing || phone.open || cityUi.isOpen()) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || editing || phone.open || cityUi.isOpen() || shopUi.isOpen()) return;
   if (event.code === 'Escape') {
     if (!wardrobe.hidden) setWardrobe(false, true);
     else if (festival) leaveFestival();

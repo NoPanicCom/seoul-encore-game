@@ -213,7 +213,7 @@ function typeLabel(building, locale) {
 }
 
 export function createCityActivities({
-  lang, onOpen, onClose, onTarget, onSumiAction,
+  lang, onOpen, onClose, onTarget, storyProgress, onSumiAction,
   onSumiAccept, onSumiPickup, onSumiReplay,
   buildings = CITY_BUILDINGS, plan = {bounds: CITY_BOUNDS, roads: CITY_ROADS},
 }) {
@@ -779,7 +779,11 @@ export function createCityActivities({
       item.dataset.stamped = String(passport.has(place.id));
       item.setAttribute('aria-pressed', String(selected?.id === place.id));
       const label = element('span', 'city-building-name');
-      label.append(element('strong', '', place.name), element('small', '', typeLabel(place, locale())));
+      const entry = storyProgress?.(place.id);
+      const endingCount = Number(Boolean(entry?.seen & 1)) + Number(Boolean(entry?.seen & 2));
+      const progress = endingCount ? (locale() === 'tr' ? ' · Sonlar ' : ' · Финалы ') + endingCount + '/2' :
+        entry && entry.stage !== 'intro' ? (locale() === 'tr' ? ' · Hikâye sürüyor' : ' · История начата') : '';
+      label.append(element('strong', '', place.name), element('small', '', typeLabel(place, locale()) + progress));
       const distance = element('span', 'city-building-distance', `${Math.round(publicDistance(position, place.door ?? place))} m`);
       item.append(label, distance);
       row.append(item);
