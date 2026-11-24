@@ -8,11 +8,11 @@
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../tour-icon.png">
   <link rel="apple-touch-icon" href="../tour-icon.png">
-  <link rel="stylesheet" href="./style.css?v=ebd69a907caa">
+  <link rel="stylesheet" href="./style.css?v=d4f49b41cf27">
   <title>Seoul Encore · Sofia</title>
   <script defer src="./vendor/babylon.js"></script>
   <script defer src="./vendor/babylonjs.loaders.js"></script>
-  <script type="module" src="./game-ea99fc27cb92.js"></script>
+  <script type="module" src="./game-00311ee28bc5.js"></script>
 </head>
 <body>
   <main id="game" data-state="loading" data-area="street" data-replay="false" data-journey="false" data-venue="studio">
@@ -50,6 +50,7 @@
       <div class="route" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       <p class="mission-area" id="area"></p>
       <h1 id="objective"></h1>
+      <p id="hongdae-route" class="mission-route" data-text="hongdaeRoute" hidden></p>
     </section>
 
     <section class="center-message" id="startup" role="status">
@@ -87,6 +88,8 @@
         <button id="rehearse" type="button" class="context-action" hidden><span class="context-icon" aria-hidden="true">♪</span><span data-text="startDuet">Танцевать с Нари</span></button>
         <button id="resume-invite" type="button" class="context-action" hidden><span class="context-icon" aria-hidden="true">↗</span><span id="resume-invite-label"></span></button>
         <button id="start-concert" type="button" class="context-action" hidden><span class="context-icon" aria-hidden="true">✦</span><span data-text="startConcert">Начать концерт</span></button>
+        <p id="hongdae-status" class="walk-status" role="status" hidden></p>
+        <button id="hongdae-action" type="button" class="context-action" hidden><span id="hongdae-action-icon" class="context-icon" aria-hidden="true"></span><span id="hongdae-action-label"></span></button>
       </div>
     </div>
 
@@ -164,6 +167,21 @@
         <a id="watch-card" class="result-tool" data-label="watchAgain" aria-label="Смотреть снова" hidden><span aria-hidden="true">▷</span><span data-text="watchShort">Смотреть</span></a>
         <button id="repeat-duet" type="button" class="result-tool" aria-label="Танцевать снова"><span id="repeat-icon" aria-hidden="true">↻</span><span id="repeat-label">Повторить</span></button>
         <button id="return-explore" type="button" class="result-tool" aria-label="Вернуться в зал"><span aria-hidden="true">↩</span><span data-text="backShort">Назад</span></button>
+      </div>
+    </section>
+
+    <div id="booth-finder" class="booth-finder" role="status" hidden><span data-text="boothPose">Улыбнись!</span></div>
+    <section id="booth-panel" class="panel result booth-panel" aria-labelledby="booth-title" hidden>
+      <header class="panel-heading">
+        <h2 id="booth-title" data-text="boothTitle">Фотокабина</h2>
+        <button type="button" id="booth-close" class="close-button" data-label="close" aria-label="Закрыть">×</button>
+      </header>
+      <img id="booth-photo" class="booth-photo" width="360" height="440" alt="" hidden>
+      <button id="booth-save" class="primary" type="button" data-text="save" hidden>В альбом</button>
+      <p id="booth-status" class="save-status" role="status" hidden></p>
+      <div class="result-actions">
+        <button id="booth-retake" class="result-tool" type="button" data-label="boothRetake" aria-label="Сделать новый кадр"><span aria-hidden="true">↻</span><span data-text="boothRetakeShort">Снова</span></button>
+        <a id="booth-album" class="result-tool" href="../?v=kulisa&amp;from=hongdae3d#chapter-album/sofia" data-label="album" aria-label="Открыть альбом"><span aria-hidden="true">▤</span><span data-text="albumShort">Альбом</span></a>
       </div>
     </section>
 

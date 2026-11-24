@@ -1,3 +1,4 @@
+import { equipHongdaeStick } from './v2-recordings.js';
 import { renderLisaMic, mountLisaMic, resetLisaMic, lisaMicTaken, setLisaMicSoundEnabled } from './lisa-mic.js';
 import { renderOfficialShow, mountOfficialShow } from './official-show.js';
 import { initConcertTrack, activeConcertTrack, renderConcertTrack, mountConcertTrack, playConcertTrack, stopConcertTrack, setConcertTrackSound, concertTrackElapsed, isConcertTrackPlaying } from './concert-track.js';
@@ -134,12 +135,14 @@ let replay = null;
 let secretTimes = [];
 const ownedSticks = new Set(shopSticks.filter(id => read('bought.' + id) === '1' || lightstick === id));
 function buyOrEquip(id) {
-    if (!ownedSticks.has(id)) {
-        save('bought.' + id, '1');
-        ownedSticks.add(id);
+    try {
+        equipHongdaeStick(id);
     }
+    catch {
+        storageError();
+    }
+    ownedSticks.add(id);
     lightstick = id;
-    save('lightstick', id);
 }
 const fanCards = () => ['heart', 'moon', 'star', ...shopSticks].filter(id => readFanRecording(id, read('secret-card.' + id)) !== null);
 let ariVenue = null;
@@ -766,9 +769,12 @@ function draw() {
     document.documentElement.lang = lang;
     const trackPanel = ['home', 'time'].includes(page) || (!playing && ['stage', 'lightshow', 'secret'].includes(page));
     const screens = { 'chapter-replay': () => renderChapterReplay(lang), chapter: renderSeoulWalk, 'chapter-crew': () => renderCrewGame(lang, role), 'official-show': officialShow, 'lisa-mic': () => renderLisaMic(lang), 'manager-practice': () => renderCrewGame(lang, 'manager', true), 'manager-mic': () => renderManagerMic(lang), 'ari-change': () => ariBackstage(lang), 'yuna-rehearsal': () => yunaRehearsal(lang), 'soyeon-change': () => velvetBackstage(lang), 'soyeon-stairs': () => velvetStairs(lang), 'mina-change': () => changeRoom(lang), home, walk: renderSeoulWalk, 'walk-bow': () => `<section class="walk-bow"><img src="art/mainstage.webp" alt=""><h2>${t('BLACKPINK sahneden selam veriyor', 'BLACKPINK на поклоне')}</h2><p>${listening ? t('Sahne ışıkları söndü. Seul’den iyi geceler!', 'Свет на сцене погас. Спокойной ночи, Сеул!') : t('Konserde yakaladığın vuruşlar', 'Твои попадания в такт') + ' · ' + hits.size + ' / ' + beatCount}</p>${arenaEntrance === 'home' ? action('home', t('Ana ekrana dön', 'На главную')) : action('walk', t('Arena meydanına dön', 'Вернуться на площадь'))}</section>`, world: () => renderWorld(lang) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), minho: () => renderMinho(lang, lightstick, ownedSticks), lightshow: stage, secret: stage, 'fan-replay': () => replay ? renderFanReplay(lang, replay) : albumPage(), blackout: () => renderBlackout(lang), 'light-result': () => lightstick ? renderLightResult(lang, lightstick, hits.size, beatCount) : renderMinho(lang, lightstick, ownedSticks), hongdae: () => renderHongdae(lang, tripMember) + action('walk', t('Sofia ile Seul’de yürü', 'Гулять по Сеулу за Софию'), 'walk-entry secondary'), booth: () => renderBooth(lang, tripMember), passes: roles, time: clockPage, city: cityScreen, pets: () => renderPets(lang), studio: studioScreen, crew: () => renderCrewGame(lang, clipDay ? 'director' : role), brief, item: itemsPage, cue: cuePage, stage, show: () => renderEncore(lang), ending, album: albumPage };
-    const homeControl = new URLSearchParams(location.search).get('from') === 'studio3d'
-        ? `<a class="smallbtn studio-return" href="v2/" data-studio-return>${t('‹ 3D oyuna dön', '‹ В 3D-игру')}</a>`
-        : `<button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button>`;
+    const origin3d = new URLSearchParams(location.search).get('from');
+    const homeControl = origin3d === 'hongdae3d'
+        ? `<a class="smallbtn studio-return" href="v2/?start=hongdae&amp;at=booth" data-studio-return>${t('‹ Hongdae’ye dön', '‹ Вернуться в Хондэ')}</a>`
+        : origin3d === 'studio3d'
+            ? `<a class="smallbtn studio-return" href="v2/" data-studio-return>${t('‹ 3D oyuna dön', '‹ В 3D-игру')}</a>`
+            : `<button class="brand" data-act="home" aria-label="${t('Ana ekran', 'Главная')}"><b>✳</b> encore</button>`;
     app.innerHTML = `<header>${homeControl}<button type="button" class="audio-switch" data-act="sound" aria-pressed="${sound}">${sound ? '♫ ' : '○ '}${soundLabel()}</button><button class="lang" data-act="lang" aria-label="Türkçe / Русский">${lang === 'tr' ? 'TR <span>/ РУ</span>' : '<span>TR /</span> РУ'}</button></header><main>${page === 'chapter' || page === 'world' ? '<a class="v2-studio-link" href="v2/">' + t('3D · Nari’yle provadan sahneye', '3D · С Нари из студии на сцену') + ' ↗</a>' : ''}${['home', 'chapter', 'chapter-replay', 'walk', 'world', 'hongdae', 'booth', 'minho', 'blackout', 'light-result', 'fan-replay'].includes(page) ? '' : `<div class="subhead">${action('back', back() === 'home' ? t('‹ Ana ekran', '‹ Главная') : t('‹ Geri', '‹ Назад'), 'smallbtn')}<span class="cardno">${(['official-show', 'lisa-mic', 'lightshow', 'secret'].includes(page)) ? 'SEOUL LIVE' : ['passes', 'album', 'pets', 'city', 'studio'].includes(page) ? 'SEOUL ENCORE' : pass().name + ' / SEOUL'}</span></div>`}${screens[page]()}${trackPanel ? renderConcertTrack(lang) : ''}<div id="feedback" class="notice" role="status"></div></main>`;
     if (!tracksReady)
         app.querySelectorAll('[data-act="play"],[data-act="listen"],[data-act^="watch-fan-"]').forEach(button => button.disabled = true);
@@ -1161,7 +1167,7 @@ app.addEventListener('click', e => {
     if (studioReturn && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
         const studioUrl = new URL(studioReturn.href);
         const previous = document.referrer ? new URL(document.referrer) : null;
-        if (history.length > 1 && previous?.origin === studioUrl.origin && previous.pathname === studioUrl.pathname) {
+        if (!studioUrl.search && history.length > 1 && previous?.origin === studioUrl.origin && previous.pathname === studioUrl.pathname) {
             e.preventDefault();
             history.back();
         }
@@ -1768,6 +1774,17 @@ document.addEventListener('visibilitychange', () => {
         stop();
         draw();
     }
+});
+window.addEventListener('pageshow', event => {
+    if (!event.persisted)
+        return;
+    lightstick = stickId(read('lightstick'));
+    for (const id of shopSticks) {
+        if (read('bought.' + id) === '1' || lightstick === id)
+            ownedSticks.add(id);
+    }
+    if (page === 'album' || page === 'minho' || page === 'lightshow')
+        draw();
 });
 window.addEventListener('encore:photo-saved', () => {
     save('lastAlbum', 'hongdae');

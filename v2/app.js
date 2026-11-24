@@ -1,5 +1,6 @@
-import {clearInvitation, readDuet, readInvitation, saveDuet, saveInvitation, startingLook} from './album.js';
+import {clearInvitation, equipHongdaeStick, readDuet, readHongdaeStick, readInvitation, saveDuet, saveInvitation, savePixelPhoto, startingLook} from './album.js';
 import {createWorld} from './world.js';
+import {isShopStick, stickColor, stickName} from '../js/lightstick.js';
 import {worldAudio as audio} from '../js/world-audio.js';
 import {pauseStageMusic, resumeStageMusic, setStageSound, stageApplause, startStageMusic, stopStageMusic} from './stage-music.js';
 
@@ -22,6 +23,32 @@ const phrases = {
     replayErrorDetail: 'Открой сохранённый танец в альбоме на устройстве, где ты его записала.',
     street: 'Улица в Сеуле',
     streetObjective: 'Войди в здание YG впереди',
+    hongdae: 'Хондэ',
+    minho: 'Магазин Минхо',
+    hongdaeRoute: 'К Пикселю через указатель «Хондэ» справа',
+    hongdaeObjective: 'Пиксель рядом. Зайди в магазин справа',
+    hongdaeBoothObjective: 'Фотокабина на другой стороне улицы',
+    minhoObjective: 'Подойди к полке, чтобы взять лайтстик',
+    minhoEquipped: 'С Пикселем и лайтстиком к фотокабине',
+    hongdaeEnter: 'В Хондэ',
+    hongdaeExit: 'Обратно к YG',
+    hongdaeLoading: 'Открываем Хондэ…',
+    hongdaeError: 'Хондэ не загрузился. Попробуй снова.',
+    stickEquip: 'Взять',
+    stickBuy: 'Купить',
+    stickCoupon: '1 купон',
+    stickEquipped: 'В руке',
+    stickError: 'Не удалось взять лайтстик. Попробуй ещё раз.',
+    boothTitle: 'Фотокабина',
+    boothAction: 'Сделать фото',
+    boothPose: 'Улыбнись!',
+    boothPhotoAlt: 'София и Пиксель в фотокабине Хондэ',
+    boothNeedsStick: 'Возьми с полки лайтстик и вернись к фотокабине',
+    boothCaptureError: 'Кадр не получился. Попробуй ещё раз.',
+    boothSaveError: 'Не удалось сохранить кадр. Попробуй ещё раз.',
+    boothSaved: 'Фото с Пикселем сохранено в альбоме.',
+    boothRetake: 'Сделать новый кадр',
+    boothRetakeShort: 'Снова',
     lobby: 'Лобби YG',
     lobbyObjective: 'Пройди прямо в репетиционный зал',
     practice: 'Репетиционный зал',
@@ -129,6 +156,32 @@ const phrases = {
     replayErrorDetail: 'Albümdeki dansı kaydettiğin cihazdan açabilirsin.',
     street: 'Seul sokağı',
     streetObjective: 'İlerideki YG binasına gir',
+    hongdae: 'Hongdae',
+    minho: 'Minho’nun dükkânı',
+    hongdaeRoute: 'Pixel için sağdaki Hongdae tabelasına yaklaş',
+    hongdaeObjective: 'Pixel yanında. Sağdaki dükkâna gir',
+    hongdaeBoothObjective: 'Fotokabin sokağın karşı kaldırımında',
+    minhoObjective: 'Işık çubuğu almak için bir rafa yaklaş',
+    minhoEquipped: 'Pixel ve ışık çubuğunla fotokabine git',
+    hongdaeEnter: 'Hongdae’ye git',
+    hongdaeExit: 'YG’ye dön',
+    hongdaeLoading: 'Hongdae hazırlanıyor…',
+    hongdaeError: 'Hongdae yüklenemedi. Yeniden dene.',
+    stickEquip: 'Eline al',
+    stickBuy: 'Satın al',
+    stickCoupon: '1 kupon',
+    stickEquipped: 'Elinde',
+    stickError: 'Işık çubuğu alınamadı. Yeniden dene.',
+    boothTitle: 'Fotokabin',
+    boothAction: 'Fotoğraf çek',
+    boothPose: 'Gülümse!',
+    boothPhotoAlt: 'Hongdae fotokabininde Sofia ve Pixel',
+    boothNeedsStick: 'Raftan bir ışık çubuğu alıp fotokabine dön',
+    boothCaptureError: 'Fotoğraf çekilemedi. Yeniden dene.',
+    boothSaveError: 'Fotoğraf kaydedilemedi. Yeniden dene.',
+    boothSaved: 'Pixel’le çekildiğin fotoğraf albüme eklendi.',
+    boothRetake: 'Yeni fotoğraf çek',
+    boothRetakeShort: 'Yeniden',
     lobby: 'YG lobisi',
     lobbyObjective: 'Düz ilerleyip prova salonuna gir',
     practice: 'Prova salonu',
@@ -226,6 +279,9 @@ const canvas = byId('scene');
 const joystick = byId('joystick');
 const rehearsal = byId('rehearse');
 const startConcert = byId('start-concert');
+const hongdaeAction = byId('hongdae-action');
+const boothPhoto = byId('booth-photo');
+const boothSave = byId('booth-save');
 const inviteButton = byId('invite-nari');
 const resumeButton = byId('resume-invite');
 const watchCard = byId('watch-card');
@@ -265,6 +321,11 @@ const finales = new Set(finaleButtons.map(button => button.dataset.finale));
 const arrows = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 const directionKeys = new Set([...arrows, 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
 const keysHeld = new Set();
+const hongdaeActions = {
+  'hongdae-enter': {label: 'hongdaeEnter', icon: '↗'},
+  'hongdae-exit': {label: 'hongdaeExit', icon: '↩'},
+  booth: {label: 'boothAction', icon: '▣'},
+};
 
 function preference(key) {
   try {
@@ -296,6 +357,12 @@ let stageAudioRequested = false;
 let world;
 let state = 'loading';
 let area = 'street';
+let spot = null;
+let hongdaePending = false;
+let hongdaeFeedback = '';
+let shopStick = readHongdaeStick();
+let booth = null;
+let boothTimer = 0;
 let nearNari = false;
 let replay = null;
 let failure = null;
@@ -311,7 +378,7 @@ let joystickInput = {x: 0, y: 0};
 
 const words = key => phrases[lang][key];
 const setText = (id, value) => { byId(id).textContent = value; };
-const canWalk = () => state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending;
+const canWalk = () => state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending && !hongdaePending;
 const journey = () => concertFinale !== null;
 const arenaRound = () => round?.venue === 'arena';
 const rhythmState = phase => phase === 'play' || phase === 'concert';
@@ -319,6 +386,24 @@ const stagePerformance = () => arenaRound() && (state === 'concert' || state ===
 const timing = () => state === 'replay' && arenaRound() ? arenaReplayTiming : timings[state];
 const concertPlan = () => replay && !arenaRound() ? replay : invitation;
 const albumHref = byId('album-link').getAttribute('href');
+const inHongdae = () => area === 'hongdae' || area === 'minho';
+
+function shelfStick() {
+  const id = spot?.startsWith('shelf-') ? spot.slice(6) : null;
+  return area === 'minho' && isShopStick(id) ? id : null;
+}
+
+function hongdaeContext() {
+  if (area === 'street' && spot === 'hongdae-enter') return hongdaeActions[spot];
+  if (inHongdae() && spot === 'hongdae-exit') return hongdaeActions[spot];
+  if (area === 'hongdae' && spot === 'booth' && shopStick) return hongdaeActions[spot];
+  const shelf = shelfStick();
+  if (shelf) {
+    const owned = shelf === shopStick || preference('encore1.bought.' + shelf) === '1';
+    return {label: shelf === shopStick ? 'stickEquipped' : owned ? 'stickEquip' : 'stickBuy', icon: '✦', shelf};
+  }
+  return null;
+}
 
 function paintSaveStatus() {
   setText('save-status', saveStatus ? words(saveStatus) : '');
@@ -354,14 +439,40 @@ function paintPhotoPreview() {
 
 function paintMission() {
   setText('area', words(area));
-  byId('mission').setAttribute('aria-label', words(journey() ? 'arenaRouteLabel' : 'routeLabel'));
+  byId('mission').setAttribute('aria-label', words(inHongdae() ? area : journey() ? 'arenaRouteLabel' : 'routeLabel'));
+  const context = hongdaeContext();
+  const direction = byId('hongdae-route');
+  const purchase = context?.label === 'stickBuy';
+  const loadingDistrict = hongdaePending && !context;
+  direction.textContent = words(loadingDistrict ? 'hongdaeLoading' : purchase ? 'stickCoupon' : 'hongdaeRoute');
+  direction.hidden = !loadingDistrict && !purchase && (area !== 'street' || journey() || Boolean(context));
   const journeyObjective = `journey${area[0].toUpperCase()}${area.slice(1)}`;
-  const objective = journey() || area === 'arena' || area === 'plaza'
+  let objective = journey() || area === 'arena' || area === 'plaza'
     ? (nearNari ? 'stageReady' : journeyObjective)
     : (nearNari ? 'nearObjective' : `${area}Objective`);
-  setText('objective', words(objective));
-  rehearsal.hidden = journey() || !nearNari;
-  startConcert.hidden = !journey() || !nearNari;
+  if (inHongdae()) {
+    if (area === 'hongdae') objective = shopStick ? 'hongdaeBoothObjective' : 'hongdaeObjective';
+    else objective = shopStick ? 'minhoEquipped' : 'minhoObjective';
+    if (spot === 'booth' && !shopStick) objective = 'boothNeedsStick';
+  }
+  setText('objective', context?.shelf ? stickName(context.shelf, lang) : words(objective));
+  rehearsal.hidden = journey() || !nearNari || inHongdae() || Boolean(context);
+  startConcert.hidden = !journey() || !nearNari || inHongdae() || Boolean(context);
+  hongdaeAction.hidden = !context;
+  hongdaeAction.disabled = hongdaePending || arenaPending || Boolean(context?.shelf && context.shelf === shopStick);
+  hongdaeAction.setAttribute('aria-busy', String(hongdaePending));
+  if (context) {
+    hongdaeAction.dataset.spot = spot;
+    const label = words(hongdaePending ? 'hongdaeLoading' : context.label);
+    setText('hongdae-action-icon', context.icon);
+    setText('hongdae-action-label', label);
+    const name = context.shelf ? `${label} · ${stickName(context.shelf, lang)}` : label;
+    hongdaeAction.setAttribute('aria-label', purchase ? `${name} · ${words('stickCoupon')}` : name);
+  } else {
+    delete hongdaeAction.dataset.spot;
+  }
+  setText('hongdae-status', hongdaeFeedback ? words(hongdaeFeedback) : '');
+  byId('hongdae-status').hidden = !hongdaeFeedback;
   paintInvitation();
 }
 
@@ -385,16 +496,16 @@ function paintResult() {
 
 function paintInvitation() {
   byId('concert-invite').hidden = !concertPlan() || journey() || arenaRound();
-  resumeButton.hidden = !invitation || Boolean(replay) || journey() || area !== 'street';
+  resumeButton.hidden = !invitation || Boolean(replay) || journey() || area !== 'street' || !hongdaeAction.hidden;
   setText('invite-nari-label', words(arenaPending ? 'preparingArena' : 'acceptInviteShort'));
   inviteButton.setAttribute('aria-label', words(arenaPending ? 'preparingArena' : 'acceptInvite'));
   setText('resume-invite-label', words(arenaPending ? 'preparingArena' : 'resumeInviteShort'));
   resumeButton.setAttribute('aria-label', words(arenaPending ? 'preparingArena' : 'resumeInvite'));
   for (const button of [inviteButton, resumeButton]) {
-    button.disabled = arenaPending;
+    button.disabled = arenaPending || (button === resumeButton && hongdaePending);
     button.setAttribute('aria-busy', String(arenaPending));
   }
-  lookToggle.disabled = arenaPending || state !== 'walk';
+  lookToggle.disabled = arenaPending || hongdaePending || state !== 'walk';
   for (const id of ['invite-status', 'walk-invite-status']) {
     setText(id, arenaError ? words('arenaError') : '');
     byId(id).hidden = !arenaError || (id === 'walk-invite-status' && resumeButton.hidden);
@@ -442,6 +553,7 @@ function paintLanguage() {
   paintFinale();
   paintMission();
   paintResult();
+  paintBooth();
   paintFailure();
   if (round && Object.hasOwn(timings, state)) paintCue();
 }
@@ -459,6 +571,7 @@ function setState(next) {
   byId('dance-panel').hidden = !dancing;
   byId('move-buttons').hidden = !rhythmState(next);
   byId('result').hidden = next !== 'result';
+  paintBooth();
   if (!rhythmState(next)) delete game.dataset.beat;
   if (!dancing) delete game.dataset.currentMove;
 }
@@ -472,6 +585,8 @@ function updateLook() {
   world.outfit(look.outfit);
   world.setWand(look.wandColor);
   world.setJacket(look.jacket);
+  world.equipShopStick(replay ? null : shopStick);
+  game.dataset.shopStick = replay ? '' : shopStick ?? '';
   game.dataset.jacket = String(look.jacket);
   paintJacket();
   for (const button of outfits) button.setAttribute('aria-pressed', String(button.dataset.outfit === look.outfit));
@@ -798,12 +913,13 @@ function backToWalk() {
     location.assign(albumHref);
     return;
   }
-  if (replay) {
+  const restoringLook = Boolean(replay);
+  if (restoringLook) {
     look = startingLook();
     look.jacket ??= true;
-    updateLook();
   }
   clearReplay();
+  if (restoringLook) updateLook();
   round = null;
   game.dataset.area = area;
   game.dataset.venue = journey() ? 'arena' : 'studio';
@@ -837,8 +953,124 @@ function saveCard() {
   paintSaveStatus();
 }
 
+async function enterHongdae(destination) {
+  if (hongdaePending || inHongdae()) return;
+  const activeWorld = world;
+  hongdaePending = true;
+  hongdaeFeedback = '';
+  resetControls();
+  paintMission();
+  try {
+    await activeWorld.enterHongdae(destination);
+    if (world === activeWorld) {
+      audio.cue('pixel');
+      if (!phone.open) phoneToggle.focus({preventScroll: true});
+    }
+  } catch (error) {
+    hongdaeFeedback = 'hongdaeError';
+    console.warn('Seoul Encore Hongdae could not load.', error);
+  } finally {
+    hongdaePending = false;
+    paintMission();
+  }
+}
+
+function actInHongdae() {
+  if (!canWalk() || !hongdaeContext() || hongdaeAction.disabled) return;
+  hongdaeFeedback = '';
+  if (spot === 'hongdae-enter') {
+    void enterHongdae();
+  } else if (spot === 'hongdae-exit') {
+    resetControls();
+    world.leaveHongdae();
+    if (!phone.open) phoneToggle.focus({preventScroll: true});
+  } else if (spot === 'booth') {
+    takeBoothPhoto();
+  } else {
+    const shelf = shelfStick();
+    try {
+      const color = equipHongdaeStick(shelf);
+      shopStick = shelf;
+      look.wandColor = color;
+      updateLook();
+      audio.cue('delivery');
+    } catch (error) {
+      hongdaeFeedback = 'stickError';
+      console.warn('Seoul Encore lightstick could not be equipped.', error);
+    }
+    paintMission();
+  }
+}
+
+function paintBooth() {
+  const active = state === 'booth';
+  byId('booth-panel').hidden = !active || Boolean(booth?.taking);
+  byId('booth-finder').hidden = !active || !booth?.taking;
+  if (!active || !booth) return;
+  const photo = booth.record?.photo;
+  boothPhoto.alt = words('boothPhotoAlt');
+  if (photo) {
+    if (boothPhoto.getAttribute('src') !== photo) boothPhoto.src = photo;
+  } else {
+    boothPhoto.removeAttribute('src');
+  }
+  boothPhoto.hidden = !photo;
+  boothSave.hidden = !photo || Boolean(booth.saved);
+  boothSave.disabled = Boolean(booth.saved);
+  const status = byId('booth-status');
+  status.hidden = !booth.feedback;
+  status.textContent = booth.feedback ? words(booth.feedback) : '';
+  status.dataset.error = String(Boolean(booth.feedback) && !booth.saved);
+}
+
+function takeBoothPhoto() {
+  if (!shopStick || (state !== 'booth' && (spot !== 'booth' || !canWalk())) || booth?.taking) return;
+  resetControls();
+  booth = {taking: true, record: null, feedback: '', saved: false};
+  setState('booth');
+  boothTimer = setTimeout(() => {
+    try {
+      const photo = world.captureBoothPhoto();
+      if (!/^data:image\/(?:jpeg|webp);base64,/.test(photo)) throw new Error('Unsupported booth photo');
+      booth.record = {...look, stick: shopStick, photo};
+      audio.cue('spotlight');
+    } catch (error) {
+      booth.feedback = 'boothCaptureError';
+      console.warn('Seoul Encore booth photo could not be captured.', error);
+    }
+    booth.taking = false;
+    paintBooth();
+    if (!phone.open) byId(booth.record ? 'booth-save' : 'booth-retake').focus({preventScroll: true});
+  }, 520);
+}
+
+function saveBoothPhoto() {
+  if (state !== 'booth' || !booth?.record || booth.saved) return;
+  try {
+    savePixelPhoto(booth.record);
+    booth.saved = true;
+    booth.feedback = 'boothSaved';
+    audio.cue('delivery');
+    byId('booth-album').focus({preventScroll: true});
+  } catch (error) {
+    booth.feedback = 'boothSaveError';
+    console.warn('Seoul Encore booth photo could not be saved.', error);
+  }
+  paintBooth();
+}
+
+function closeBooth() {
+  if (state !== 'booth') return;
+  clearTimeout(boothTimer);
+  booth = null;
+  setState('walk');
+  paintMission();
+  (hongdaeAction.hidden ? phoneToggle : hongdaeAction).focus({preventScroll: true});
+}
+
 function showFailure(kind, error) {
   cancelAnimationFrame(frame);
+  clearTimeout(boothTimer);
   resetControls();
   closeStageAudio();
   audio.exit();
@@ -879,6 +1111,12 @@ async function load() {
         paintMission();
         if (near) audio.cue('spotlight');
       },
+      onSpot(next) {
+        if (spot === next) return;
+        spot = next;
+        hongdaeFeedback = '';
+        paintMission();
+      },
     });
     updateLook();
     if (replay) {
@@ -888,6 +1126,14 @@ async function load() {
     } else {
       setState('walk');
       paintMission();
+      const entry = new URL(location.href);
+      if (entry.searchParams.get('start') === 'hongdae') {
+        const destination = entry.searchParams.get('at') === 'booth' ? 'booth' : 'gate';
+        entry.searchParams.delete('start');
+        entry.searchParams.delete('at');
+        history.replaceState(history.state, '', entry);
+        await enterHongdae(destination);
+      }
     }
   } catch (error) {
     showFailure('scene', error);
@@ -935,6 +1181,7 @@ document.addEventListener('keydown', event => {
   if (event.altKey || event.ctrlKey || event.metaKey || editing || phone.open) return;
   if (event.code === 'Escape') {
     if (!wardrobe.hidden) setWardrobe(false, true);
+    else if (state === 'booth') closeBooth();
     else if (state === 'result' || Object.hasOwn(timings, state)) backToWalk();
     return;
   }
@@ -946,8 +1193,10 @@ document.addEventListener('keydown', event => {
   } else if (state === 'walk' && (event.code === 'KeyQ' || event.code === 'KeyE')) {
     event.preventDefault();
     world.orbit(event.code === 'KeyQ' ? 15 : -15, 0);
-  } else if (canWalk() && nearNari && event.code === 'KeyF' && !event.repeat) {
-    enterPerformance();
+  } else if (canWalk() && event.code === 'KeyF' && !event.repeat) {
+    if (!hongdaeAction.hidden) actInHongdae();
+    else if (!resumeButton.hidden) void beginConcertWalk();
+    else if (nearNari) enterPerformance();
   } else if (rhythmState(state) && !event.repeat) {
     const index = /^(?:Digit|Numpad)([1-3])$/.exec(event.code);
     if (index) {
@@ -967,6 +1216,14 @@ window.addEventListener('pageshow', event => {
   sound = preference('encore1.sound') !== 'off';
   audio.setEnabled(sound);
   setStageSound(sound);
+  if (state === 'walk' && world) {
+    const selected = readHongdaeStick();
+    if (selected !== shopStick) {
+      shopStick = selected;
+      look.wandColor = shopStick ? stickColor(shopStick) : startingLook().wandColor;
+      updateLook();
+    }
+  }
   paintLanguage();
 });
 window.addEventListener('hashchange', () => location.reload());
@@ -1033,6 +1290,10 @@ function enterPerformance() {
 
 rehearsal.addEventListener('click', enterPerformance);
 startConcert.addEventListener('click', enterPerformance);
+hongdaeAction.addEventListener('click', actInHongdae);
+byId('booth-close').addEventListener('click', closeBooth);
+byId('booth-retake').addEventListener('click', takeBoothPhoto);
+boothSave.addEventListener('click', saveBoothPhoto);
 inviteButton.addEventListener('click', () => void beginConcertWalk());
 resumeButton.addEventListener('click', () => void beginConcertWalk());
 for (const button of moveButtons) button.addEventListener('click', () => {

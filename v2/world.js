@@ -1,3 +1,9 @@
+import {
+  addHongdaeProps, BOOTH, createHongdaeWayfinder, districtArea, districtSpot, districtWalkable,
+  DISTRICT_X, HONGDAE_CAMERA_WALLS, HONGDAE_ENTRY, YG_GATE,
+} from './hongdae-world.js';
+import { createLightstick, createPixel, HONGDAE_LIGHTSTICKS } from './hongdae-props.js';
+
 const PORTALS = [
   { low: 2.68, high: 3.38 },
   { low: -4.24, high: -3.78 },
@@ -59,6 +65,7 @@ function walkable(x, z, journey = false) {
   const furthest = journey ? ARENA_END_Z : PLAZA_Z - PLAYER_RADIUS;
   if (Math.abs(x) > 4.6 - PLAYER_RADIUS || z < -13 + PLAYER_RADIUS || z > furthest) return false;
   if (!journey && Math.hypot(x - NARI_X, z - STUDIO_Z) < .66) return false;
+  if (Math.hypot(x - YG_GATE.x - .52, z - YG_GATE.z) < .32) return false;
   return Math.abs(x) <= OPENING - PLAYER_RADIUS || PORTALS.every(({ low, high }) =>
     z <= low - PLAYER_RADIUS || z >= high + PLAYER_RADIUS);
 }
@@ -79,12 +86,12 @@ const CAMERA_WALLS = [
 
 const CAMERA_PADDING = .17;
 
-function cameraLimit(target, offset) {
+function cameraLimit(target, offset, walls = CAMERA_WALLS) {
   const origin = [target.x, target.y, target.z];
   const direction = [offset.x, offset.y, offset.z];
   let limit = 1;
   // Pad the architecture so the camera's near plane also clears each surface.
-  for (const { min, max } of CAMERA_WALLS) {
+  for (const { min, max } of walls) {
     let enter = 0;
     let leave = limit;
     for (let axis = 0; axis < 3; axis++) {
@@ -302,6 +309,14 @@ function animateActor(actor, style, time, elapsed, effort = 1) {
     rightArm = [.38 * raise, .14 + 2.78 * raise, .12 * raise, .11 + 1.44 * raise];
     leftLeg = [-.13 * raise, .21 * raise, .06];
     rightLeg = [-.13 * raise, .21 * raise, .06];
+  } else if (style === 'booth-photo') {
+    bodyTilt = -.065;
+    bodyTwist = .075;
+    bodyPitch = -.055;
+    leftArm = [-.18, .44, -.35, .46];
+    rightArm = [.21, .96, .19, 1.30, -.08];
+    leftLeg = [-.055, .11, .055];
+    rightLeg = [0, .035, 0];
   } else if (style === 'step') {
     const step = Math.sin(beat) * hit;
     travelZ = .24 * hit;
@@ -363,7 +378,7 @@ function animateActor(actor, style, time, elapsed, effort = 1) {
   actor.shadow.scaling.set(spread, 1, spread);
 }
 
-export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
+export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {}) {
   const B = globalThis.BABYLON;
   if (!B) throw new Error('Babylon.js yüklenemedi');
 
@@ -394,6 +409,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   glow.intensity = .30;
   let player;
   let nari;
+  let city;
+  let wayfinder;
+  let pixel;
+  let pixelShadow;
+  const pixelPose = { x: -.76, z: 10.39, yaw: Math.PI };
   try {
     const [building, sofia, partner] = await Promise.all([
       B.SceneLoader.ImportMeshAsync('', MODEL_URL, 'yg.glb', scene),
@@ -401,8 +421,15 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       loadActor(B, scene, 'nari.glb', 'nari', NARI_X, STUDIO_Z, shadow),
     ]);
     for (const mesh of building.meshes) mesh.isPickable = false;
+    city = building.meshes[0];
+    wayfinder = createHongdaeWayfinder(B, scene);
     player = sofia;
     nari = partner;
+    pixel = createPixel(B, scene, 'pixel');
+    pixel.place(pixelPose.x, pixelPose.z, pixelPose.yaw);
+    pixelShadow = B.MeshBuilder.CreateGround('Pixel shadow', { width: .59, height: .45 }, scene);
+    pixelShadow.material = shadow;
+    pixelShadow.isPickable = false;
     rim.includedOnlyMeshes = [...player.meshes, ...nari.meshes];
     if (!player.wand || !player.materials.has('Wand')) throw new Error('Sofia modelinde ışık çubuğu eksik');
     if (!player.jacket.length) throw new Error('Sofia modelinde çıkarılabilir ceket eksik');
@@ -434,6 +461,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   let orbitAdjusted = false;
   let establishing = 1;
   let currentArea = areaAt(player.z);
+  let currentSpot = null;
   let nearNari = false;
   let nariGreeted = false;
   let greetingEnds = 0;
@@ -441,6 +469,12 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   let journey = null;
   let arena = null;
   let arenaPending = null;
+  let hongdae = null;
+  let hongdaePending = null;
+  let districtVisit = null;
+  let districtEpoch = 0;
+  let equippedStick = null;
+  let wandVisible = false;
   let action = null;
   let photo = false;
   let lookPreview = null;
@@ -449,6 +483,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   const defaultWand = color(B, '#ff9acb');
   const spotlightWhite = B.Color3.White();
   let audienceTint = defaultWand;
+  const handSticks = new Map();
   const originalOutfit = OUTFIT_PARTS.map(part => player.materials.get(part).albedoColor.clone());
 
   async function loadArena() {
@@ -469,7 +504,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       await scene.whenReadyAsync();
       if (disposed) throw new Error('Sahne kapatıldı');
       return {
-        neon, crowd, spotlight,
+        root: model.meshes[0], neon, crowd, spotlight,
         neonColor: neon.emissiveColor.clone(),
         crowdColor: crowd.emissiveColor.clone(),
         crowdPaint: crowd.albedoColor.clone(),
@@ -491,6 +526,57 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     await arenaPending;
   }
 
+  function addGlowingMeshes(meshes) {
+    for (const mesh of meshes) {
+      const emission = mesh.material?.emissiveColor;
+      if (emission && (emission.r + emission.g + emission.b > .035)) glow.addIncludedOnlyMesh(mesh);
+      mesh.isPickable = false;
+    }
+  }
+
+  async function loadHongdae() {
+    const model = await B.SceneLoader.LoadAssetContainerAsync(MODEL_URL, 'hongdae.glb', scene);
+    let anchor;
+    let props = [];
+    try {
+      if (disposed) throw new Error('Sahne kapatıldı');
+      if (!model.meshes.some(mesh => mesh.getTotalVertices() > 0)) throw new Error('Hongdae çevre modeli boş');
+      model.addAllToScene();
+      anchor = new B.TransformNode('Hongdae district', scene);
+      anchor.position.x = DISTRICT_X;
+      model.populateRootNodes();
+      for (const root of model.rootNodes) root.parent = anchor;
+      props = addHongdaeProps(B, scene, anchor, createLightstick);
+      addGlowingMeshes(model.meshes);
+      for (const prop of props) addGlowingMeshes(prop.meshes);
+      await scene.whenReadyAsync();
+      if (disposed) throw new Error('Sahne kapatıldı');
+      anchor.setEnabled(false);
+      return { anchor };
+    } catch (error) {
+      for (const prop of props) prop.dispose();
+      model.dispose();
+      anchor?.dispose();
+      throw error;
+    }
+  }
+
+  function equipShopStick(id) {
+    if (id !== null && !HONGDAE_LIGHTSTICKS.includes(id)) throw new RangeError('Işık çubuğu geçersiz: ' + id);
+    if (id === equippedStick) return;
+    if (id && !handSticks.has(id)) {
+      const stick = createLightstick(B, scene, id, `equipped-${id}`);
+      stick.root.parent = player.wand.parent;
+      stick.root.position.copyFrom(player.wand.position);
+      addGlowingMeshes(stick.meshes);
+      handSticks.set(id, stick.root);
+    }
+    if (equippedStick) handSticks.get(equippedStick).setEnabled(false);
+    equippedStick = id;
+    if (id) handSticks.get(id).setEnabled(true);
+    player.wand.setEnabled(!id && wandVisible);
+  }
+
   function lightConcert(elapsed) {
     const phase = elapsed * TAU / .465;
     const pulse = .5 + .5 * Math.cos(phase);
@@ -508,15 +594,19 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     const portrait = aspect < .85;
     const staged = exploration !== null;
     const shortLandscape = !portrait && viewHeight <= 560;
-    const reveal = !journey && !discoveredMovement && !orbitAdjusted && !lookPreview && !staged;
+    const reveal = !districtVisit && !journey && !discoveredMovement && !orbitAdjusted && !lookPreview && !staged;
     const opening = clamp((time - .82) / 1.60, 0, 1);
     const wideShot = reveal ? 1 - .65 * opening * opening * (3 - 2 * opening) : 0;
     establishing += (wideShot - establishing) * (elapsed ? damping(4.6, elapsed) : 1);
-    const panorama = journey && !orbitAdjusted && !lookPreview ?
+    const panorama = !districtVisit && journey && !orbitAdjusted && !lookPreview ?
       clamp(Math.min((player.z - 12.5) / 3, (25.3 - player.z) / 3), 0, 1) : 0;
+    const districtWide = districtVisit && !orbitAdjusted && !lookPreview && districtArea(player.x - DISTRICT_X) === 'hongdae' ?
+      clamp((player.z - 1.2) / 4.4, 0, 1) : 0;
+    const shelfView = districtVisit && currentSpot?.startsWith('shelf-') && !orbitAdjusted && !lookPreview && !inputX && !inputY;
 
     camera.fov = staged ? (portrait || cardCapture ? .88 : .77) :
-      (portrait ? 1.04 + .22 * establishing + .22 * panorama : .84 + .14 * establishing + .13 * panorama);
+      (portrait ? 1.04 + .25 * establishing + .22 * panorama + .13 * districtWide :
+        .84 + .14 * establishing + .13 * panorama + .08 * districtWide);
     let distance = portrait ? 4.7 : 4.45;
 
     if (staged) {
@@ -531,15 +621,19 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       distance = Math.max(photo ? 3.95 + 1.65 * compactPhoto : 4.25,
         danceWidth / (2 * Math.tan(camera.fov / 2) * aspect));
     } else {
-      const aimHeight = lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) : 1.16 + .62 * establishing + .56 * panorama;
-      distance += (portrait ? 4.7 : 3.4) * establishing + 3.2 * panorama;
-      desiredFocus.set(player.x, aimHeight, player.z);
+      const indoors = districtVisit && districtArea(player.x - DISTRICT_X) === 'minho';
+      const aimHeight = lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) :
+        1.16 + .62 * establishing + .56 * panorama + .24 * districtWide;
+      distance += (portrait ? 4.7 : 3.4) * establishing + 3.2 * panorama + 1.12 * districtWide;
+      if (indoors) distance = shelfView ? 3.65 : 3.25;
+      desiredFocus.set(player.x + .48 * establishing + (shelfView ? .42 : 0), aimHeight, shelfView ? -1.38 : player.z);
       focus.x += (desiredFocus.x - focus.x) * smoothing;
       focus.y += (desiredFocus.y - focus.y) * smoothing;
       focus.z += (desiredFocus.z - focus.z) * smoothing;
       // At a jamb, interpolating between two valid positions can cross the corner.
-      if (!walkable(focus.x, focus.z, journey !== null)) focus.copyFrom(desiredFocus);
-      cameraYaw = blendAngle(cameraYaw, orbitYaw + .43 * establishing - .25 * panorama, smoothing);
+      if (!canStep(focus.x, focus.z)) focus.copyFrom(desiredFocus);
+      const desiredYaw = shelfView ? -1.34 : orbitYaw + .43 * establishing - .25 * panorama - .16 * districtWide;
+      cameraYaw = blendAngle(cameraYaw, desiredYaw, smoothing);
       cameraPitch += (orbitPitch - .075 * establishing - cameraPitch) * smoothing;
     }
     if (staged) focus.copyFrom(desiredFocus);
@@ -549,7 +643,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       Math.sin(cameraPitch) * distance,
       Math.cos(cameraYaw) * Math.cos(cameraPitch) * distance,
     );
-    const safeDistance = distance * cameraLimit(focus, cameraOffset);
+    const safeDistance = distance * cameraLimit(focus, cameraOffset, districtVisit ? HONGDAE_CAMERA_WALLS : undefined);
     cameraDistance = Math.min(safeDistance, cameraDistance + (safeDistance - cameraDistance) * smoothing);
     cameraOffset.scaleInPlace(cameraDistance / distance);
     camera.position.copyFrom(focus).addInPlace(cameraOffset);
@@ -557,11 +651,12 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   }
 
   function showBoundaries() {
-    const area = areaAt(player.z);
+    const districtX = player.x - DISTRICT_X;
+    const area = districtVisit ? districtArea(districtX) : areaAt(player.z);
     const distance = Math.hypot(player.x - nari.x, player.z - nari.z);
-    const near = journey ? area === 'arena' && player.z >= (nearNari ? 25.45 : 25.7) &&
+    const near = !districtVisit && (journey ? area === 'arena' && player.z >= (nearNari ? 25.45 : 25.7) &&
       Math.abs(player.x) <= (nearNari ? 2.4 : 2.2) && distance <= 2.75 :
-      area === 'practice' && distance <= (nearNari ? 2.35 : 2.12);
+      area === 'practice' && distance <= (nearNari ? 2.35 : 2.12));
     if (currentArea !== area) {
       currentArea = area;
       onArea?.(area);
@@ -574,17 +669,28 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       }
       onNear?.(near);
     }
+    const closeToGate = area === 'street' && Math.hypot(player.x - YG_GATE.x, player.z - YG_GATE.z) <=
+      (currentSpot === 'hongdae-enter' ? 1.26 : 1.06);
+    const spot = districtVisit ? districtSpot(districtX, player.z, currentSpot) : closeToGate ? 'hongdae-enter' : null;
+    if (spot !== currentSpot) {
+      currentSpot = spot;
+      onSpot?.(spot);
+    }
   }
 
-  function advanceActor(actor, deltaX, deltaZ, elapsed) {
+  function canStep(x, z, radius = PLAYER_RADIUS) {
+    return districtVisit ? districtWalkable(x - DISTRICT_X, z, radius) : walkable(x, z, journey !== null);
+  }
+
+  function advanceActor(actor, deltaX, deltaZ, elapsed, radius = PLAYER_RADIUS) {
     const beforeX = actor.x;
     const beforeZ = actor.z;
     const steps = Math.max(1, Math.ceil(Math.hypot(deltaX, deltaZ) / .12));
     for (let step = 0; step < steps; step++) {
       const x = actor.x + deltaX / steps;
       const z = actor.z + deltaZ / steps;
-      if (walkable(x, actor.z, journey !== null)) actor.x = x;
-      if (walkable(actor.x, z, journey !== null)) actor.z = z;
+      if (canStep(x, actor.z, radius)) actor.x = x;
+      if (canStep(actor.x, z, radius)) actor.z = z;
     }
     const distance = Math.hypot(actor.x - beforeX, actor.z - beforeZ);
     if (distance > .0001) {
@@ -635,7 +741,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     const deltaZ = (inputX * forwardX + inputY * forwardZ) * elapsed * WALK_SPEED;
     const moved = advanceActor(player, deltaX, deltaZ, elapsed);
     if (moved > .0001) {
-      if (journey) recordTrail(moved);
+      if (journey && !districtVisit) recordTrail(moved);
       if (!discoveredMovement) {
         discoveredMovement = true;
         onMove?.();
@@ -651,6 +757,42 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     animateActor(actor, walking ? 'walk' : 'idle', walking ? actor.walkCycle : time + actor.idlePhase, elapsed, effort);
   }
 
+  function setPixelVisible(visible) {
+    pixel.root.setEnabled(visible);
+    pixelShadow.setEnabled(visible);
+  }
+
+  function placePixel(x, z, yaw, elapsed = 0, walking = false, posing = false) {
+    pixel.step({ x, z, yaw, elapsed, walking, photo: posing });
+    pixelShadow.position.set(x, .015, z);
+    pixelShadow.rotation.y = yaw;
+  }
+
+  function followPixel(elapsed) {
+    const visible = districtVisit !== null || areaAt(player.z) === 'street';
+    setPixelVisible(visible);
+    if (!visible) return;
+    let moved = 0;
+    if (elapsed && !lookPreview) {
+      const facingX = Math.sin(player.yaw);
+      const facingZ = Math.cos(player.yaw);
+      const targetZ = player.z - .63 * facingZ;
+      const sideX = player.x + .70 * facingZ - .63 * facingX;
+      const sideZ = targetZ - .70 * facingX;
+      const clearSide = canStep(sideX, sideZ, .18);
+      const x = clearSide ? sideX : player.x;
+      const z = clearSide ? sideZ : player.z;
+      const dx = x - pixelPose.x;
+      const dz = z - pixelPose.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > .11) {
+        const stride = Math.min(elapsed * WALK_SPEED * 1.25, (distance - .075) * .66);
+        moved = advanceActor(pixelPose, dx * stride / distance, dz * stride / distance, elapsed, .18);
+      }
+    }
+    placePixel(pixelPose.x, pixelPose.z, pixelPose.yaw, elapsed, moved > .001);
+  }
+
   function updateActors(elapsed) {
     if (exploration) {
       const now = performance.now();
@@ -664,13 +806,15 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       return;
     }
     const moved = lookPreview ? 0 : move(elapsed);
-    const followed = journey && !lookPreview ? followTrail(elapsed) : 0;
+    const followed = journey && !districtVisit && !lookPreview ? followTrail(elapsed) : 0;
     if (moved > .0001 || followed > .0001) showBoundaries();
     if (lookPreview) player.yaw = blendAngle(player.yaw, cameraYaw, elapsed ? damping(12, elapsed) : 1);
     if (!journey && nearNari) {
       nari.yaw = blendAngle(nari.yaw, Math.atan2(player.x - nari.x, player.z - nari.z), damping(9, elapsed));
     }
     animateWalk(player, moved, elapsed);
+    followPixel(elapsed);
+    if (districtVisit) return;
     if (!journey && time < greetingEnds) {
       animateActor(nari, 'greet', 1 - (greetingEnds - time) / GREETING_DURATION, elapsed);
     } else {
@@ -698,9 +842,70 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     }
   }
 
+  function setDistrictVisible(visible) {
+    hongdae.anchor.setEnabled(visible);
+    city.setEnabled(!visible);
+    wayfinder.setEnabled(!visible);
+    arena?.root.setEnabled(!visible);
+    nari.pivot.setEnabled(!visible);
+    nari.shadow.setEnabled(!visible);
+  }
+
+  async function enterHongdae(destination = 'gate') {
+    if (disposed) throw new Error('Sahne kapatıldı');
+    if (districtVisit) return;
+    if (destination !== 'gate' && destination !== 'booth') throw new RangeError('Hongdae konumu geçersiz: ' + destination);
+    if (exploration || areaAt(player.z) !== 'street') throw new Error('Hongdae geçidi Seul sokağında');
+    const epoch = districtEpoch;
+    if (!hongdae) {
+      if (!hongdaePending) {
+        hongdaePending = loadHongdae().then(model => { hongdae = model; }).finally(() => { hongdaePending = null; });
+      }
+      await hongdaePending;
+    }
+    if (disposed) throw new Error('Sahne kapatıldı');
+    if (districtVisit || epoch !== districtEpoch || exploration || areaAt(player.z) !== 'street') return;
+    setLookPreview(false);
+    districtVisit = {
+      player: { x: player.x, z: player.z, yaw: player.yaw }, pixel: { ...pixelPose },
+      orbitYaw, orbitPitch, cameraYaw, cameraPitch, cameraDistance, orbitAdjusted,
+    };
+    player.x = DISTRICT_X + (destination === 'booth' ? BOOTH.x + .35 : HONGDAE_ENTRY.x);
+    player.z = destination === 'booth' ? BOOTH.z : HONGDAE_ENTRY.z;
+    player.yaw = destination === 'booth' ? -Math.PI / 2 : Math.PI;
+    Object.assign(pixelPose, { x: player.x - .38, z: player.z + .46, yaw: player.yaw });
+    orbitYaw = cameraYaw = destination === 'booth' ? Math.PI / 2 : 0;
+    orbitPitch = cameraPitch = .22;
+    orbitAdjusted = false;
+    inputX = inputY = 0;
+    setDistrictVisible(true);
+    updateActors(0);
+    updateCamera(0);
+    scene.render();
+    showBoundaries();
+  }
+
+  function leaveHongdae() {
+    districtEpoch++;
+    if (!districtVisit) return;
+    const saved = districtVisit;
+    setLookPreview(false);
+    districtVisit = null;
+    Object.assign(player, saved.player);
+    Object.assign(pixelPose, saved.pixel);
+    ({ orbitYaw, orbitPitch, cameraYaw, cameraPitch, cameraDistance, orbitAdjusted } = saved);
+    inputX = inputY = 0;
+    setDistrictVisible(false);
+    updateActors(0);
+    updateCamera(0);
+    scene.render();
+    showBoundaries();
+  }
+
   function startDance(venue = 'studio') {
     if (exploration) return;
     if (venue !== 'studio' && venue !== 'arena') throw new RangeError('Dans mekânı geçersiz: ' + venue);
+    if (districtVisit) throw new Error('Hongdae’de prova sahnesi yok');
     const concert = venue === 'arena';
     if (concert && !arena) throw new Error('Konser sahnesi yüklenmedi');
     setLookPreview(false);
@@ -720,6 +925,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     nari.x = .69 * side;
     nari.z = centerZ - .02 * side;
     nari.yaw = facing - .05;
+    setPixelVisible(false);
     inputX = 0;
     inputY = 0;
     photo = false;
@@ -763,6 +969,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   function beginJourney() {
     if (!arena) throw new Error('Konser sahnesi yüklenmedi');
     if (journey) return;
+    leaveHongdae();
     endDance();
     setLookPreview(false);
     if (areaAt(player.z) !== 'practice') {
@@ -792,6 +999,59 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     action = null;
   }
 
+  function captureFrame(frameCamera, restoreCamera) {
+    const frame = canvas.ownerDocument.createElement('canvas');
+    frame.width = 360;
+    frame.height = 440;
+    engine.setSize(frame.width, frame.height);
+    try {
+      frameCamera();
+      scene.render();
+      frame.getContext('2d').drawImage(canvas, 0, 0);
+      return frame.toDataURL('image/jpeg', .86);
+    } finally {
+      resize();
+      restoreCamera();
+      scene.render();
+    }
+  }
+
+  function captureBoothPhoto() {
+    if (!districtVisit || currentSpot !== 'booth') throw new Error('Fotoğraf çekmek için kabine yaklaş');
+    const savedPlayer = { x: player.x, z: player.z, yaw: player.yaw };
+    const savedCamera = { position: camera.position.clone(), rotation: camera.rotation.clone(), fov: camera.fov };
+    const heldStick = handSticks.get(equippedStick);
+    const heldRotation = heldStick?.rotationQuaternion;
+    const heldEuler = heldStick?.rotation.clone();
+    return captureFrame(() => {
+      player.x = DISTRICT_X - 4.39;
+      player.z = BOOTH.z + .20;
+      player.yaw = Math.PI / 2 + .06;
+      animateActor(player, 'booth-photo', time, 0);
+      if (heldStick) {
+        const handRotation = new B.Quaternion();
+        heldStick.parent.computeWorldMatrix(true).decompose(undefined, handRotation);
+        const facingCamera = B.Quaternion.RotationYawPitchRoll(Math.PI / 2, 0, .20);
+        heldStick.rotationQuaternion = handRotation.conjugate().multiply(facingCamera);
+      }
+      placePixel(DISTRICT_X - 4.10, BOOTH.z - .39, Math.PI / 2 - .09, 0, false, true);
+      camera.fov = .81;
+      camera.position.set(DISTRICT_X - .96, 1.82, BOOTH.z);
+      camera.setTarget(new B.Vector3(DISTRICT_X - 4.39, .94, BOOTH.z - .035));
+    }, () => {
+      if (heldStick) {
+        heldStick.rotationQuaternion = heldRotation;
+        if (!heldRotation) heldStick.rotation.copyFrom(heldEuler);
+      }
+      Object.assign(player, savedPlayer);
+      animateActor(player, 'idle', time, 0);
+      placePixel(pixelPose.x, pixelPose.z, pixelPose.yaw);
+      camera.fov = savedCamera.fov;
+      camera.position.copyFrom(savedCamera.position);
+      camera.rotation.copyFrom(savedCamera.rotation);
+    });
+  }
+
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
@@ -800,6 +1060,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   scene.render();
   onArea?.(currentArea);
   onNear?.(false);
+  onSpot?.(null);
   engine.runRenderLoop(() => {
     const elapsed = Math.min(.10, engine.getDeltaTime() / 1000);
     time += elapsed;
@@ -811,6 +1072,10 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   return {
     prepareArena,
     beginJourney,
+    enterHongdae,
+    leaveHongdae,
+    equipShopStick,
+    captureBoothPhoto,
     setInput(x, y) {
       const length = Math.max(1, Math.hypot(x, y));
       inputX = x / length;
@@ -844,7 +1109,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     },
     setLookPreview,
     setWand(hex) {
-      player.wand.setEnabled(Boolean(hex));
+      wandVisible = Boolean(hex);
+      player.wand.setEnabled(wandVisible && !equippedStick);
       audienceTint = hex ? color(B, hex) : defaultWand;
       if (hex) {
         const material = player.materials.get('Wand');
@@ -856,20 +1122,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     capturePhoto() {
       poseForPhoto();
       updateActors(0);
-      const frame = canvas.ownerDocument.createElement('canvas');
-      frame.width = 360;
-      frame.height = 440;
-      engine.setSize(frame.width, frame.height);
-      try {
-        updateCamera(0, true);
-        scene.render();
-        frame.getContext('2d').drawImage(canvas, 0, 0);
-        return frame.toDataURL('image/jpeg', .86);
-      } finally {
-        resize();
-        updateCamera(0);
-        scene.render();
-      }
+      return captureFrame(() => updateCamera(0, true), () => updateCamera(0));
     },
     dispose() {
       if (disposed) return;

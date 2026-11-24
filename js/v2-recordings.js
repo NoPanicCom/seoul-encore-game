@@ -1,10 +1,89 @@
-import { stickColor, stickId } from './lightstick.js';
+import { isShopStick, stickColor, stickId, stickName } from './lightstick.js';
 const prefix = 'encore.v2.duet.';
+const pixelPrefix = 'encore.v2.pixel-photo.';
 const invitationKey = 'encore.v2.nari-invitation';
 const validId = (id) => /^[a-z0-9]{8,48}$/.test(id);
 const hex = (v) => typeof v === 'string' && /^#[a-f0-9]{6}$/i.test(v);
 const outfit = (v) => v === 'rose' || v === 'midnight';
 const validPhoto = (v) => typeof v === 'string' && v.length <= 480000 && /^data:image\/(?:webp|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(v);
+function newCardId() {
+    return Date.now().toString(36) + Array.from(crypto.getRandomValues(new Uint8Array(12)), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+export function readHongdaeStick() {
+    try {
+        const selected = localStorage.getItem('encore1.lightstick');
+        return selected && isShopStick(selected) ? selected : null;
+    }
+    catch {
+        return null;
+    }
+}
+export function equipHongdaeStick(id) {
+    if (!isShopStick(id))
+        throw new Error('Invalid shop lightstick');
+    const previous = readHongdaeStick();
+    // Older saves may have only an equipped model, without its purchase marker.
+    if (previous && previous !== id)
+        localStorage.setItem('encore1.bought.' + previous, '1');
+    localStorage.setItem('encore1.bought.' + id, '1');
+    const color = stickColor(id);
+    localStorage.setItem('encore.v2.color', color);
+    localStorage.setItem('encore1.lightstick', id);
+    return color;
+}
+function isPixelPhoto(value) {
+    if (!value || typeof value !== 'object')
+        return false;
+    const card = value;
+    return validPhoto(card.photo) && outfit(card.outfit) && typeof card.jacket === 'boolean' &&
+        typeof card.stick === 'string' && isShopStick(card.stick) && hex(card.wandColor);
+}
+export function savePixelPhoto(input) {
+    if (!isPixelPhoto(input))
+        throw new Error('Invalid Hongdae photo');
+    const { photo, outfit, jacket, stick, wandColor } = input;
+    const id = newCardId();
+    // The print and the look are one record; a full album must leave the preview available for retry.
+    localStorage.setItem(pixelPrefix + id, JSON.stringify({ photo, outfit, jacket, stick, wandColor }));
+    return id;
+}
+export function pixelAlbum(lang) {
+    const ids = [];
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith(pixelPrefix)) {
+                const id = key.slice(pixelPrefix.length);
+                if (validId(id))
+                    ids.push(id);
+            }
+        }
+    }
+    catch {
+        return '';
+    }
+    const tr = lang === 'tr';
+    return ids.sort().reverse().map(id => {
+        let card;
+        try {
+            card = JSON.parse(localStorage.getItem(pixelPrefix + id) ?? 'null');
+        }
+        catch {
+            return '';
+        }
+        if (!isPixelPhoto(card))
+            return '';
+        const title = tr ? 'Sofia ve Pixel' : 'София и Пиксель';
+        const open = tr ? 'Fotoğrafı büyüt' : 'Увеличить фото';
+        const close = tr ? 'Küçült' : 'Свернуть';
+        return `<details class="pixel-print" data-pixel-photo="${id}" data-stick="${card.stick}">
+      <summary class="v2-photo" data-venue="hongdae" style="--v2-wand:${card.wandColor}">
+        <img loading="lazy" src="${card.photo}" alt="${tr ? 'Hongdae fotokabininde Sofia ve Pixel' : 'София и Пиксель в фотобудке Хондэ'}">
+        <span><small>HONGDAE · PHOTO CLUB</small><strong>${title}</strong><em>${stickName(card.stick, lang)}</em>
+        <b class="print-zoom"><i>${open} ＋</i><i>${close} −</i></b></span>
+      </summary></details>`;
+    }).join('');
+}
 function isDuet(value) {
     if (!value || typeof value !== 'object')
         return false;
@@ -69,7 +148,7 @@ export function saveDuet(input) {
         card.photo = input.photo;
     if (!isDuet(card))
         throw new Error('Invalid duet');
-    const id = Date.now().toString(36) + Array.from(crypto.getRandomValues(new Uint8Array(12)), byte => byte.toString(16).padStart(2, '0')).join('');
+    const id = newCardId();
     // One entry per performance keeps simultaneous tabs from overwriting another night's card.
     try {
         localStorage.setItem(prefix + id, JSON.stringify(card));

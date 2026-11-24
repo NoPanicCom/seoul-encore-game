@@ -1,3 +1,4 @@
+import { pixelAlbum } from './v2-recordings.js';
 import { hasHongdaeMelody } from './hongdae.js';
 import { studioMemberId } from './studio.js';
 import { drawTravelLook, loadTravelLook, travelLook } from './travel-look.js';
@@ -341,11 +342,13 @@ export function boothPhotoCount() {
 export function boothAlbum(lang) {
     const result = loadAlbum();
     const date = new Intl.DateTimeFormat(lang === 'tr' ? 'tr-TR' : 'ru-RU', { dateStyle: 'medium' });
+    const pixelPrints = pixelAlbum(lang);
     const photos = result.cards.map(card => `<li><figure data-booth-card="${card.id}" data-booth-outfit="${card.outfit}" data-booth-pieces="${card.pieces.join(',')}">
     ${printImage(card)}<figcaption><strong>${names[card.member]} + Pixel</strong><time datetime="${new Date(card.created).toISOString()}">${date.format(card.created)}</time></figcaption>
   </figure></li>`);
     return `<section class="booth-album" lang="${lang}"><h3>${say(lang, copy.albumTitle)}</h3>
-    ${photos.length ? `<ul>${photos.join('')}</ul>` : `<p>${say(lang, copy.albumEmpty)}</p>`}
+    ${pixelPrints}
+    ${photos.length ? `<ul>${photos.join('')}</ul>` : pixelPrints ? '' : `<p>${say(lang, copy.albumEmpty)}</p>`}
     ${result.issue ? `<p role="status">${say(lang, copy.albumIssue)}</p>` : ''}
   </section>`;
 }

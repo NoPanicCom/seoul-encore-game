@@ -222,6 +222,9 @@ button:disabled { cursor: default; }
   margin-bottom: 4px;
 }
 .mission h1 { font-size: clamp(14px, 3.3vw, 19px); font-weight: 750; line-height: 1.2; }
+.mission-route { margin-top: 6px; color: var(--muted); font-size: clamp(10px, 2.6vw, 12px); line-height: 1.23; }
+[data-area="hongdae"] .route i:nth-child(n+3), [data-area="minho"] .route i:nth-child(n+3) { display: none; }
+[data-area="minho"] .route i:nth-child(2) { background: var(--pink); box-shadow: 0 0 8px #ffa0d36b; }
 
 .center-message {
   position: absolute;
@@ -672,6 +675,44 @@ button:active:not(.header-control, .close-button) { transform: scale(.97); }
 .concert-invite .secondary { min-height: 44px; padding-inline: 8px; border-color: #ffb2d782; background: #56324c; }
 .invite-status { grid-column: 1 / -1; color: var(--pink); font-size: 12px; }
 
+.booth-finder {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: min(67vw, 53dvh);
+  aspect-ratio: 9 / 11;
+  transform: translate(-50%, -50%);
+  align-content: end;
+  justify-items: center;
+  padding: 10px;
+  border: 2px solid #fff2dfba;
+  border-radius: 12px;
+  box-shadow: 0 0 0 100vmax #180c2360, 0 0 18px #fbd7ff60;
+  pointer-events: none;
+}
+.booth-finder span {
+  padding: 6px 11px;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--gold);
+  font: 750 13px/1.2 system-ui, sans-serif;
+}
+.booth-panel .panel-heading { margin: 0; }
+.booth-photo {
+  display: block;
+  width: clamp(112px, 37vw, 172px);
+  height: auto;
+  aspect-ratio: 9 / 11;
+  margin: 0 auto;
+  border: 4px solid #fff0f8;
+  border-bottom-width: 13px;
+  border-radius: 6px;
+  box-shadow: 0 5px 17px #0c06168f;
+  object-fit: cover;
+}
+
 @media (max-width: 359px) {
   .game-header { gap: 7px; }
   .mission { padding: 9px 10px; }
@@ -684,6 +725,7 @@ button:active:not(.header-control, .close-button) { transform: scale(.97); }
   .wardrobe { bottom: var(--bottom); max-height: calc(100% - var(--top) - var(--bottom) - 53px); overflow-y: auto; }
   .result { max-height: calc(100% - var(--top) - var(--bottom) - 53px); }
   .result-photo { width: clamp(66px, 16dvh, 100px); }
+  .booth-photo { width: clamp(74px, 29dvh, 105px); }
   .duet-banner { top: var(--top); left: var(--left); transform: none; text-align: left; }
   .duet-banner h1 { font-size: clamp(18px, 5.6dvh, 28px); }
   .phrase { justify-content: flex-start; margin-top: 4px; }
