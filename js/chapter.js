@@ -1,5 +1,6 @@
 import { createChapterDance, restoreChapterDance, renderChapterDance, renderChapterDanceCard, handleChapterDanceAction, isChapterDanceSnapshot } from './chapter-dance.js';
 import { chapterHongdaeAlbum, resetChapterHongdae } from './chapter-hongdae.js';
+import { v2Album } from './v2-recordings.js';
 import { travelLook } from './travel-look.js';
 import { studioMemberId } from './studio.js';
 import { stickColor } from './lightstick.js';
@@ -38,7 +39,8 @@ export function chapterRecording(id) {
 export function chapterAlbum(lang) {
     const cards = album();
     const title = lang === 'ru' ? 'Наша сцена' : 'Bizim sahnemiz';
-    return '<section class="chapter-scrapbook"><h3>' + title + '</h3>' + (cards.length ? cards.map(entry => `<div class="chapter-recording-card">${renderChapterDanceCard(entry.card, lang)}<button class="chapter-recording-open" data-act="chapter-watch-${entry.id}" type="button"><span>▶ ${lang === 'ru' ? 'Смотреть танец' : 'Dansı izle'}</span></button></div>`).join('') : '<p>' + (lang === 'ru' ? 'После выступления с Нари сделай снимок на память.' : 'Nari’yle sahneye çıktıktan sonra hatıra fotoğrafını çek.') + '</p>') + chapterHongdaeAlbum(lang) + '</section>';
+    const studioCards = v2Album(lang);
+    return '<section class="chapter-scrapbook"><h3>' + title + '</h3>' + studioCards + (cards.length ? cards.map(entry => `<div class="chapter-recording-card">${renderChapterDanceCard(entry.card, lang)}<button class="chapter-recording-open" data-act="chapter-watch-${entry.id}" type="button"><span>▶ ${lang === 'ru' ? 'Смотреть танец' : 'Dansı izle'}</span></button></div>`).join('') : studioCards ? '' : '<p>' + (lang === 'ru' ? 'После выступления с Нари сделай снимок на память.' : 'Nari’yle sahneye çıktıktan sonra hatıra fotoğrafını çek.') + '</p>') + chapterHongdaeAlbum(lang) + '</section>';
 }
 export function resetChapter(role) {
     write(keyFor(role), { id: newId(), dance: createChapterDance() });

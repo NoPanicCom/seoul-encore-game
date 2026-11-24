@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#100b18">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" href="../tour-icon.png">
+  <link rel="apple-touch-icon" href="../tour-icon.png">
+  <link rel="stylesheet" href="./style.css?v=3075bbdc2242">
+  <title>Seoul Encore · Sofia</title>
+  <script defer src="./vendor/babylon.js"></script>
+  <script defer src="./vendor/babylonjs.loaders.js"></script>
+  <script type="module" src="./game-f65ea6fb75b4.js"></script>
+</head>
+<body>
+  <main id="game" data-state="loading" data-area="street" data-replay="false">
+    <div class="loading-backdrop"></div>
+    <canvas id="scene" aria-label="Трёхмерная сцена Seoul Encore" data-label="sceneLabel"></canvas>
+    <div class="screen-shade" aria-hidden="true"></div>
+    <header class="game-header">
+      <a class="return-button" id="exit-game" href="../?v=kulisa#two-days/sofia" data-label="exit" title="Вернуться в основную игру" aria-label="Вернуться в основную игру">
+        <span aria-hidden="true">‹</span>
+      </a>
+      <div class="wordmark">
+        <span class="wordmark-spark" aria-hidden="true">✦</span>
+        <div><strong>SEOUL ENCORE</strong><small data-text="chapter">Глава Софии</small></div>
+      </div>
+      <div class="settings">
+        <button type="button" id="sound" class="header-control" aria-pressed="true" aria-label="Звук включён">
+          <span class="sound-glyph" aria-hidden="true">♪</span>
+        </button>
+        <button type="button" id="language" class="header-control language" aria-pressed="false" aria-label="Türkçe">
+          <span>РУ</span><span>TR</span>
+        </button>
+      </div>
+    </header>
+
+    <section id="mission" class="mission" aria-label="Маршрут" data-label="routeLabel" aria-live="polite" hidden>
+      <div class="route" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p class="mission-area" id="area"></p>
+      <h1 id="objective"></h1>
+    </section>
+
+    <section class="center-message" id="startup" role="status">
+      <span class="loader" aria-hidden="true">✦</span>
+      <h1 data-text="loading">Сеул зажигает огни</h1>
+      <p data-text="loadingDescription">Готовим улицу и репетиционный зал…</p>
+    </section>
+    <section class="center-message" id="failure" role="alert" hidden>
+      <h1 id="failure-title"></h1>
+      <p id="failure-detail"></p>
+      <button type="button" class="primary" id="retry-load" data-text="retryLoad">Загрузить снова</button>
+      <a class="text-link" id="error-back" href="../?v=kulisa#two-days/sofia" data-text="exit">Вернуться в основную игру</a>
+    </section>
+
+    <section class="duet-banner" id="duet-banner" hidden>
+      <p id="duet-mode"></p>
+      <h1 id="duet-title">София × Нари</h1>
+      <div class="phrase" aria-hidden="true"><i></i><i></i><i></i></div>
+    </section>
+
+    <div class="walk-controls" id="walk-controls" hidden>
+      <div class="nav-cluster">
+        <div id="joystick" class="joystick" role="group" aria-label="Джойстик движения" data-label="joystickLabel">
+          <span class="pad-arrow top" aria-hidden="true"></span>
+          <span class="pad-arrow right" aria-hidden="true"></span>
+          <span class="pad-arrow bottom" aria-hidden="true"></span>
+          <span class="pad-arrow left" aria-hidden="true"></span>
+          <span class="joystick-thumb" aria-hidden="true"></span>
+        </div>
+        <p class="touch-hint" data-text="moveTouch">Движение</p>
+        <p class="keyboard-hint" data-text="moveKeyboard">WASD / Стрелки</p>
+      </div>
+      <div class="walk-actions">
+        <button id="rehearse" type="button" class="primary" hidden><span data-text="startDuet">Танцевать с Нари</span><span aria-hidden="true">↗</span></button>
+        <button id="look-toggle" type="button" class="secondary" aria-controls="wardrobe" aria-expanded="false"><span aria-hidden="true">✦</span><span data-text="look">Образ</span></button>
+        <p class="touch-hint" data-text="cameraTouch">Свайп по сцене — камера</p>
+        <p class="keyboard-hint" data-text="cameraKeyboard">Потяни сцену или нажми Q / E</p>
+      </div>
+    </div>
+
+    <section id="wardrobe" class="panel wardrobe" aria-labelledby="wardrobe-title" hidden>
+      <header class="panel-heading">
+        <h2 id="wardrobe-title" data-text="look">Образ</h2>
+        <button id="look-close" type="button" class="close-button" aria-label="Закрыть" data-label="close"><span aria-hidden="true">×</span></button>
+      </header>
+      <div class="outfit-select" role="group" aria-label="Костюм" data-label="outfitLabel">
+        <button type="button" data-outfit="rose" aria-pressed="false"><span class="fabric fabric-rose" aria-hidden="true"></span><span data-text="rose">Розовый</span></button>
+        <button type="button" data-outfit="midnight" aria-pressed="false"><span class="fabric fabric-midnight" aria-hidden="true"></span><span data-text="midnight">Полночный</span></button>
+      </div>
+      <button type="button" id="jacket" class="secondary jacket" aria-pressed="true">
+        <span data-text="jacket">Куртка</span><span id="jacket-state">На Софии</span>
+      </button>
+      <div class="wand-select" role="group" aria-label="Цвет лайтстика" data-label="wandLabel">
+        <span data-text="wandLabel">Цвет лайтстика</span>
+        <div>
+          <button type="button" data-wand="#ff71bb" style="--swatch:#ff71bb" data-label="wandPink" aria-label="Розовый" aria-pressed="false"></button>
+          <button type="button" data-wand="#9e8aff" style="--swatch:#9e8aff" data-label="wandViolet" aria-label="Лиловый" aria-pressed="false"></button>
+          <button type="button" data-wand="#71ddff" style="--swatch:#71ddff" data-label="wandBlue" aria-label="Голубой" aria-pressed="false"></button>
+          <button type="button" data-wand="#fff2ca" style="--swatch:#fff2ca" data-label="wandGold" aria-label="Тёплый белый" aria-pressed="false"></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="dance-panel" class="panel dance-panel" aria-label="Танец" data-label="danceLabel" hidden>
+      <div class="dance-cue">
+        <div class="cue-icon" id="cue-icon" aria-hidden="true"></div>
+        <div>
+          <p id="cue-phase"></p>
+          <h2 id="cue-title"></h2>
+        </div>
+        <div id="dance-step" class="dance-step" aria-hidden="true"></div>
+        <button type="button" id="stop-duet" class="close-button" data-label="close" aria-label="Закрыть"><span aria-hidden="true">×</span></button>
+      </div>
+      <div id="beat-meter" class="beat-meter" aria-hidden="true">
+        <div class="beat-window"></div><div id="beat-marker" class="beat-marker"></div>
+      </div>
+      <div id="move-buttons" class="move-buttons" hidden>
+        <button type="button" data-move="side"><span aria-hidden="true">↔</span><span data-text="side">Вбок</span><kbd>1</kbd></button>
+        <button type="button" data-move="jump"><span aria-hidden="true">↑</span><span data-text="jump">Прыжок</span><kbd>2</kbd></button>
+        <button type="button" data-move="spin"><span aria-hidden="true">↻</span><span data-text="spin">Поворот</span><kbd>3</kbd></button>
+        <button type="button" data-move="heart"><span aria-hidden="true">♡</span><span data-text="heart">Сердце</span><kbd>4</kbd></button>
+        <button type="button" data-move="step"><span aria-hidden="true">⇢</span><span data-text="step">Шаг</span><kbd>5</kbd></button>
+      </div>
+      <p id="dance-feedback" class="dance-feedback" role="status"></p>
+    </section>
+
+    <section id="result" class="panel result" aria-labelledby="result-title" tabindex="-1" hidden>
+      <p class="result-kicker"><span aria-hidden="true">✦</span> <span id="result-kicker" data-text="resultKicker">Репетиция окончена</span></p>
+      <h2 id="result-title">София × Нари</h2>
+      <p id="result-score" class="result-score" hidden></p>
+      <p id="result-copy" data-text="resultCopy">Сохрани кадр с вашим дуэтом в альбом Софии.</p>
+      <button id="save-card" type="button" class="primary" data-text="save">Сохранить фотокарту</button>
+      <p id="save-status" class="save-status" role="status" hidden></p>
+      <div class="result-actions">
+        <button id="repeat-duet" type="button" class="secondary" data-text="repeat">Танцевать снова</button>
+        <a id="album-link" class="secondary" href="../?v=kulisa#chapter-album/sofia" data-text="album">Открыть альбом</a>
+      </div>
+      <button id="return-explore" type="button" class="text-link" data-text="backToWalk">Вернуться в зал</button>
+    </section>
+
+    <noscript>
+      <style>#startup{display:none}</style>
+      <section class="center-message">
+        <h1>Для 3D нужен JavaScript</h1>
+        <a class="text-link" href="../?v=kulisa#two-days/sofia">Вернуться в основную игру</a>
+      </section>
+    </noscript>
+  </main>
+</body>
+</html>

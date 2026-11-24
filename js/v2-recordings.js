@@ -1,0 +1,87 @@
+import { stickColor, stickId } from './lightstick.js';
+const prefix = 'encore.v2.duet.';
+const validId = (id) => /^[a-z0-9]{8,48}$/.test(id);
+const hex = (v) => typeof v === 'string' && /^#[a-f0-9]{6}$/i.test(v);
+const outfit = (v) => v === 'rose' || v === 'midnight';
+const validPhoto = (v) => typeof v === 'string' && v.length <= 480000 && /^data:image\/(?:webp|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(v);
+function isDuet(value) {
+    if (!value || typeof value !== 'object')
+        return false;
+    const card = value;
+    return outfit(card.outfit) && hex(card.wandColor) && ['heart', 'step', 'spin'].some(move => move === card.finalMove)
+        && (card.jacket === undefined || typeof card.jacket === 'boolean')
+        && (card.photo === undefined || validPhoto(card.photo));
+}
+export function startingLook() {
+    try {
+        const storedOutfit = localStorage.getItem('encore.v2.outfit');
+        const selected = stickId(localStorage.getItem('encore1.lightstick'));
+        const previous = localStorage.getItem('encore.v2.color');
+        return { jacket: localStorage.getItem('encore.v2.jacket') !== 'off', outfit: outfit(storedOutfit) ? storedOutfit : 'rose', wandColor: hex(previous) ? previous : selected ? stickColor(selected) : '#ff91ba' };
+    }
+    catch {
+        return { outfit: 'rose', wandColor: '#ff91ba' };
+    }
+}
+export function saveDuet(input) {
+    const card = { outfit: input.outfit, wandColor: input.wandColor, finalMove: input.finalMove };
+    if (input.jacket !== undefined)
+        card.jacket = input.jacket;
+    if (validPhoto(input.photo))
+        card.photo = input.photo;
+    if (!isDuet(card))
+        throw new Error('Invalid duet');
+    const id = Date.now().toString(36) + Array.from(crypto.getRandomValues(new Uint8Array(12)), byte => byte.toString(16).padStart(2, '0')).join('');
+    // One entry per performance keeps simultaneous tabs from overwriting another night's card.
+    try {
+        localStorage.setItem(prefix + id, JSON.stringify(card));
+    }
+    catch (error) {
+        if (!(error instanceof DOMException) || error.name !== 'QuotaExceededError' || !card.photo)
+            throw error;
+        delete card.photo;
+        localStorage.setItem(prefix + id, JSON.stringify(card));
+    }
+    try {
+        localStorage.setItem('encore.v2.outfit', card.outfit);
+        localStorage.setItem('encore.v2.color', card.wandColor);
+        localStorage.setItem('encore.v2.jacket', card.jacket === false ? 'off' : 'on');
+    }
+    catch { /* The recording has already been saved. */ }
+    return id;
+}
+export function readDuet(id) {
+    if (!validId(id))
+        return null;
+    try {
+        const raw = localStorage.getItem(prefix + id);
+        if (!raw)
+            return null;
+        const card = JSON.parse(raw);
+        return isDuet(card) ? card : null;
+    }
+    catch {
+        return null;
+    }
+}
+export function v2Album(lang) {
+    const ids = [];
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith(prefix))
+                ids.push(key.slice(prefix.length));
+        }
+    }
+    catch {
+        return '';
+    }
+    return ids.sort().reverse().map(id => {
+        const card = readDuet(id);
+        if (!card)
+            return '';
+        const title = lang === 'ru' ? 'София и Нари · Студия YG' : 'Sofia ve Nari · YG Stüdyosu';
+        const finale = lang === 'ru' ? { heart: 'Сердце', spin: 'Поворот', step: 'Шаг' } : { heart: 'Kalp', spin: 'Dönüş', step: 'Adım' };
+        return `<a class="v2-photo" href="v2/#replay/${id}" style="--v2-wand:${card.wandColor}"><img loading="lazy" alt="" src="${card.photo ?? 'art/lobby/v2-duet.jpg'}"><span><small>YG STUDIO · 3D</small><strong>${title}</strong><em>${finale[card.finalMove]} · ${lang === 'ru' ? 'Смотреть танец' : 'Dansı izle'} ▷</em></span></a>`;
+    }).join('');
+}
