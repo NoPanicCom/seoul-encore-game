@@ -41,6 +41,7 @@ const TYPE_NAMES = [
     ['Dallim', 'Bada', 'Suyu', 'Hwayang', 'Baram', 'Gajwa', 'Munhwa', 'Dawool', 'Yeonseo', 'Noksapyeong']],
 ];
 
+export const SUMI_CAFE_ID = 'city-181';
 export const CITY_TYPES = Object.freeze(TYPE_NAMES.map(([id, tr, ru]) => Object.freeze({id, tr, ru})));
 export const CITY_BOUNDS = Object.freeze({minX: -80, maxX: 80, minZ: -65, maxZ: 65});
 export const CITY_ENTRY = Object.freeze({x: -16, z: 62, yaw: 0});
@@ -91,9 +92,10 @@ function createBlock(row, column) {
       x: buildingX, z: doorZ, nx: 0, nz, yaw: nz < 0 ? Math.PI : 0,
       width: 1.32, approachX: buildingX, approachZ: doorZ + nz * .90,
     });
+    const buildingId = `city-${String(ordinal + 1).padStart(3, '0')}`;
     return Object.freeze({
-      id: `city-${String(ordinal + 1).padStart(3, '0')}`,
-      name: `${names[variant]} ${sign}`,
+      id: buildingId,
+      name: buildingId === SUMI_CAFE_ID ? 'Sumi Café' : `${names[variant]} ${sign}`,
       type, typeIndex, variant, block: id, row, column, lot,
       x: buildingX, z: buildingZ, width: BUILDING_WIDTH, depth: BUILDING_DEPTH,
       height: (44 + (typeIndex * 7 + variant * 13) % 34) / 10,

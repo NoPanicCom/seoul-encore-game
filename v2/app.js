@@ -1,4 +1,4 @@
-import {getBuilding, CITY_TYPES} from './city-grid.js';
+import {getBuilding, CITY_TYPES, SUMI_CAFE_ID} from './city-grid.js';
 import {createCityActivities} from './city-activities.js';
 import {originalEncoreCues, createLisaEncore, ENCORE_BEAT_MS, createFestivalRound, FESTIVAL_BEAT_MS} from './festival-round.js';
 import {readLisaEncorePhoto, saveLisaEncorePhoto, clearInvitation, equipHongdaeStick, readDuet, readHongdaeStick, readInvitation, saveDuet, saveInvitation, savePixelPhoto, startingLook} from './album.js';
@@ -18,7 +18,10 @@ const phrases = {
     doorAction: 'Войти',
     exitRoom: 'На улицу',
     activityAction: 'Попробовать',
-    cityObjective: 'Подойди к двери или открой карту',
+    cityObjective: 'Найди кафе Суми на карте',
+    followTarget: 'Иди к отмеченной двери',
+    sumiTalk: 'Поговорить',
+    sumiCounter: 'Подойди к Суми за стойкой',
     interiorObjective: 'Подойди к месту задания',
     cityRoute: 'У указателя CITY — вход в кварталы',
     cityError: 'Не удалось открыть локацию. Попробуй ещё раз.',
@@ -186,7 +189,10 @@ const phrases = {
     doorAction: 'İçeri gir',
     exitRoom: 'Dışarı çık',
     activityAction: 'Etkinliğe başla',
-    cityObjective: 'Bir binaya yürü veya haritayı aç',
+    cityObjective: 'Haritada Sumi’nin kafesini bul',
+    followTarget: 'İşaretlediğin kapıya yürü',
+    sumiTalk: 'Konuş',
+    sumiCounter: 'Tezgâhtaki Sumi’ye yaklaş',
     interiorObjective: 'Etkinlik noktasına yaklaş',
     cityRoute: 'CITY tabelasından mahallelere geç',
     cityError: 'Mekân açılamadı. Tekrar dene.',
@@ -465,7 +471,12 @@ const cityUi=createCityActivities({
   lang:()=>lang,
   onOpen:()=>resetControls(),
   onClose:()=>{moveInput(); paintMission();},
-  onTarget:building=>{cityTarget=building; paintCityTarget();},
+  onSumiAction:action=>{
+    if (!world?.setSumiAction(action)) return;
+    if (action==='greet') audio.cue('pixel');
+    if (action==='serve') audio.cue('delivery');
+  },
+  onTarget:building=>{cityTarget=building; paintMission();},
 });
 const inCity=()=>area==='city' || area==='interior';
 const canWalk = () => !cityUi.isOpen() && state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending && !hongdaePending;
@@ -498,7 +509,11 @@ function paintCityTarget() {
   const dx=cityTarget.door.approachX-pos.x;
   const dz=cityTarget.door.approachZ-pos.z;
   const distance=Math.round(Math.hypot(dx,dz));
-  label.textContent=`${words('target')} · ${cityTarget.name} · ${distance} ${words('meters')}`;
+  const right = dx*Math.cos(pos.cameraYaw) - dz*Math.sin(pos.cameraYaw);
+  const forward = -dx*Math.sin(pos.cameraYaw) - dz*Math.cos(pos.cameraYaw);
+  const sector = (Math.round(Math.atan2(right,forward)/(Math.PI/4))+8)%8;
+  const arrow = distance<=1 ? '⌖' : ['↑','↗','→','↘','↓','↙','←','↖'][sector];
+  label.textContent=`${arrow} ${cityTarget.name} · ${distance} ${words('meters')}`;
   directionTimer=setTimeout(paintCityTarget,400);
 }
 
@@ -507,6 +522,7 @@ function hongdaeContext() {
   if (spot==='city-exit') return {label:cityReturn==='street'?'exitToYG':'exitCity',icon:'↩'};
   if (spot==='room-exit') return {label:'exitRoom',icon:'↩'};
   if (area==='city' && spot?.startsWith('door:')) return {label:'doorAction',icon:'⌂'};
+  if (area==='interior' && spot===`activity:${SUMI_CAFE_ID}`) return {label:'sumiTalk',icon:'♡'};
   if (area==='interior' && spot?.startsWith('activity:')) return {label:'activityAction',icon:'✦'};
   if (area === 'street' && spot === 'hongdae-enter') return hongdaeActions[spot];
   if (inHongdae() && spot === 'hongdae-exit') return hongdaeActions[spot];
@@ -583,8 +599,11 @@ function paintMission() {
     if (spot === 'festival') objective = shopStick ? 'festivalTitle' : 'festivalShop';
     if (spot === 'booth' && !shopStick) objective = 'boothNeedsStick';
   }
-  if(inCity()) objective=area==='city'?'cityObjective':'interiorObjective';
-  setText('objective', building ? building.name : context?.shelf ? stickName(context.shelf, lang) : words(objective));
+  if (area==='city') objective=cityTarget?'followTarget':'cityObjective';
+  if (area==='interior') objective='interiorObjective';
+  let objectiveText=building?.name ?? (context?.shelf ? stickName(context.shelf,lang) : words(objective));
+  if (area==='interior' && building?.id===SUMI_CAFE_ID && !context) objectiveText=words('sumiCounter');
+  setText('objective',objectiveText);
   rehearsal.hidden = journey() || !nearNari || inHongdae() || Boolean(context);
   startConcert.hidden = !journey() || !nearNari || inHongdae() || Boolean(context);
   hongdaeAction.hidden = !context;
@@ -1479,6 +1498,7 @@ async function load() {
       paintMission();
       const entry = new URL(location.href);
       if (entry.searchParams.get('start') === 'city') {
+        if (entry.searchParams.get('visit') === 'sumi') cityTarget=getBuilding(SUMI_CAFE_ID);
         await enterHongdae('city-gate');
         if (spot==='city-enter' || spot==='street-city-enter') await actInCity();
       } else if (entry.searchParams.get('start') === 'hongdae') {
@@ -1603,7 +1623,7 @@ byId('encore-retry').addEventListener('click',awardEncorePrint);
 byId('festival-again').addEventListener('click', startFestival);
 byId('festival-leave').addEventListener('click', leaveFestival);
 byId('city-map-open').addEventListener('click',()=>{
-  if(canWalk() && inCity()) cityUi.map(world.cityPosition());
+  if(canWalk() && inCity()) cityUi.map(world.cityPosition(), cityTarget);
 });
 phoneToggle.addEventListener('click', openPhone);
 byId('phone-close').addEventListener('click', closePhone);

@@ -1,4 +1,5 @@
-import {CITY_BOUNDS, CITY_BUILDINGS, CITY_ROADS, CITY_TYPES} from './city-grid.js';
+import {CITY_BOUNDS, CITY_BUILDINGS, CITY_ROADS, CITY_TYPES, SUMI_CAFE_ID} from './city-grid.js';
+import {createSumiOrder, SUMI_ORDER_TITLE, SUMI_STAMP} from './sumi-order.js';
 
 const pair = (ru, tr) => ({ru, tr});
 const activity = (mechanic, icon, title, instruction, reward, data) =>
@@ -133,6 +134,7 @@ const ui = {
   targetValue: pair('Цель', 'Hedef'),
   check: pair('Проверить', 'Kontrol et'),
   map: pair('Карта города', 'Şehir haritası'),
+  sumiRoute: pair('Идти к Суми', 'Sumi’ye yürü'),
   search: pair('Найти здание', 'Bina ara'),
   types: pair('Тип здания', 'Bina türü'),
   allTypes: pair('Все типы', 'Tüm türler'),
@@ -189,7 +191,8 @@ function readPassport(known) {
   if (!Array.isArray(entries)) throw new Error('Invalid city passport');
   const saved = new Set(entries.filter(id => known.has(id)));
   for (const id of known.keys()) {
-    if (localStorage.getItem(stampKey + '.' + id) === '1') saved.add(id);
+    const marker = localStorage.getItem(stampKey + '.' + id);
+    if (marker === '1' || (id === SUMI_CAFE_ID && marker === SUMI_STAMP)) saved.add(id);
   }
   return saved;
 }
@@ -209,7 +212,7 @@ function typeLabel(building, locale) {
 }
 
 export function createCityActivities({
-  lang, onOpen, onClose, onTarget,
+  lang, onOpen, onClose, onTarget, onSumiAction,
   buildings = CITY_BUILDINGS, plan = {bounds: CITY_BOUNDS, roads: CITY_ROADS},
 }) {
   const {bounds, roads} = plan;
@@ -294,6 +297,7 @@ export function createCityActivities({
   function finishClose() {
     if (!mode) return;
     stopAnimation();
+    if (round?.sumi) onSumiAction?.('idle');
     mapObserver?.disconnect();
     mapObserver = undefined;
     mapView = null;
@@ -315,6 +319,13 @@ export function createCityActivities({
   function renderActivity() {
     stopAnimation();
     paintHeading();
+    if (round.sumi) {
+      dialog.dataset.activity = 'sumi-order';
+      dialog.dataset.cityState = round.sumi.finished() ? 'result' : 'activity';
+      content.replaceChildren(round.sumi.render());
+      return;
+    }
+    delete dialog.dataset.activity;
     dialog.dataset.cityState = round.finished ? 'result' : 'activity';
     if (round.finished) {
       const result = element('section', 'city-result');
@@ -459,14 +470,17 @@ export function createCityActivities({
     frame = requestAnimationFrame(animate);
   }
 
+  function persistStamp(id, marker = '1') {
+    const updated = readPassport(known);
+    for (const value of passport) updated.add(value);
+    updated.add(id);
+    localStorage.setItem(stampKey + '.' + id, marker);
+    passport = updated;
+  }
+
   function saveStamp() {
-    const id = round.building.id;
     try {
-      const updated = readPassport(known);
-      for (const value of passport) updated.add(value);
-      updated.add(id);
-      localStorage.setItem(stampKey + '.' + id, '1');
-      passport = updated;
+      persistStamp(round.building.id);
       round.saved = true;
       round.feedback = 'stamped';
     } catch (error) {
@@ -501,6 +515,10 @@ export function createCityActivities({
     if (mode !== 'activity' || !(event.target instanceof Element)) return;
     const chosen = event.target.closest('button');
     if (!chosen) return;
+    if (round.sumi) {
+      round.sumi.handleClick(chosen);
+      return;
+    }
     if (chosen.dataset.cityChoice !== undefined) {
       progress(Number(chosen.dataset.cityChoice) === round.pattern[round.step]);
     } else if (chosen.id === 'city-timing') {
@@ -520,6 +538,31 @@ export function createCityActivities({
 
   function play(building) {
     const place = known.get(building?.id);
+    if (place?.id === SUMI_CAFE_ID) {
+      let completed = false;
+      try {
+        completed = localStorage.getItem(stampKey + '.' + place.id) === SUMI_STAMP;
+      } catch (error) {
+        console.warn('Seoul Encore Sumi order could not be read.', error);
+      }
+      round = {
+        building: place,
+        theme: {title: SUMI_ORDER_TITLE},
+        sumi: createSumiOrder({
+          locale, element, button, completed,
+          onAction: onSumiAction,
+          onSave: () => persistStamp(place.id, SUMI_STAMP),
+          onChange(selector) {
+            renderActivity();
+            content.querySelector(selector)?.focus({preventScroll: true});
+          },
+        }),
+      };
+      open('activity');
+      onSumiAction?.('idle');
+      renderActivity();
+      return;
+    }
     const theme = place && activities[place.type];
     if (!theme) throw new RangeError('Unknown city activity building');
     const variant = place.variant;
@@ -556,6 +599,14 @@ export function createCityActivities({
     search.addEventListener('input', recompute);
     types.addEventListener('change', recompute);
     controls.append(search, types);
+    const sumiRoute = button('city-map-sumi', 'city-sumi-route');
+    const cafe = known.get(SUMI_CAFE_ID);
+    sumiRoute.hidden = !cafe;
+    sumiRoute.addEventListener('click', () => {
+      search.value = '';
+      types.value = '';
+      follow(cafe);
+    });
 
     const mapBlock = element('div', 'city-map-frame');
     const canvas = element('canvas', 'city-map-canvas');
@@ -591,8 +642,8 @@ export function createCityActivities({
     const list = element('ul', 'city-map-list');
     list.id = 'city-map-list';
 
-    content.replaceChildren(controls, legend, mapBlock, destination, listHeading, list);
-    mapView = {search, types, canvas, player, north, destination, targetLine, remove, listHeading, list, out, closer, back, matches: [], project: null};
+    content.replaceChildren(controls, sumiRoute, legend, mapBlock, destination, listHeading, list);
+    mapView = {search, types, canvas, player, north, destination, targetLine, remove, listHeading, list, out, closer, back, sumiRoute, matches: [], project: null};
     canvas.addEventListener('click', event => {
       const point = mapView.project?.(event);
       if (!point) return;
@@ -620,7 +671,7 @@ export function createCityActivities({
   function paintMap() {
     if (!mapView) return;
     paintHeading();
-    const {search, types, canvas, north, player, destination, targetLine, remove, listHeading, list, out, closer, back} = mapView;
+    const {search, types, canvas, north, player, destination, targetLine, remove, listHeading, list, out, closer, back, sumiRoute} = mapView;
     search.placeholder = words('search');
     search.setAttribute('aria-label', words('search'));
     types.setAttribute('aria-label', words('types'));
@@ -642,6 +693,8 @@ export function createCityActivities({
     closer.setAttribute('aria-label', words('zoomIn'));
     back.setAttribute('aria-label', words('recenter'));
     remove.setAttribute('aria-label', words('clear'));
+    sumiRoute.textContent = words('sumiRoute') + ' →';
+    sumiRoute.setAttribute('aria-pressed', String(selected?.id === SUMI_CAFE_ID));
     destination.setAttribute('aria-label', words('target'));
     destination.hidden = !selected;
     if (selected) {
@@ -661,6 +714,7 @@ export function createCityActivities({
       const matchesType = !filter || place.type === filter;
       return matchesType && (!query ||
         place.name.toLowerCase().includes(query) ||
+        (place.id === SUMI_CAFE_ID && ['sumi', 'суми'].some(alias => alias.includes(query))) ||
         typeLabel(place, locale()).toLowerCase().includes(query) ||
         place.id.includes(query));
     });
@@ -733,7 +787,7 @@ export function createCityActivities({
     for (const place of buildings) {
       const active = visible.has(place.id);
       const color = palette[place.typeIndex % palette.length];
-      context.fillStyle = active ? passport.has(place.id) ? '#f9c7ad' : color : '#49405c';
+      context.fillStyle = active ? passport.has(place.id) || place.id === SUMI_CAFE_ID ? '#f9c7ad' : color : '#49405c';
       const w = (place.width - .65) * scale;
       const h = (place.depth - .73) * scale;
       context.fillRect(x(place.x) - w / 2, z(place.z) - h / 2, w, h);
@@ -775,15 +829,19 @@ export function createCityActivities({
     closer.disabled = zoom >= 3;
   }
 
-  function map(currentPosition) {
+  function map(currentPosition, initialTarget = selected) {
     position = cleanPosition(currentPosition, bounds);
+    selected = initialTarget ? known.get(initialTarget.id) ?? null : null;
     if (!dialog.open || mode !== 'map') {
       stopAnimation();
+      if (round?.sumi) onSumiAction?.('idle');
+      round = null;
       zoom = 1;
       panCenter = null;
       makeMap();
       open('map');
     }
+    delete dialog.dataset.activity;
     dialog.dataset.cityState = 'map';
     paintMap();
   }

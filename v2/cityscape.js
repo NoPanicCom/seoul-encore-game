@@ -1,4 +1,4 @@
-import { CITY_BLOCKS, CITY_BOUNDS, CITY_BUILDINGS, CITY_ENTRY, CITY_EXIT, CITY_ROADS } from './city-grid.js';
+import { CITY_BLOCKS, CITY_BOUNDS, CITY_BUILDINGS, CITY_ENTRY, CITY_EXIT, CITY_ROADS, SUMI_CAFE_ID } from './city-grid.js';
 
 const BLOCK_WIDTH = 24;
 const BLOCK_DEPTH = 18;
@@ -162,14 +162,16 @@ function signs(B, scene) {
   context.textBaseline = 'middle';
   for (const [index, { id, title, accent }] of labels.entries()) {
     const x = (index % columns) * cw, y = Math.floor(index / columns) * ch;
-    context.fillStyle = '#30243e';
+    const sumi = id === SUMI_CAFE_ID;
+    context.fillStyle = sumi ? '#315556' : '#30243e';
     context.fillRect(x, y, cw, ch);
     context.strokeStyle = `#${accent}`;
     context.lineWidth = 2.5;
     context.strokeRect(x + 4, y + 4, cw - 8, ch - 8);
     context.fillStyle = `#${accent}`;
-    context.font = '700 22px system-ui, sans-serif';
-    context.fillText(title.toUpperCase(), x + cw / 2, y + ch / 2 + 1, cw - 21);
+    context.font = sumi ? 'italic 700 29px Georgia, serif' : '700 22px system-ui, sans-serif';
+    if (sumi) context.fillStyle = '#fff0d4';
+    context.fillText(sumi ? title : title.toUpperCase(), x + cw / 2, y + ch / 2 + 1, cw - 21);
     const u0 = (x + 1) / width, u1 = (x + cw - 1) / width;
     const v0 = 1 - (y + ch - 1) / height, v1 = 1 - (y + 1) / height;
     uvs.set(id, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);
@@ -237,7 +239,10 @@ function roof(building, out, detail, body, trim, accent) {
 
 function architecture(building, solid, detail, labels, uvs) {
   const { x, z, width: w, depth: d, height: h, door, variant, type, lot } = building;
-  const [bodyHex, trimHex, accentHex, glassHex, style] = ARCHITECTURE[type];
+  const sumi = building.id === SUMI_CAFE_ID;
+  const [bodyHex, trimHex, accentHex, glassHex, style] = sumi
+    ? ['A5756F','F2CF9F','FFE5A9','FFC98A','awning']
+    : ARCHITECTURE[type];
   const body = tint(paint(bodyHex), .92 + variant * .021);
   const trim = paint(trimHex), accent = paint(accentHex), glass = paint(glassHex);
   const ink = paint('342A43');
@@ -328,7 +333,29 @@ function architecture(building, solid, detail, labels, uvs) {
   beam(0, 2.54, w - .44, .64, .17, ink, .097);
   face(labels, 0, 2.54, w - 1.14, .55, [1, 1, 1], .185, uvs.get(building.id));
 
-  if (style === 'awning' || style === 'marquee') {
+  if (sumi) {
+    // A striped canvas canopy casts a shadow over the two pastry windows.
+    const cream = paint('FFDFC1'), rose = paint('DC7181'), leaf = paint('609379');
+    for (let stripe=0; stripe<13; stripe++) {
+      const u = (stripe-6)*.36;
+      const fabric = stripe%2 ? cream : rose;
+      const left = x+u-.18, right = x+u+.18;
+      polygon(solid, [[left,2.27,door.z+.07],[left,2.12,door.z+.79],
+        [right,2.12,door.z+.79],[right,2.27,door.z+.07]], fabric);
+      beam(u,2.05,.357,.15,.045,fabric,.78);
+    }
+    for (const side of [-1,1]) {
+      const shelf=side*1.53;
+      beam(shelf,.72,1.12,.075,.25,cream,.12);
+      for (const [i,color] of [rose,cream,leaf].entries()) {
+        const u=shelf+(i-1)*.28;
+        beam(u,.813,.23,.12,.16,color,.12);
+        face(detail,u,.814,.205,.022,cream,.212);
+      }
+      beam(side*2.13,1.79,.04,.36,.045,leaf,.31);
+      diamond(detail,x+side*2.13,1.5,door.z+.31,.13,.34,paint('FFAB91'));
+    }
+  } else if (style === 'awning' || style === 'marquee') {
     beam(0, 2.20, w - .30, .105, style === 'awning' ? .50 : .62, trim, .25);
     for (let i = 0; i < 7; i++) {
       const u = (i - 3) * .63;

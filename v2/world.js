@@ -31,6 +31,7 @@ const NEON_MATERIAL = /tube|filament|lettering/i;
 const MODEL_URL = new URL('./models/', import.meta.url).href;
 const CITY_X = 100;
 const ROOM_X = 320;
+const SUMI_ACTIONS = new Set(['idle', 'greet', 'prepare', 'serve']);
 const FESTIVAL_Z = -7.60;
 const DISTRICT_SPAWNS = {
   gate: { ...HONGDAE_ENTRY, yaw: Math.PI },
@@ -295,6 +296,19 @@ function animateActor(actor, style, time, elapsed, effort = 1) {
     bodyTwist = .10 * lift;
     rightArm = [.21 * lift, .14 + 1.46 * lift, .14 * lift,
       .11 + (1.27 + .29 * wave) * lift, (.10 + .22 * wave) * lift];
+  } else if (style === 'cafe-prepare') {
+    const stir = Math.sin(time * TAU * 1.45);
+    bodyPitch = .092;
+    bodyTilt = -.039 + .031 * stir;
+    bodyTwist = .055 * stir;
+    leftArm = [-.57 - .10 * stir, .25, -.42, .26];
+    rightArm = [-.72 + .17 * stir, .28 - .07 * stir, -.65 + .21 * stir, .34];
+  } else if (style === 'cafe-serve') {
+    const nod = Math.sin(Math.PI * clamp(time, 0, 1));
+    bodyPitch = .045 + .073 * nod;
+    bodyTilt = -.057;
+    leftArm = [-.66, .24, -.53, .23];
+    rightArm = [-.76, .27, -.48, .21];
   } else if (style === 'side') {
     const sway = Math.sin(beat) * hit;
     travelX = .34 * sway;
@@ -428,7 +442,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   let city;
   let pixel;
   let pixelShadow;
-  const pixelPose = { x: -.76, z: 10.39, yaw: Math.PI };
+  const pixelPose = { x: -.76, y: 0, z: 10.39, yaw: Math.PI };
   try {
     const [building, sofia, partner] = await Promise.all([
       B.SceneLoader.ImportMeshAsync('', MODEL_URL, 'yg.glb', scene),
@@ -598,14 +612,19 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   }
 
   async function loadCity() {
-    const [grid, layouts] = await Promise.all([import('./city-grid.js'), import('./cityscape.js')]);
+    const [grid, layouts, citizens] = await Promise.all([
+      import('./city-grid.js'), import('./cityscape.js'), import('./city-pedestrians.js'),
+    ]);
     if (disposed) throw new Error('Sahne kapatıldı');
     const anchor = new B.TransformNode('City district', scene);
     anchor.position.x = CITY_X;
     let layout;
+    let pedestrians;
     try {
       layout = layouts.createCityscape(B, scene, anchor);
+      pedestrians = citizens.createCityPedestrians(B, scene, anchor);
       layout.update(grid.CITY_ENTRY.x, grid.CITY_ENTRY.z);
+      pedestrians.update(grid.CITY_ENTRY.x, grid.CITY_ENTRY.z, 0);
       await scene.whenReadyAsync();
       if (disposed) throw new Error('Sahne kapatıldı');
       anchor.setEnabled(false);
@@ -613,8 +632,9 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
         min: [x - width / 2, 0, z - depth / 2],
         max: [x + width / 2, height, z + depth / 2],
       })), CITY_X);
-      return { anchor, layout, grid, walls };
+      return { anchor, layout, pedestrians, grid, walls };
     } catch (error) {
+      pedestrians?.dispose();
       layout?.dispose();
       anchor.dispose();
       throw error;
@@ -648,6 +668,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     B.Color3.LerpToRef(spotlightWhite, audienceTint, .30, arena.spotlight.diffuse);
   }
 
+  function showingSumi() {
+    return roomVisit?.sumi && roomVisit.sumiAction !== 'idle' &&
+      currentSpot === `activity:${roomVisit.building.id}` && !lookPreview && !inputX && !inputY;
+  }
+
   function updateCamera(elapsed, cardCapture = false) {
     if (festivalView) {
       const aspect = engine.getRenderWidth() / engine.getRenderHeight();
@@ -671,6 +696,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     const districtWide = districtVisit && !cityVisit && !orbitAdjusted && !lookPreview && districtArea(player.x - DISTRICT_X) === 'hongdae' ?
       clamp((player.z - 1.2) / 4.4, 0, 1) : 0;
     const shelfView = districtVisit && currentSpot?.startsWith('shelf-') && !orbitAdjusted && !lookPreview && !inputX && !inputY;
+    const sumiView = showingSumi();
+    const compactSumi = sumiView && portrait ? clamp((800 - viewHeight) / 180, 0, 1) : 0;
 
     camera.fov = staged ? (portrait || cardCapture ? .88 : .77) :
       (portrait ? 1.04 + .33 * establishing + .22 * panorama + .13 * districtWide :
@@ -690,20 +717,28 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
         danceWidth / (2 * Math.tan(camera.fov / 2) * aspect));
     } else {
       const indoors = districtVisit && !cityVisit && districtArea(player.x - DISTRICT_X) === 'minho';
-      const aimHeight = lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) :
+      const aimHeight = sumiView ? (portrait ? .64 - .64 * compactSumi : .88) : lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) :
         1.16 + .62 * establishing + .56 * panorama + .24 * districtWide;
       distance += (portrait ? 4.7 : 3.4) * establishing + 3.2 * panorama + 1.12 * districtWide;
       if (indoors) distance = shelfView ? 3.65 : 3.25;
       if (cityVisit) distance = roomVisit ? 3.55 : 5.25;
-      desiredFocus.set(player.x + .34 * establishing + (shelfView ? .42 : 0), aimHeight, shelfView ? -1.38 : player.z);
+      if (sumiView) {
+        distance = portrait ? 4.25 : 3.85;
+        const panelOffset = shortLandscape ? .78 : 0;
+        desiredFocus.set((player.x + ROOM_X + roomVisit.sumi.position.x) / 2 + panelOffset, aimHeight,
+          (player.z + roomVisit.sumi.position.z) / 2 - panelOffset * .32);
+      } else {
+        desiredFocus.set(player.x + .34 * establishing + (shelfView ? .42 : 0), aimHeight, shelfView ? -1.38 : player.z);
+      }
       focus.x += (desiredFocus.x - focus.x) * smoothing;
       focus.y += (desiredFocus.y - focus.y) * smoothing;
       focus.z += (desiredFocus.z - focus.z) * smoothing;
       // At a jamb, interpolating between two valid positions can cross the corner.
       if (!canStep(focus.x, focus.z)) focus.copyFrom(desiredFocus);
-      const desiredYaw = shelfView ? -1.34 : orbitYaw + .32 * establishing - .25 * panorama - .16 * districtWide;
+      const desiredYaw = sumiView ? .72 : shelfView ? -1.34 : orbitYaw + .32 * establishing - .25 * panorama - .16 * districtWide;
       cameraYaw = blendAngle(cameraYaw, desiredYaw, smoothing);
-      cameraPitch += (orbitPitch - .075 * establishing - cameraPitch) * smoothing;
+      const desiredPitch = sumiView ? (portrait ? .26 + .12 * compactSumi : .18) : orbitPitch - .075 * establishing;
+      cameraPitch += (desiredPitch - cameraPitch) * smoothing;
     }
     if (staged) focus.copyFrom(desiredFocus);
 
@@ -855,16 +890,46 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     pixelShadow.setEnabled(visible);
   }
 
-  function placePixel(x, z, yaw, elapsed = 0, walking = false, posing = false) {
+  function placePixel(x, z, yaw, elapsed = 0, walking = false, posing = false, height = 0) {
     pixel.step({ x, z, yaw, elapsed, walking, photo: posing });
-    pixelShadow.position.set(x, .015, z);
+    pixel.root.position.y = height;
+    pixelShadow.position.set(x, height + .015, z);
     pixelShadow.rotation.y = yaw;
+  }
+
+  function animatePixelPerch(elapsed) {
+    if (!roomVisit?.sumi) return false;
+    const seated = showingSumi();
+    const perch = roomVisit.model.pixelPerch;
+    if (seated !== roomVisit.pixelSeated) {
+      roomVisit.pixelSeated = seated;
+      const destination = seated ? { x: ROOM_X + perch.x, y: perch.y, z: perch.z } :
+        { x: ROOM_X + perch.x - .24, y: 0, z: perch.z + .68 };
+      roomVisit.pixelHop = { start: { ...pixelPose }, destination, elapsed: 0 };
+    }
+    const hop = roomVisit.pixelHop;
+    if (hop) {
+      hop.elapsed += elapsed;
+      const progress = clamp(hop.elapsed / .54, 0, 1);
+      const eased = progress * progress * (3 - 2 * progress);
+      pixelPose.x = hop.start.x + (hop.destination.x - hop.start.x) * eased;
+      pixelPose.y = hop.start.y + (hop.destination.y - hop.start.y) * eased + Math.sin(Math.PI * progress) * .24;
+      pixelPose.z = hop.start.z + (hop.destination.z - hop.start.z) * eased;
+      if (progress === 1) roomVisit.pixelHop = null;
+    }
+    if (!seated && !roomVisit.pixelHop) return false;
+    const direction = Math.atan2(camera.position.x - pixelPose.x, camera.position.z - pixelPose.z);
+    pixelPose.yaw = blendAngle(pixelPose.yaw, direction, elapsed ? damping(9, elapsed) : 1);
+    const paw = seated && !roomVisit.pixelHop && roomVisit.sumiAction === 'greet';
+    placePixel(pixelPose.x, pixelPose.z, pixelPose.yaw, elapsed, false, paw, pixelPose.y);
+    return true;
   }
 
   function followPixel(elapsed) {
     const visible = cityVisit !== null || districtVisit !== null || areaAt(player.z) === 'street';
     setPixelVisible(visible);
     if (!visible) return;
+    if (animatePixelPerch(elapsed)) return;
     let moved = 0;
     if (elapsed && !lookPreview) {
       const facingX = Math.sin(player.yaw);
@@ -915,13 +980,30 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     }
     const moved = lookPreview ? 0 : move(elapsed);
     const followed = journey && !districtVisit && !cityVisit && !lookPreview ? followTrail(elapsed) : 0;
-    if (cityVisit && !roomVisit) cityState.layout.update(player.x - CITY_X, player.z);
+    if (roomVisit?.sumi) {
+      roomVisit.sumiElapsed += elapsed;
+      roomVisit.model.updateSumi(elapsed, roomVisit.sumiAction);
+    }
+    if (cityVisit && !roomVisit) {
+      const x = player.x - CITY_X;
+      cityState.layout.update(x, player.z);
+      cityState.pedestrians.update(x, player.z, elapsed);
+    }
     if (moved > .0001 || followed > .0001) showBoundaries();
     if (lookPreview) player.yaw = blendAngle(player.yaw, cameraYaw, elapsed ? damping(12, elapsed) : 1);
     if (!journey && nearNari) {
       nari.yaw = blendAngle(nari.yaw, Math.atan2(player.x - nari.x, player.z - nari.z), damping(9, elapsed));
     }
-    animateWalk(player, moved, elapsed);
+    if (showingSumi()) {
+      const { sumi, sumiAction, sumiElapsed } = roomVisit;
+      const yaw = Math.atan2(ROOM_X + sumi.position.x - player.x, sumi.position.z - player.z);
+      player.yaw = blendAngle(player.yaw, yaw, elapsed ? damping(10, elapsed) : 1);
+      const pose = sumiAction === 'greet' ? 'greet' : `cafe-${sumiAction}`;
+      const progress = sumiAction === 'greet' ? clamp(sumiElapsed / GREETING_DURATION, 0, 1) : sumiElapsed;
+      animateActor(player, pose, progress, elapsed);
+    } else {
+      animateWalk(player, moved, elapsed);
+    }
     followPixel(elapsed);
     if (districtVisit || cityVisit) return;
     if (!journey && time < greetingEnds) {
@@ -979,7 +1061,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
 
   function placeLocation(x, z, yaw, viewYaw = yaw + Math.PI) {
     Object.assign(player, { x, z, yaw });
-    Object.assign(pixelPose, { x: x - .38, z: z + .46, yaw });
+    Object.assign(pixelPose, { x: x - .38, y: 0, z: z + .46, yaw });
     orbitYaw = cameraYaw = viewYaw % TAU;
     orbitPitch = cameraPitch = .22;
     orbitAdjusted = false;
@@ -1081,11 +1163,17 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     let model;
     try {
       model = createInterior(B, scene, anchor, building);
+      const sumiCafe = building.id === cityState.grid.SUMI_CAFE_ID;
+      const sumi = sumiCafe ? model.root.getChildTransformNodes(true).find(node => node.name === 'Sumi') : null;
+      if (sumiCafe && (!sumi || typeof model.updateSumi !== 'function' || !model.pixelPerch)) throw new Error('Sumi karşılaşması eksik');
       await scene.whenReadyAsync();
       if (disposed) throw new Error('Sahne kapatıldı');
       if (visit === cityVisit && currentSpot === `door:${building.id}`) {
         setLookPreview(false);
-        roomVisit = { building, model, anchor, walls: offsetWalls(model.cameraWalls, ROOM_X), previous: saveLocation() };
+        roomVisit = {
+          building, model, anchor, walls: offsetWalls(model.cameraWalls, ROOM_X), previous: saveLocation(),
+          sumi, sumiAction: 'idle', sumiElapsed: 0, pixelSeated: false, pixelHop: null,
+        };
         const spawn = model.spawn;
         placeLocation(ROOM_X + spawn.x, spawn.z, spawn.yaw);
         cityState.anchor.setEnabled(false);
@@ -1134,7 +1222,23 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   function cityPosition() {
     if (!cityVisit) return null;
     const position = roomVisit?.previous.player ?? player;
-    return { x: position.x - CITY_X, z: position.z, yaw: position.yaw, building: roomVisit?.building.id ?? null };
+    return {
+      x: position.x - CITY_X,
+      z: position.z,
+      yaw: position.yaw,
+      cameraYaw: roomVisit?.previous.cameraYaw ?? cameraYaw,
+      building: roomVisit?.building.id ?? null,
+    };
+  }
+
+  function setSumiAction(action) {
+    if (!SUMI_ACTIONS.has(action)) throw new RangeError('Sumi hareketi geçersiz: ' + action);
+    if (!roomVisit?.sumi) return false;
+    if (roomVisit.sumiAction !== action) {
+      roomVisit.sumiAction = action;
+      roomVisit.sumiElapsed = 0;
+    }
+    return true;
   }
 
   function startDance(venue = 'studio') {
@@ -1344,6 +1448,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     enterBuilding,
     leaveBuilding,
     cityPosition,
+    setSumiAction,
     equipShopStick,
     captureBoothPhoto,
     festivalView: toggleFestivalView,
@@ -1448,6 +1553,12 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       disposed = true;
       observer.disconnect();
       engine.stopRenderLoop();
+      if (roomVisit) disposeRoom();
+      if (cityState) {
+        cityState.pedestrians.dispose();
+        cityState.layout.dispose();
+        cityState.anchor.dispose();
+      }
       engine.dispose();
     },
   };

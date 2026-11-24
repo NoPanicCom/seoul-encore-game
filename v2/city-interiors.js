@@ -1,3 +1,6 @@
+import {SUMI_CAFE_ID} from './city-grid.js';
+import {createSumi} from './sumi-model.js';
+
 const WIDTH = 8.28;
 const DEPTH = 7.43;
 const BACK = -3.75;
@@ -225,7 +228,7 @@ function frame(s,x,y,z,w,h,index=0) {
   s.box(s.accent,x+.13*w,y+.19*h,z+.072,w*.39,h*.07,.020,0,-.55);
 }
 
-function fixtureWall(s) {
+function fixtureWall(s, customSign = false) {
   s.box(s.floor,0,-.068,(BACK+FRONT)/2,WIDTH+.27,.13,DEPTH+.28);
   s.box(s.wall,0,HEIGHT/2,BACK-.068,WIDTH+.27,HEIGHT,.136);
   s.box(s.highlight,0,HEIGHT+.054,(BACK+FRONT)/2,WIDTH+.22,.113,DEPTH+.10);
@@ -253,7 +256,7 @@ function fixtureWall(s) {
     s.box(s.deep,side*2.42,2.983,-1.02,.088,.044,2.81);
     for(const z of [-2.15,.15])s.box(s.deep,side*2.42,3.068,z,.032,.151,.034);
   }
-  s.box(s.deep,0,2.888,BACK+.115,2.65,.36,.105);
+  if (!customSign) s.box(s.deep,0,2.888,BACK+.115,2.65,.36,.105);
 }
 
 const decorators = {
@@ -383,6 +386,111 @@ function cafe(s) {
     plant(s,x+Math.sign(x)*.69,-1.84,.73);
   }
 }
+
+function strawberryGlass(s, x, y, z) {
+  s.cylinder('#c97789',x,y+.027,z,.102,.054,.102);
+  s.cylinder('#f5c4ce',x,y+.075,z,.112,.062,.112);
+  s.cylinder(IVORY,x,y+.111,z,.116,.037,.116);
+  s.box('#d5758a',x+.03,y+.143,z,.008,.088,.008,0,.21);
+}
+
+const PIXEL_PERCH = Object.freeze({x: 1, z: -1.35, y: .64});
+
+function pixelStool(s) {
+  const {x, y, z} = PIXEL_PERCH;
+  const legHeight = y - .116;
+  for (const dx of [-.158,.158]) for (const dz of [-.156,.156]) {
+    s.box('#82564b',x+dx,legHeight/2,z+dz,.055,legHeight,.055,0,-dx*.28);
+    s.box('#a5755d',x+dx,.045,z+dz,.060,.09,.060);
+  }
+  s.box('#82564b',x,.155,z,.30,.042,.085);
+  s.box('#82564b',x,.155,z,.085,.042,.30);
+  s.cylinder('#c78b73',x,y-.106,z,.492,.060,.492);
+  s.cylinder('#b8717c',x,y-.076,z,.506,.040,.506);
+  s.orb('#dfa8aa',x,y-.038,z,.516,.076,.516);
+  s.block(x,z,.52,.52);
+}
+
+function sumiCafe(s, cafeName) {
+  const walnut='#7d5146';
+  const clay='#b36f58';
+  const ceramic='#fff0d2';
+  const top=counter(s,0,-2.66,3.46,.78);
+  for(let i=0;i<26;i++){
+    const x=(i-12.5)*.123;
+    s.box(i%3===0?'#c89263':'#ad795e',x,.414,-2.281,.038,.56,.043);
+  }
+  s.box('#eed2ab',0,.726,-2.247,3.35,.051,.047);
+  s.box(clay,0,.157,-2.243,3.33,.055,.045);
+  s.box(walnut,0,1.20,-3.58,3.25,.073,.26);
+  s.box('#daa986',0,1.253,-3.72,3.38,.34,.033);
+  for(let i=0;i<8;i++){
+    cup(s, (i-3.5)*.302, 1.25, -3.56, [ceramic, '#d9b9a0','#b86d77'][i%3],.105);
+  }
+
+  s.box(walnut,0,2.07,BACK+.178,1.42,.38,.10);
+  s.box('#3c2e37',0,2.07,BACK+.239,1.32,.30,.030);
+  s.text(cafeName,-.097,2.071,BACK+.262,.98,.245,'#3c2e37','#ffdfb7');
+  s.orb('#c36b71',.504,2.064,BACK+.269,.183,.178,.038,.22);
+  s.orb('#ce7980',.514,2.022,BACK+.278,.130,.161,.029,.38);
+  for (const [dx,dy] of [[-.046,.02],[.025,.037],[-.014,-.024],[.047,-.017],[.01,-.057]]) {
+    s.bud('#f4bd9d',.506+dx,2.061+dy,BACK+.298,.014,.019,.013,.34);
+  }
+  for (const [dx,roll] of [[-.041,.76],[.0,.14],[.043,-.71]]) {
+    s.bud('#a9ab76',.499+dx,2.153,BACK+.292,.044,.088,.022,roll);
+  }
+
+  s.box('#66505a',-1.11,top+.225,-2.67,.76,.44,.47);
+  s.box(walnut,-1.11,top+.242,-2.405,.78,.43,.058);
+  s.box('#342835',-1.11,top+.247,-2.368,.65,.28,.024);
+  s.light('#ecb677',-1.11,top+.374,-2.347,.56,.025,.022);
+  s.box(METAL,-1.11,top+.046,-2.43,.69,.062,.36);
+  for(const x of [-1.30,-.98]){
+    s.cylinder(GOLD,x,top+.206,-2.319,.038,.100,.038);
+    cup(s,x,top+.072,-2.31,ceramic,.098);
+  }
+
+  s.cylinder(ceramic,1.09,top+.043,-2.64,.50,.07,.47);
+  s.cylinder('#e3b389',1.09,top+.114,-2.64,.41,.13,.38);
+  for (const [x,z] of [[.98,-2.60],[1.16,-2.59],[1.08,-2.72]]) {
+    s.orb('#f2d8bf',x,top+.198,z,.18,.083,.18);
+    s.orb('#cf7684',x,top+.24,z,.082,.091,.082);
+  }
+  strawberryGlass(s,.77,top,-2.44);
+  strawberryGlass(s,1.40,top,-2.52);
+  pixelStool(s);
+
+  for (const side of [-1,1]) {
+    const x=side*2.72;
+    sofa(s,x,-.79,1.63,side<0?'#bd8f79':'#bb876f');
+    const h=table(s,x,.28,1.04,.71,.71,walnut);
+    cup(s,x-.17,h,.25,ceramic,.12);
+    strawberryGlass(s,x+.19,h,.24);
+    flowers(s,x+.31,h,.51,.29,'#d98b8e');
+    seat(s,x,1.04,Math.PI,'#c68e71');
+    plant(s,side*3.52,-2.27,.78,'#92a077');
+    frame(s,side*2.68,1.97,BACK+.153,1.01,.69,side+1);
+    s.cylinder(walnut,side*2.64,2.92,-.71,.046,.38,.046);
+    s.cone('#d6a05f',side*2.64,2.73,-.71,.42,.23,.42);
+    s.orb(IVORY,side*2.64,2.601,-.71,.26,.11,.26);
+  }
+  for (const x of [-.95,0,.95]) {
+    s.cylinder(walnut,x,2.96,-2.53,.038,.34,.038);
+    s.cone('#dfaf77',x,2.756,-2.53,.31,.17,.31);
+    s.orb('#fff2ca',x,2.658,-2.53,.15,.103,.15);
+  }
+}
+
+const SUMI_PALETTE = {
+  wall: '#d5a98e',
+  floor: '#8b675c',
+  accent: '#d19082',
+  display: '#ffe0ad',
+  secondary: '#ae7d69',
+  wood: '#82564b',
+  highlight: '#f1d6ac',
+  deep: '#593941',
+};
 
 function restaurant(s) {
   const y=counter(s);
@@ -793,9 +901,10 @@ export function createInterior(B, scene, anchor, building) {
   if (!style || !edition) throw new RangeError('Bina türü veya iç dekor seçeneği geçersiz');
   const [build, room, accent] = style;
   const wall = mix(room, edition.room, .50);
+  const sumiAddress = building.id === SUMI_CAFE_ID && building.type === 'cafe';
   const root = new B.TransformNode('Interior ' + building.id, scene);
   root.parent = anchor;
-  const s = maker(B, scene, root, {
+  const s = maker(B, scene, root, sumiAddress ? SUMI_PALETTE : {
     wall,
     floor: mix(edition.floor, room, .22),
     accent: mix(accent, edition.accent, .67),
@@ -805,15 +914,22 @@ export function createInterior(B, scene, anchor, building) {
     highlight: mix(wall, IVORY, .56),
     deep: mix(room, INK, .67),
   });
+  let sumi;
   try {
-    fixtureWall(s);
-    decorators[edition.trim](s);
-    build(s);
-    s.text(building.name, 0, 2.888, BACK+.182, 2.54, .30, s.deep, s.display);
+    fixtureWall(s, sumiAddress);
+    decorators[sumiAddress ? 'slats' : edition.trim](s);
+    if (sumiAddress) {
+      sumiCafe(s, building.name);
+      sumi = createSumi(B, scene, root);
+    } else {
+      build(s);
+    }
+    if (!sumiAddress) s.text(building.name, 0, 2.888, BACK+.182, 2.54, .30, s.deep, s.display);
     s.torus(s.display,0,.016,STATION_Z,.65,.070,.65);
     s.box(s.accent,0,.012,STATION_Z,.17,.020,.17,0,.785);
     s.ready();
   } catch (error) {
+    sumi?.dispose();
     s.dispose();
     throw error;
   }
@@ -823,12 +939,16 @@ export function createInterior(B, scene, anchor, building) {
     spawn: SPAWN,
     exit: EXIT,
     activity: {x:0, z:STATION_Z, id:building.type},
+    ...(sumi ? {updateSumi: sumi.update, pixelPerch: PIXEL_PERCH} : {}),
     bounds: BOUNDS,
     cameraWalls: CAMERA_WALLS,
     walkable(x,z,radius) {
       if (x < BOUNDS.minX+radius || x > BOUNDS.maxX-radius || z < BOUNDS.minZ+radius || z > BOUNDS.maxZ-radius) return false;
       return s.hitboxes.every(hit => x <= hit.minX-radius || x >= hit.maxX+radius || z <= hit.minZ-radius || z >= hit.maxZ+radius);
     },
-    dispose: () => s.dispose(),
+    dispose() {
+      sumi?.dispose();
+      s.dispose();
+    },
   };
 }
