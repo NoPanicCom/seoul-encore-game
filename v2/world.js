@@ -1,6 +1,6 @@
 import {
-  addHongdaeProps, BOOTH, createHongdaeWayfinder, districtArea, districtSpot, districtWalkable,
-  DISTRICT_X, HONGDAE_CAMERA_WALLS, HONGDAE_ENTRY, YG_GATE,
+  addHongdaeProps, BOOTH, createHongdaeWayfinder, createStreetBackdrop, createWayfinder, districtArea, districtSpot,
+  districtWalkable, DISTRICT_X, HONGDAE_CAMERA_WALLS, HONGDAE_CITY_GATE, HONGDAE_ENTRY, YG_CITY_GATE, YG_GATE,
 } from './hongdae-world.js';
 import { createLightstick, createPixel, HONGDAE_LIGHTSTICKS } from './hongdae-props.js';
 
@@ -29,6 +29,15 @@ const GREETING_DURATION = 1.48;
 const DANCE_MOVES = new Set(['side', 'spin', 'heart', 'step', 'jump']);
 const NEON_MATERIAL = /tube|filament|lettering/i;
 const MODEL_URL = new URL('./models/', import.meta.url).href;
+const CITY_X = 100;
+const ROOM_X = 320;
+const FESTIVAL_Z = -7.60;
+const DISTRICT_SPAWNS = {
+  gate: { ...HONGDAE_ENTRY, yaw: Math.PI },
+  booth: { x: BOOTH.x + .35, z: BOOTH.z, yaw: -Math.PI / 2 },
+  festival: { x: 0, z: FESTIVAL_Z, yaw: Math.PI },
+  'city-gate': { x: HONGDAE_CITY_GATE.x - .44, z: HONGDAE_CITY_GATE.z, yaw: Math.PI },
+};
 
 const JOINTS = [
   'hips', 'chest', 'head', 'L-hair', 'R-hair',
@@ -55,6 +64,10 @@ function damping(rate, elapsed) {
   return 1 - Math.exp(-rate * elapsed);
 }
 
+function offsetWalls(walls, x) {
+  return walls.map(({ min, max }) => ({ min: [min[0] + x, min[1], min[2]], max: [max[0] + x, max[1], max[2]] }));
+}
+
 function areaAt(z) {
   if (z >= ARENA_START_Z) return 'arena';
   if (z >= PLAZA_Z) return 'plaza';
@@ -68,6 +81,7 @@ function walkable(x, z, journey = false) {
   if (Math.abs(x) > 4.6 - PLAYER_RADIUS || z < -13 + PLAYER_RADIUS || z > furthest) return false;
   if (!journey && Math.hypot(x - NARI_X, z - STUDIO_Z) < .66) return false;
   if (Math.hypot(x - YG_GATE.x - .52, z - YG_GATE.z) < .32) return false;
+  if (Math.hypot(x - YG_CITY_GATE.x - .52, z - YG_CITY_GATE.z + .06) < .32) return false;
   return Math.abs(x) <= OPENING - PLAYER_RADIUS || PORTALS.every(({ low, high }) =>
     z <= low - PLAYER_RADIUS || z >= high + PLAYER_RADIUS);
 }
@@ -412,7 +426,6 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   let player;
   let nari;
   let city;
-  let wayfinder;
   let pixel;
   let pixelShadow;
   const pixelPose = { x: -.76, z: 10.39, yaw: Math.PI };
@@ -423,8 +436,14 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       loadActor(B, scene, 'nari.glb', 'nari', NARI_X, STUDIO_Z, shadow),
     ]);
     for (const mesh of building.meshes) mesh.isPickable = false;
-    city = building.meshes[0];
-    wayfinder = createHongdaeWayfinder(B, scene);
+    city = new B.TransformNode('YG streets', scene);
+    building.meshes[0].parent = city;
+    createHongdaeWayfinder(B, scene).parent = city;
+    const streetGate = createWayfinder(B, scene, {
+      name: 'YG city wayfinder', ...YG_CITY_GATE, yaw: .13, title: 'SEOUL CITY', detail: '서울', direction: -1, accent: '#98ecf5',
+    });
+    streetGate.parent = city;
+    createStreetBackdrop(B, scene, city);
     player = sofia;
     nari = partner;
     pixel = createPixel(B, scene, 'pixel');
@@ -475,6 +494,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   let hongdaePending = null;
   let districtVisit = null;
   let districtEpoch = 0;
+  let cityState = null;
+  let cityPending = null;
+  let cityVisit = null;
+  let roomVisit = null;
+  let roomPending = null;
   let festivalView = null;
   let lastWave = -10;
   const stageFocus = new B.Vector3(DISTRICT_X,1.34,-11.25);
@@ -553,6 +577,10 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       anchor.position.x = DISTRICT_X;
       model.populateRootNodes();
       for (const root of model.rootNodes) root.parent = anchor;
+      const gate = createWayfinder(B, scene, {
+        name: 'Seoul city wayfinder', ...HONGDAE_CITY_GATE, yaw: -.40, title: 'SEOUL CITY', detail: '서울',
+      });
+      gate.parent = anchor;
       const festival = createStreetStage(B, scene, anchor, glow);
       props = addHongdaeProps(B, scene, anchor, createLightstick);
       addGlowingMeshes(model.meshes);
@@ -565,6 +593,30 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       for (const prop of props) prop.dispose();
       model.dispose();
       anchor?.dispose();
+      throw error;
+    }
+  }
+
+  async function loadCity() {
+    const [grid, layouts] = await Promise.all([import('./city-grid.js'), import('./cityscape.js')]);
+    if (disposed) throw new Error('Sahne kapatıldı');
+    const anchor = new B.TransformNode('City district', scene);
+    anchor.position.x = CITY_X;
+    let layout;
+    try {
+      layout = layouts.createCityscape(B, scene, anchor);
+      layout.update(grid.CITY_ENTRY.x, grid.CITY_ENTRY.z);
+      await scene.whenReadyAsync();
+      if (disposed) throw new Error('Sahne kapatıldı');
+      anchor.setEnabled(false);
+      const walls = offsetWalls(grid.CITY_BUILDINGS.map(({ x, z, width, depth, height }) => ({
+        min: [x - width / 2, 0, z - depth / 2],
+        max: [x + width / 2, height, z + depth / 2],
+      })), CITY_X);
+      return { anchor, layout, grid, walls };
+    } catch (error) {
+      layout?.dispose();
+      anchor.dispose();
       throw error;
     }
   }
@@ -610,18 +662,18 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     const portrait = aspect < .85;
     const staged = exploration !== null;
     const shortLandscape = !portrait && viewHeight <= 560;
-    const reveal = !districtVisit && !journey && !discoveredMovement && !orbitAdjusted && !lookPreview && !staged;
+    const reveal = !districtVisit && !cityVisit && !journey && !discoveredMovement && !orbitAdjusted && !lookPreview && !staged;
     const opening = clamp((time - .82) / 1.60, 0, 1);
     const wideShot = reveal ? 1 - .65 * opening * opening * (3 - 2 * opening) : 0;
     establishing += (wideShot - establishing) * (elapsed ? damping(4.6, elapsed) : 1);
-    const panorama = !districtVisit && journey && !orbitAdjusted && !lookPreview ?
+    const panorama = !districtVisit && !cityVisit && journey && !orbitAdjusted && !lookPreview ?
       clamp(Math.min((player.z - 12.5) / 3, (25.3 - player.z) / 3), 0, 1) : 0;
-    const districtWide = districtVisit && !orbitAdjusted && !lookPreview && districtArea(player.x - DISTRICT_X) === 'hongdae' ?
+    const districtWide = districtVisit && !cityVisit && !orbitAdjusted && !lookPreview && districtArea(player.x - DISTRICT_X) === 'hongdae' ?
       clamp((player.z - 1.2) / 4.4, 0, 1) : 0;
     const shelfView = districtVisit && currentSpot?.startsWith('shelf-') && !orbitAdjusted && !lookPreview && !inputX && !inputY;
 
     camera.fov = staged ? (portrait || cardCapture ? .88 : .77) :
-      (portrait ? 1.04 + .25 * establishing + .22 * panorama + .13 * districtWide :
+      (portrait ? 1.04 + .33 * establishing + .22 * panorama + .13 * districtWide :
         .84 + .14 * establishing + .13 * panorama + .08 * districtWide);
     let distance = portrait ? 4.7 : 4.45;
 
@@ -637,18 +689,19 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       distance = Math.max(photo ? 3.95 + 1.65 * compactPhoto : 4.25,
         danceWidth / (2 * Math.tan(camera.fov / 2) * aspect));
     } else {
-      const indoors = districtVisit && districtArea(player.x - DISTRICT_X) === 'minho';
+      const indoors = districtVisit && !cityVisit && districtArea(player.x - DISTRICT_X) === 'minho';
       const aimHeight = lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) :
         1.16 + .62 * establishing + .56 * panorama + .24 * districtWide;
       distance += (portrait ? 4.7 : 3.4) * establishing + 3.2 * panorama + 1.12 * districtWide;
       if (indoors) distance = shelfView ? 3.65 : 3.25;
-      desiredFocus.set(player.x + .48 * establishing + (shelfView ? .42 : 0), aimHeight, shelfView ? -1.38 : player.z);
+      if (cityVisit) distance = roomVisit ? 3.55 : 5.25;
+      desiredFocus.set(player.x + .34 * establishing + (shelfView ? .42 : 0), aimHeight, shelfView ? -1.38 : player.z);
       focus.x += (desiredFocus.x - focus.x) * smoothing;
       focus.y += (desiredFocus.y - focus.y) * smoothing;
       focus.z += (desiredFocus.z - focus.z) * smoothing;
       // At a jamb, interpolating between two valid positions can cross the corner.
       if (!canStep(focus.x, focus.z)) focus.copyFrom(desiredFocus);
-      const desiredYaw = shelfView ? -1.34 : orbitYaw + .43 * establishing - .25 * panorama - .16 * districtWide;
+      const desiredYaw = shelfView ? -1.34 : orbitYaw + .32 * establishing - .25 * panorama - .16 * districtWide;
       cameraYaw = blendAngle(cameraYaw, desiredYaw, smoothing);
       cameraPitch += (orbitPitch - .075 * establishing - cameraPitch) * smoothing;
     }
@@ -659,7 +712,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       Math.sin(cameraPitch) * distance,
       Math.cos(cameraYaw) * Math.cos(cameraPitch) * distance,
     );
-    const safeDistance = distance * cameraLimit(focus, cameraOffset, districtVisit ? HONGDAE_CAMERA_WALLS : undefined);
+    const walls = roomVisit ? roomVisit.walls : cityVisit ? cityState.walls : districtVisit ? HONGDAE_CAMERA_WALLS : undefined;
+    const safeDistance = distance * cameraLimit(focus, cameraOffset, walls);
     cameraDistance = Math.min(safeDistance, cameraDistance + (safeDistance - cameraDistance) * smoothing);
     cameraOffset.scaleInPlace(cameraDistance / distance);
     camera.position.copyFrom(focus).addInPlace(cameraOffset);
@@ -668,9 +722,9 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
 
   function showBoundaries() {
     const districtX = player.x - DISTRICT_X;
-    const area = districtVisit ? districtArea(districtX) : areaAt(player.z);
+    const area = roomVisit ? 'interior' : cityVisit ? 'city' : districtVisit ? districtArea(districtX) : areaAt(player.z);
     const distance = Math.hypot(player.x - nari.x, player.z - nari.z);
-    const near = !districtVisit && (journey ? area === 'arena' && player.z >= (nearNari ? 25.45 : 25.7) &&
+    const near = !districtVisit && !cityVisit && (journey ? area === 'arena' && player.z >= (nearNari ? 25.45 : 25.7) &&
       Math.abs(player.x) <= (nearNari ? 2.4 : 2.2) && distance <= 2.75 :
       area === 'practice' && distance <= (nearNari ? 2.35 : 2.12));
     if (currentArea !== area) {
@@ -685,16 +739,39 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       }
       onNear?.(near);
     }
-    const closeToGate = area === 'street' && Math.hypot(player.x - YG_GATE.x, player.z - YG_GATE.z) <=
-      (currentSpot === 'hongdae-enter' ? 1.26 : 1.06);
-    const spot = districtVisit ? districtSpot(districtX, player.z, currentSpot) : closeToGate ? 'hongdae-enter' : null;
+    const spot = cityVisit ? citySpot() : districtVisit ? districtSpot(districtX, player.z, currentSpot) : streetSpot(area);
     if (spot !== currentSpot) {
       currentSpot = spot;
       onSpot?.(spot);
     }
   }
 
+  function streetSpot(area) {
+    if (area !== 'street') return null;
+    const near = (gate, id) => Math.hypot(player.x - gate.x, player.z - gate.z) <= (currentSpot === id ? 1.26 : 1.06);
+    if (near(YG_GATE, 'hongdae-enter')) return 'hongdae-enter';
+    if (near(YG_CITY_GATE, 'street-city-enter')) return 'street-city-enter';
+    return null;
+  }
+
+  function citySpot() {
+    if (roomVisit) {
+      const { exit, activity } = roomVisit.model;
+      const x = player.x - ROOM_X;
+      if (Math.hypot(x - exit.x, player.z - exit.z) <= 1.16) return 'room-exit';
+      if (Math.hypot(x - activity.x, player.z - activity.z) <= 1.18) return `activity:${roomVisit.building.id}`;
+      return null;
+    }
+    const x = player.x - CITY_X;
+    const gate = cityState.grid.CITY_EXIT;
+    if (Math.hypot(x - gate.x, player.z - gate.z) <= 1.34) return 'city-exit';
+    const door = cityState.grid.nearestDoor(x, player.z);
+    return door ? `door:${door.id}` : null;
+  }
+
   function canStep(x, z, radius = PLAYER_RADIUS) {
+    if (roomVisit) return roomVisit.model.walkable(x - ROOM_X, z, radius);
+    if (cityVisit) return cityState.grid.walkable(x - CITY_X, z, radius);
     return districtVisit ? districtWalkable(x - DISTRICT_X, z, radius) : walkable(x, z, journey !== null);
   }
 
@@ -757,7 +834,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     const deltaZ = (inputX * forwardX + inputY * forwardZ) * elapsed * WALK_SPEED;
     const moved = advanceActor(player, deltaX, deltaZ, elapsed);
     if (moved > .0001) {
-      if (journey && !districtVisit) recordTrail(moved);
+      if (journey && !districtVisit && !cityVisit) recordTrail(moved);
       if (!discoveredMovement) {
         discoveredMovement = true;
         onMove?.();
@@ -785,7 +862,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   }
 
   function followPixel(elapsed) {
-    const visible = districtVisit !== null || areaAt(player.z) === 'street';
+    const visible = cityVisit !== null || districtVisit !== null || areaAt(player.z) === 'street';
     setPixelVisible(visible);
     if (!visible) return;
     let moved = 0;
@@ -810,14 +887,17 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   }
 
   function updateActors(elapsed) {
-    if (districtVisit) {
-      hongdae.festival.update(time, Boolean(festivalView), festivalView?.color ?? audienceTint, festivalView?.encore);
+    if (districtVisit && !cityVisit) {
+      const clock = festivalView?.clock ?? time;
+      hongdae.festival.update(clock, Boolean(festivalView), festivalView?.color ?? audienceTint, festivalView?.encore);
       if (festivalView) {
-        const phase = time-lastWave;
-        animateActor(player, phase < .7 ? 'greet' : 'booth-photo', Math.min(1,phase/.7), elapsed);
-        const stick = handSticks.get(equippedStick);
+        const phase = clock - lastWave;
+        const waving = phase >= 0 && phase < .7;
+        animateActor(player, waving ? 'greet' : 'booth-photo', waving ? phase / .7 : 1,
+          festivalView.clock === null ? elapsed : 0);
+        const stick = festivalView.stick;
         stick.parent.computeWorldMatrix(true).decompose(undefined, handRotation);
-        B.Quaternion.RotationYawPitchRollToRef(0,0,.12+.30*Math.sin(Math.min(.7,phase)*Math.PI/.7),stickRotation);
+        B.Quaternion.RotationYawPitchRollToRef(0, 0, .12 + (waving ? .30 * Math.sin(phase * Math.PI / .7) : 0), stickRotation);
         handRotation.conjugateInPlace().multiplyToRef(stickRotation,stick.rotationQuaternion);
         return;
       }
@@ -834,7 +914,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       return;
     }
     const moved = lookPreview ? 0 : move(elapsed);
-    const followed = journey && !districtVisit && !lookPreview ? followTrail(elapsed) : 0;
+    const followed = journey && !districtVisit && !cityVisit && !lookPreview ? followTrail(elapsed) : 0;
+    if (cityVisit && !roomVisit) cityState.layout.update(player.x - CITY_X, player.z);
     if (moved > .0001 || followed > .0001) showBoundaries();
     if (lookPreview) player.yaw = blendAngle(player.yaw, cameraYaw, elapsed ? damping(12, elapsed) : 1);
     if (!journey && nearNari) {
@@ -842,7 +923,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     }
     animateWalk(player, moved, elapsed);
     followPixel(elapsed);
-    if (districtVisit) return;
+    if (districtVisit || cityVisit) return;
     if (!journey && time < greetingEnds) {
       animateActor(nari, 'greet', 1 - (greetingEnds - time) / GREETING_DURATION, elapsed);
     } else {
@@ -870,20 +951,53 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     }
   }
 
+  function setYGVisible(visible) {
+    city.setEnabled(visible);
+    arena?.root.setEnabled(visible);
+    nari.pivot.setEnabled(visible);
+    nari.shadow.setEnabled(visible);
+  }
+
   function setDistrictVisible(visible) {
     hongdae.anchor.setEnabled(visible);
-    city.setEnabled(!visible);
-    wayfinder.setEnabled(!visible);
-    arena?.root.setEnabled(!visible);
-    nari.pivot.setEnabled(!visible);
-    nari.shadow.setEnabled(!visible);
+    setYGVisible(!visible);
+  }
+
+  function saveLocation() {
+    return {
+      player: { x: player.x, z: player.z, yaw: player.yaw }, pixel: { ...pixelPose },
+      orbitYaw, orbitPitch, cameraYaw, cameraPitch, cameraDistance, orbitAdjusted,
+    };
+  }
+
+  function restoreLocation(saved) {
+    Object.assign(player, saved.player);
+    Object.assign(pixelPose, saved.pixel);
+    ({ orbitYaw, orbitPitch, cameraYaw, cameraPitch, cameraDistance, orbitAdjusted } = saved);
+    inputX = inputY = 0;
+  }
+
+  function placeLocation(x, z, yaw, viewYaw = yaw + Math.PI) {
+    Object.assign(player, { x, z, yaw });
+    Object.assign(pixelPose, { x: x - .38, z: z + .46, yaw });
+    orbitYaw = cameraYaw = viewYaw % TAU;
+    orbitPitch = cameraPitch = .22;
+    orbitAdjusted = false;
+    inputX = inputY = 0;
+  }
+
+  function renderTravel() {
+    updateActors(0);
+    updateCamera(0);
+    scene.render();
+    showBoundaries();
   }
 
   async function enterHongdae(destination = 'gate') {
     if (disposed) throw new Error('Sahne kapatıldı');
     if (districtVisit) return;
-    if (destination !== 'gate' && destination !== 'booth') throw new RangeError('Hongdae konumu geçersiz: ' + destination);
-    if (exploration || areaAt(player.z) !== 'street') throw new Error('Hongdae geçidi Seul sokağında');
+    if (!Object.hasOwn(DISTRICT_SPAWNS, destination)) throw new RangeError('Hongdae konumu geçersiz: ' + destination);
+    if (cityVisit || exploration || areaAt(player.z) !== 'street') throw new Error('Hongdae geçidi Seul sokağında');
     const epoch = districtEpoch;
     if (!hongdae) {
       if (!hongdaePending) {
@@ -892,25 +1006,13 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       await hongdaePending;
     }
     if (disposed) throw new Error('Sahne kapatıldı');
-    if (districtVisit || epoch !== districtEpoch || exploration || areaAt(player.z) !== 'street') return;
+    if (districtVisit || cityVisit || epoch !== districtEpoch || exploration || areaAt(player.z) !== 'street') return;
     setLookPreview(false);
-    districtVisit = {
-      player: { x: player.x, z: player.z, yaw: player.yaw }, pixel: { ...pixelPose },
-      orbitYaw, orbitPitch, cameraYaw, cameraPitch, cameraDistance, orbitAdjusted,
-    };
-    player.x = DISTRICT_X + (destination === 'booth' ? BOOTH.x + .35 : HONGDAE_ENTRY.x);
-    player.z = destination === 'booth' ? BOOTH.z : HONGDAE_ENTRY.z;
-    player.yaw = destination === 'booth' ? -Math.PI / 2 : Math.PI;
-    Object.assign(pixelPose, { x: player.x - .38, z: player.z + .46, yaw: player.yaw });
-    orbitYaw = cameraYaw = destination === 'booth' ? Math.PI / 2 : 0;
-    orbitPitch = cameraPitch = .22;
-    orbitAdjusted = false;
-    inputX = inputY = 0;
+    districtVisit = saveLocation();
+    const spawn = DISTRICT_SPAWNS[destination];
+    placeLocation(DISTRICT_X + spawn.x, spawn.z, spawn.yaw);
     setDistrictVisible(true);
-    updateActors(0);
-    updateCamera(0);
-    scene.render();
-    showBoundaries();
+    renderTravel();
   }
 
   function leaveHongdae() {
@@ -918,22 +1020,127 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     if (!districtVisit) return;
     const saved = districtVisit;
     setLookPreview(false);
+    if (festivalView) toggleFestivalView(false);
+    if (roomVisit) disposeRoom();
+    if (cityVisit) cityState.anchor.setEnabled(false);
+    cityVisit = null;
     districtVisit = null;
-    Object.assign(player, saved.player);
-    Object.assign(pixelPose, saved.pixel);
-    ({ orbitYaw, orbitPitch, cameraYaw, cameraPitch, cameraDistance, orbitAdjusted } = saved);
-    inputX = inputY = 0;
+    restoreLocation(saved);
     setDistrictVisible(false);
-    updateActors(0);
-    updateCamera(0);
-    scene.render();
-    showBoundaries();
+    renderTravel();
+  }
+
+  async function enterCity() {
+    if (cityVisit) return;
+    const visit = districtVisit;
+    const gate = visit ? 'city-enter' : 'street-city-enter';
+    if (festivalView || exploration || currentSpot !== gate) throw new Error('Şehre girmek için geçide yaklaş');
+    if (!cityState) {
+      if (!cityPending) cityPending = loadCity().then(loaded => { cityState = loaded; }).finally(() => { cityPending = null; });
+      await cityPending;
+    }
+    if (disposed) throw new Error('Sahne kapatıldı');
+    if (cityVisit || visit !== districtVisit) return;
+    if (currentSpot !== gate) throw new Error('Şehre girmek için geçide yaklaş');
+    setLookPreview(false);
+    cityVisit = { home: saveLocation(), fromHongdae: visit !== null };
+    const entry = cityState.grid.CITY_ENTRY;
+    placeLocation(CITY_X + entry.x, entry.z, entry.yaw + Math.PI, entry.yaw);
+    if (visit) hongdae.anchor.setEnabled(false);
+    else setYGVisible(false);
+    cityState.anchor.setEnabled(true);
+    renderTravel();
+  }
+
+  function leaveCity() {
+    if (!cityVisit) return;
+    if (roomVisit || currentSpot !== 'city-exit') throw new Error('Geri dönmek için şehir çıkışına yaklaş');
+    returnFromCity();
+  }
+
+  function returnFromCity() {
+    setLookPreview(false);
+    if (roomVisit) disposeRoom();
+    const { home, fromHongdae } = cityVisit;
+    restoreLocation(home);
+    cityVisit = null;
+    cityState.anchor.setEnabled(false);
+    if (fromHongdae) hongdae.anchor.setEnabled(true);
+    else setYGVisible(true);
+    renderTravel();
+  }
+
+  async function openRoom(building) {
+    const visit = cityVisit;
+    const { createInterior } = await import('./city-interiors.js');
+    if (disposed) throw new Error('Sahne kapatıldı');
+    if (visit !== cityVisit) return;
+    if (currentSpot !== `door:${building.id}`) throw new Error('Binaya girmek için kapısına yaklaş');
+    const anchor = new B.TransformNode('Interior travel anchor', scene);
+    anchor.position.x = ROOM_X;
+    let model;
+    try {
+      model = createInterior(B, scene, anchor, building);
+      await scene.whenReadyAsync();
+      if (disposed) throw new Error('Sahne kapatıldı');
+      if (visit === cityVisit && currentSpot === `door:${building.id}`) {
+        setLookPreview(false);
+        roomVisit = { building, model, anchor, walls: offsetWalls(model.cameraWalls, ROOM_X), previous: saveLocation() };
+        const spawn = model.spawn;
+        placeLocation(ROOM_X + spawn.x, spawn.z, spawn.yaw);
+        cityState.anchor.setEnabled(false);
+        renderTravel();
+        return;
+      }
+    } catch (error) {
+      if (roomVisit?.anchor === anchor) {
+        restoreLocation(roomVisit.previous);
+        roomVisit = null;
+        cityState.anchor.setEnabled(true);
+      }
+      model?.dispose();
+      anchor.dispose();
+      throw error;
+    }
+    model.dispose();
+    anchor.dispose();
+  }
+
+  async function enterBuilding(id) {
+    if (!cityVisit || roomVisit || currentSpot !== `door:${id}`) throw new Error('Binaya girmek için kapısına yaklaş');
+    const building = cityState.grid.getBuilding(id);
+    if (!building) throw new RangeError('Bina bulunamadı: ' + id);
+    if (!roomPending) roomPending = openRoom(building).finally(() => { roomPending = null; });
+    await roomPending;
+  }
+
+  function disposeRoom() {
+    const closed = roomVisit;
+    roomVisit = null;
+    closed.model.dispose();
+    closed.anchor.dispose();
+  }
+
+  function leaveBuilding() {
+    if (!roomVisit) return;
+    if (currentSpot !== 'room-exit') throw new Error('Çıkmak için kapıya yaklaş');
+    setLookPreview(false);
+    restoreLocation(roomVisit.previous);
+    disposeRoom();
+    cityState.anchor.setEnabled(true);
+    renderTravel();
+  }
+
+  function cityPosition() {
+    if (!cityVisit) return null;
+    const position = roomVisit?.previous.player ?? player;
+    return { x: position.x - CITY_X, z: position.z, yaw: position.yaw, building: roomVisit?.building.id ?? null };
   }
 
   function startDance(venue = 'studio') {
     if (exploration) return;
     if (venue !== 'studio' && venue !== 'arena') throw new RangeError('Dans mekânı geçersiz: ' + venue);
-    if (districtVisit) throw new Error('Hongdae’de prova sahnesi yok');
+    if (districtVisit || cityVisit) throw new Error('Prova sahnesine YG binasından ulaşabilirsin');
     const concert = venue === 'arena';
     if (concert && !arena) throw new Error('Konser sahnesi yüklenmedi');
     setLookPreview(false);
@@ -997,6 +1204,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   function beginJourney() {
     if (!arena) throw new Error('Konser sahnesi yüklenmedi');
     if (journey) return;
+    if (cityVisit) returnFromCity();
     leaveHongdae();
     endDance();
     setLookPreview(false);
@@ -1082,6 +1290,33 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     });
   }
 
+  function toggleFestivalView(active, hex) {
+    if (active && !festivalView && districtVisit && !cityVisit && currentSpot === 'festival') {
+      const stick = handSticks.get(equippedStick) ?? player.wand;
+      festivalView = {
+        x: player.x, z: player.z, yaw: player.yaw, color: color(B, hex), clock: null,
+        stick, rotation: stick.rotationQuaternion, euler: stick.rotation.clone(), exposure: scene.imageProcessingConfiguration.exposure,
+      };
+      stick.rotationQuaternion = B.Quaternion.Identity();
+      lastWave = -Infinity;
+      hongdae.festival.wave(-20);
+      player.x = DISTRICT_X - .67;
+      player.z = -7.81;
+      player.yaw = Math.PI;
+      inputX = inputY = 0;
+      placePixel(player.x - .49, player.z + .18, Math.PI);
+    } else if (!active && festivalView) {
+      const { x, z, yaw, exposure, stick, rotation, euler } = festivalView;
+      scene.imageProcessingConfiguration.exposure = exposure;
+      Object.assign(player, { x, z, yaw });
+      stick.rotationQuaternion = rotation;
+      if (!rotation) stick.rotation.copyFrom(euler);
+      festivalView = null;
+    }
+    updateActors(0);
+    updateCamera(0);
+  }
+
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
@@ -1104,27 +1339,17 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     beginJourney,
     enterHongdae,
     leaveHongdae,
+    enterCity,
+    leaveCity,
+    enterBuilding,
+    leaveBuilding,
+    cityPosition,
     equipShopStick,
     captureBoothPhoto,
-    festivalView(active,hex) {
-      if (active && !festivalView && districtVisit && currentSpot === 'festival') {
-        const stick = handSticks.get(equippedStick);
-        festivalView = {x:player.x, z:player.z, yaw:player.yaw, color:color(B,hex), rotation:stick.rotationQuaternion, exposure:scene.imageProcessingConfiguration.exposure};
-        stick.rotationQuaternion = B.Quaternion.Identity();
-        player.x = DISTRICT_X - .67;
-        player.z = -7.81;
-        player.yaw = Math.PI;
-        inputX = inputY = 0;
-        placePixel(player.x-.49,player.z+.18,Math.PI);
-      } else if (!active && festivalView) {
-        scene.imageProcessingConfiguration.exposure = festivalView.exposure;
-        const {x,z,yaw,rotation} = festivalView;
-        Object.assign(player,{x,z,yaw});
-        handSticks.get(equippedStick).rotationQuaternion = rotation;
-        festivalView = null;
-      }
-      updateActors(0);
-      updateCamera(0);
+    festivalView: toggleFestivalView,
+    setFestivalTime(elapsedMs) {
+      if (elapsedMs !== null && (!Number.isFinite(elapsedMs) || elapsedMs < 0)) throw new RangeError('Konser saati geçersiz');
+      if (festivalView) festivalView.clock = elapsedMs === null ? null : elapsedMs / 1000;
     },
     showEncore(encore) {
       if (!festivalView) return;
@@ -1167,8 +1392,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     },
     waveStick() {
       if (!festivalView) return;
-      lastWave = time;
-      hongdae.festival.wave(time);
+      lastWave = festivalView.clock ?? time;
+      hongdae.festival.wave(lastWave);
     },
     setInput(x, y) {
       const length = Math.max(1, Math.hypot(x, y));

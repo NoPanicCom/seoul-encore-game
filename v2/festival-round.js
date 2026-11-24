@@ -43,7 +43,11 @@ const revealAt = bowDuration+1900;
 const audienceAt = revealAt + 3 * ENCORE_BEAT_MS;
 
 // The audience has as many beats as it needs to light the four banks.
-export function createLisaEncore() {
+// Cards from the first festival release retained the look and colour only.
+export const originalEncoreCues = Array.from({length:4},(_,i)=>audienceAt+(i+1)*2*ENCORE_BEAT_MS);
+
+export function createLisaEncore(playbackCues = null) {
+  const waveTimes = [];
   let elapsed = 0, last = null, lit = 0, lastHit = -1, finaleAt = null;
   const interval = 2 * ENCORE_BEAT_MS;
   const beat = () => (elapsed-audienceAt)/interval;
@@ -55,6 +59,8 @@ export function createLisaEncore() {
       if (finaleAt === null) return 'relight';
       return elapsed-finaleAt < 1450 ? 'finale' : 'card';
     },
+    get elapsed() {return elapsed;},
+    get waveTimes() {return [...waveTimes];},
     get lit() {return lit;},
     get bow() {return Math.sin(Math.PI*Math.min(1,elapsed/bowDuration));},
     get entrance() {return Math.min(1,Math.max(0,(elapsed-revealAt)/(audienceAt-revealAt)));},
@@ -67,10 +73,15 @@ export function createLisaEncore() {
     tick(now) {
       if(last!==null) elapsed+=Math.max(0,now-last);
       last=now;
+      if (playbackCues) {
+        while (lit<4 && elapsed>=playbackCues[lit]) lit++;
+        if (lit===4) finaleAt=playbackCues[3];
+      }
     },
     pause() {last=null;},
     tap() {
-      if(!this.ready) return false;
+      if(playbackCues || !this.ready) return false;
+      waveTimes.push(Math.round(elapsed));
       lastHit=Math.round(beat());
       lit++;
       if(lit===4) finaleAt=elapsed;

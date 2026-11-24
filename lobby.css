@@ -562,3 +562,9 @@
 .el-walks .el-3d img {inset:0;width:100%;height:100%;object-position:50% 32%;}
 .el-walks .el-3d::before {background:linear-gradient(0deg,#261328 3%,#261328cf 27%,#26132811 72%);}
 .el-walks .el-3d strong {font-size:clamp(.9rem,3.5vw,1.08rem);line-height:1.15;}
+
+.encore-recording b {color:#fff1f6;font-size:.84rem;}
+.encore-recording:focus-visible {outline:3px solid var(--v2-wand);outline-offset:3px;}
+
+.el-walks .el-city {grid-column:1/-1;min-height:110px;}
+.el-walks .el-city img {object-position:50% 53%;}

@@ -48,8 +48,26 @@ export function savePixelPhoto(input) {
     localStorage.setItem(pixelPrefix + id, JSON.stringify({ photo, outfit, jacket, stick, wandColor }));
     return id;
 }
+function isEncorePrint(value) {
+    if (!isPixelPhoto(value) || value.wandColor !== stickColor(value.stick))
+        return false;
+    const { waveTimes } = value;
+    return waveTimes === undefined || (Array.isArray(waveTimes) && waveTimes.length === 4 &&
+        waveTimes.every((ms, i) => Number.isSafeInteger(ms) && ms >= 0 && (i === 0 || ms > Number(waveTimes[i - 1]))));
+}
+export function readLisaEncorePhoto(id) {
+    if (!validId(id))
+        return null;
+    try {
+        const value = JSON.parse(localStorage.getItem(encorePhotoPrefix + id) ?? 'null');
+        return isEncorePrint(value) ? value : null;
+    }
+    catch {
+        return null;
+    }
+}
 export function saveLisaEncorePhoto(input) {
-    if (!isPixelPhoto(input) || input.wandColor !== stickColor(input.stick))
+    if (!isEncorePrint(input))
         throw new Error('Invalid Lisa encore photo');
     const id = newCardId();
     localStorage.setItem(encorePhotoPrefix + id, JSON.stringify(input));
@@ -86,10 +104,18 @@ export function pixelAlbum(lang, kind = 'pixel') {
         const title = encore ? (tr ? 'Lisa’nın gizli bisi' : 'Секретный бис Лисы') : (tr ? 'Sofia ve Pixel' : 'София и Пиксель');
         const open = tr ? 'Fotoğrafı büyüt' : 'Увеличить фото';
         const close = tr ? 'Küçült' : 'Свернуть';
-        return `<details class="pixel-print" data-${encore ? 'encore' : 'pixel'}-photo="${id}" data-stick="${card.stick}">
+        if (encore) {
+            if (!isEncorePrint(card))
+                return '';
+            return `<a class="v2-photo encore-recording" data-encore-photo="${id}" data-stick="${card.stick}" href="v2/#lisa-encore/${id}" style="--v2-wand:${card.wandColor}">
+        <img loading="lazy" src="${card.photo}" alt=""><span><small>HONGDAE · SECRET ENCORE</small>
+        <strong>${title}</strong><em>${stickName(card.stick, lang)}</em>
+        <b>▶ ${tr ? 'Bisi 3D izle' : 'Смотреть бис в 3D'}</b></span></a>`;
+        }
+        return `<details class="pixel-print" data-pixel-photo="${id}" data-stick="${card.stick}">
       <summary class="v2-photo" data-venue="hongdae" style="--v2-wand:${card.wandColor}">
-        <img loading="lazy" src="${card.photo}" alt="${encore ? title : tr ? 'Hongdae fotokabininde Sofia ve Pixel' : 'София и Пиксель в фотобудке Хондэ'}">
-        <span><small>HONGDAE · ${encore ? 'SECRET ENCORE' : 'PHOTO CLUB'}</small><strong>${title}</strong><em>${stickName(card.stick, lang)}</em>
+        <img loading="lazy" src="${card.photo}" alt="${tr ? 'Hongdae fotokabininde Sofia ve Pixel' : 'София и Пиксель в фотобудке Хондэ'}">
+        <span><small>HONGDAE · PHOTO CLUB</small><strong>${title}</strong><em>${stickName(card.stick, lang)}</em>
         <b class="print-zoom"><i>${open} ＋</i><i>${close} −</i></b></span>
       </summary></details>`;
     }).join('');

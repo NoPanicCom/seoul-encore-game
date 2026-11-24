@@ -761,3 +761,8 @@ button:active:not(.header-control, .close-button) { transform: scale(.97); }
 .encore-gift p {margin:8px 0;font-size:.88rem;color:#ffe9f6;}
 .encore-gift a,.encore-gift button {display:inline-flex;align-items:center;justify-content:center;min-height:42px;text-decoration:none;}
 @media(max-height:500px){.encore-gift{width:auto;min-width:165px;top:54%;}.encore-gift img{max-height:27dvh;}}
+
+#game:is([data-area="city"],[data-area="interior"]) .mission {max-width:min(330px,calc(100% - var(--left) - var(--right) - 154px));}
+#game:is([data-area="city"],[data-area="interior"]) .route {display:none;}
+#city-map-open span {font:26px/1 system-ui;}
+#city-target {color:#ffe19b;}

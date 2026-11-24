@@ -1,5 +1,7 @@
-import {createLisaEncore, ENCORE_BEAT_MS, createFestivalRound, FESTIVAL_BEAT_MS} from './festival-round.js';
-import {saveLisaEncorePhoto, clearInvitation, equipHongdaeStick, readDuet, readHongdaeStick, readInvitation, saveDuet, saveInvitation, savePixelPhoto, startingLook} from './album.js';
+import {getBuilding, CITY_TYPES} from './city-grid.js';
+import {createCityActivities} from './city-activities.js';
+import {originalEncoreCues, createLisaEncore, ENCORE_BEAT_MS, createFestivalRound, FESTIVAL_BEAT_MS} from './festival-round.js';
+import {readLisaEncorePhoto, saveLisaEncorePhoto, clearInvitation, equipHongdaeStick, readDuet, readHongdaeStick, readInvitation, saveDuet, saveInvitation, savePixelPhoto, startingLook} from './album.js';
 import {createWorld} from './world.js';
 import {isShopStick, stickColor, stickName} from '../js/lightstick.js';
 import {worldAudio as audio} from '../js/world-audio.js';
@@ -7,6 +9,21 @@ import {silentStageBreak, pauseStageMusic, resumeStageMusic, setStageSound, stag
 
 const phrases = {
   ru: {
+    city: 'Улицы Сеула',
+    interior: 'В помещении',
+    cityMap: 'Карта кварталов',
+    enterCity: 'В город',
+    exitCity: 'В Хондэ',
+    exitToYG: 'К зданию YG',
+    doorAction: 'Войти',
+    exitRoom: 'На улицу',
+    activityAction: 'Попробовать',
+    cityObjective: 'Подойди к двери или открой карту',
+    interiorObjective: 'Подойди к месту задания',
+    cityRoute: 'У указателя CITY — вход в кварталы',
+    cityError: 'Не удалось открыть локацию. Попробуй ещё раз.',
+    target: 'Цель',
+    meters: 'м',
     bowTitle: 'Спасибо, Хондэ!',
     blackoutHint: 'В зале гаснет свет…',
     encoreTitle: 'Секретный бис Лисы',
@@ -30,9 +47,10 @@ const phrases = {
     loadError: 'Сцена не загрузилась',
     loadErrorDetail: 'Для этой главы нужен браузер с поддержкой WebGL. Попробуй загрузить сцену снова.',
     replayError: 'Запись не найдена',
-    replayErrorDetail: 'Открой сохранённый танец в альбоме на устройстве, где ты его записала.',
+    replayErrorDetail: 'Открой фотокарту в альбоме на телефоне, где ты её получила.',
     street: 'Улица в Сеуле',
     streetObjective: 'Войди в здание YG впереди',
+    encoreWatch: 'Запись той ночи · 3D',
     festivalTitle: 'Волна Хондэ',
     festivalJoin: 'На концерт',
     festivalTap: 'Зажечь лайтстик',
@@ -45,7 +63,7 @@ const phrases = {
     festivalAgain: 'Ещё раз',
     hongdae: 'Хондэ',
     minho: 'Магазин Минхо',
-    hongdaeRoute: 'К Пикселю через указатель «Хондэ» справа',
+    hongdaeRoute: 'Кварталы Сеула слева · Хондэ справа',
     hongdaeObjective: 'Пиксель рядом. Зайди в магазин справа',
     hongdaeBoothObjective: 'Фотокабина на другой стороне улицы',
     minhoObjective: 'Подойди к полке, чтобы взять лайтстик',
@@ -159,6 +177,21 @@ const phrases = {
     backToArena: 'Вернуться на арену',
   },
   tr: {
+    city: 'Seul sokakları',
+    interior: 'İç mekân',
+    cityMap: 'Mahalle haritası',
+    enterCity: 'Şehre gir',
+    exitCity: 'Hongdae’ye dön',
+    exitToYG: 'YG sokağına dön',
+    doorAction: 'İçeri gir',
+    exitRoom: 'Dışarı çık',
+    activityAction: 'Etkinliğe başla',
+    cityObjective: 'Bir binaya yürü veya haritayı aç',
+    interiorObjective: 'Etkinlik noktasına yaklaş',
+    cityRoute: 'CITY tabelasından mahallelere geç',
+    cityError: 'Mekân açılamadı. Tekrar dene.',
+    target: 'Hedef',
+    meters: 'm',
     bowTitle: 'Teşekkürler, Hongdae!',
     blackoutHint: 'Salonda ışıklar sönüyor…',
     encoreTitle: 'Lisa’nın gizli bisi',
@@ -182,9 +215,10 @@ const phrases = {
     loadError: 'Sahne yüklenemedi',
     loadErrorDetail: 'Bu bölüm WebGL destekli bir tarayıcı gerektiriyor. Sahneyi yeniden yüklemeyi dene.',
     replayError: 'Kayıt bulunamadı',
-    replayErrorDetail: 'Albümdeki dansı kaydettiğin cihazdan açabilirsin.',
+    replayErrorDetail: 'Fotokartı kazandığın telefonda albümünü açabilirsin.',
     street: 'Seul sokağı',
     streetObjective: 'İlerideki YG binasına gir',
+    encoreWatch: 'O gecenin kaydı · 3D',
     festivalTitle: 'Hongdae ışık dalgası',
     festivalJoin: 'Konsere katıl',
     festivalTap: 'Lightstick’i yak',
@@ -197,7 +231,7 @@ const phrases = {
     festivalAgain: 'Yeniden oyna',
     hongdae: 'Hongdae',
     minho: 'Minho’nun dükkânı',
-    hongdaeRoute: 'Pixel için sağdaki Hongdae tabelasına yaklaş',
+    hongdaeRoute: 'Solda Seul mahalleleri · Sağda Hongdae',
     hongdaeObjective: 'Pixel yanında. Sağdaki dükkâna gir',
     hongdaeBoothObjective: 'Fotokabin sokağın karşı kaldırımında',
     minhoObjective: 'Işık çubuğu almak için bir rafa yaklaş',
@@ -406,6 +440,7 @@ let festival = null;
 let encore = null;
 let encorePhoto = null;
 let encoreId = null;
+let encoreRecording = null;
 let festivalFrame = 0;
 let festivalBest = Number(preference('encore.v2.hongdae-wave.best')) || 0;
 let nearNari = false;
@@ -423,7 +458,17 @@ let joystickInput = {x: 0, y: 0};
 
 const words = key => phrases[lang][key];
 const setText = (id, value) => { byId(id).textContent = value; };
-const canWalk = () => state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending && !hongdaePending;
+let cityTarget=null;
+let cityReturn='hongdae';
+let directionTimer=0;
+const cityUi=createCityActivities({
+  lang:()=>lang,
+  onOpen:()=>resetControls(),
+  onClose:()=>{moveInput(); paintMission();},
+  onTarget:building=>{cityTarget=building; paintCityTarget();},
+});
+const inCity=()=>area==='city' || area==='interior';
+const canWalk = () => !cityUi.isOpen() && state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending && !hongdaePending;
 const journey = () => concertFinale !== null;
 const arenaRound = () => round?.venue === 'arena';
 const rhythmState = phase => phase === 'play' || phase === 'concert';
@@ -438,7 +483,31 @@ function shelfStick() {
   return area === 'minho' && isShopStick(id) ? id : null;
 }
 
+function cityBuilding() {
+  if (spot?.startsWith('door:') || spot?.startsWith('activity:')) return getBuilding(spot.split(':')[1]);
+  const building=world?.cityPosition()?.building;
+  return typeof building==='string'?getBuilding(building):building;
+}
+
+function paintCityTarget() {
+  clearTimeout(directionTimer);
+  const label=byId('city-target');
+  const pos=area==='city' && state==='walk' && cityTarget && world?.cityPosition();
+  label.hidden=!pos;
+  if(!pos) return;
+  const dx=cityTarget.door.approachX-pos.x;
+  const dz=cityTarget.door.approachZ-pos.z;
+  const distance=Math.round(Math.hypot(dx,dz));
+  label.textContent=`${words('target')} · ${cityTarget.name} · ${distance} ${words('meters')}`;
+  directionTimer=setTimeout(paintCityTarget,400);
+}
+
 function hongdaeContext() {
+  if (spot==='city-enter' || spot==='street-city-enter') return {label:'enterCity',icon:'↗'};
+  if (spot==='city-exit') return {label:cityReturn==='street'?'exitToYG':'exitCity',icon:'↩'};
+  if (spot==='room-exit') return {label:'exitRoom',icon:'↩'};
+  if (area==='city' && spot?.startsWith('door:')) return {label:'doorAction',icon:'⌂'};
+  if (area==='interior' && spot?.startsWith('activity:')) return {label:'activityAction',icon:'✦'};
   if (area === 'street' && spot === 'hongdae-enter') return hongdaeActions[spot];
   if (inHongdae() && spot === 'hongdae-exit') return hongdaeActions[spot];
   if (area === 'hongdae' && spot === 'festival' && shopStick) return {label:'festivalJoin',icon:'♫'};
@@ -484,7 +553,11 @@ function paintPhotoPreview() {
 }
 
 function paintMission() {
-  setText('area', words(area));
+  const building=inCity()?cityBuilding():null;
+  const type=building && CITY_TYPES[building.typeIndex];
+  setText('area',type ? type[lang] : words(area));
+  byId('city-map-open').hidden = !inCity() || state!=='walk';
+  paintCityTarget();
   byId('mission').setAttribute('aria-label', words(inHongdae() ? area : journey() ? 'arenaRouteLabel' : 'routeLabel'));
   const context = hongdaeContext();
   const direction = byId('hongdae-route');
@@ -496,6 +569,10 @@ function paintMission() {
     direction.hidden = false;
     direction.textContent = words('festivalRoute');
   }
+  if(area==='hongdae' && !shopStick && !context) {
+    direction.hidden=false;
+    direction.textContent=words('cityRoute');
+  }
   const journeyObjective = `journey${area[0].toUpperCase()}${area.slice(1)}`;
   let objective = journey() || area === 'arena' || area === 'plaza'
     ? (nearNari ? 'stageReady' : journeyObjective)
@@ -506,7 +583,8 @@ function paintMission() {
     if (spot === 'festival') objective = shopStick ? 'festivalTitle' : 'festivalShop';
     if (spot === 'booth' && !shopStick) objective = 'boothNeedsStick';
   }
-  setText('objective', context?.shelf ? stickName(context.shelf, lang) : words(objective));
+  if(inCity()) objective=area==='city'?'cityObjective':'interiorObjective';
+  setText('objective', building ? building.name : context?.shelf ? stickName(context.shelf, lang) : words(objective));
   rehearsal.hidden = journey() || !nearNari || inHongdae() || Boolean(context);
   startConcert.hidden = !journey() || !nearNari || inHongdae() || Boolean(context);
   hongdaeAction.hidden = !context;
@@ -517,7 +595,7 @@ function paintMission() {
     const label = words(hongdaePending ? 'hongdaeLoading' : context.label);
     setText('hongdae-action-icon', context.icon);
     setText('hongdae-action-label', label);
-    const name = context.shelf ? `${label} · ${stickName(context.shelf, lang)}` : label;
+    const name = building ? label+' · '+building.name : context.shelf ? `${label} · ${stickName(context.shelf, lang)}` : label;
     hongdaeAction.setAttribute('aria-label', purchase ? `${name} · ${words('stickCoupon')}` : name);
   } else {
     delete hongdaeAction.dataset.spot;
@@ -599,6 +677,7 @@ function paintLanguage() {
   const nextLanguage = lang === 'tr' ? 'Русский' : 'Türkçe';
   languageButton.setAttribute('aria-label', `${words('language')} · ${nextLanguage}`);
   languageButton.title = nextLanguage;
+  cityUi.refresh();
   paintSound();
   paintJacket();
   paintFinale();
@@ -706,7 +785,7 @@ function playAudio() {
   if (!sound || phone.open || document.hidden) return;
   if (festival) {
     const solo=encore && ['entrance','relight','finale'].includes(encore.phase);
-    if ((!festival.complete || solo) && !stageAudioRequested) {
+    if (((!encore && !festival.complete) || solo) && !stageAudioRequested) {
       const session = festival;
       stageAudioRequested = true;
       void startStageMusic({beatMs:solo?ENCORE_BEAT_MS:FESTIVAL_BEAT_MS, solo:Boolean(solo), offsetMs:() => solo ? encore?.musicTime ?? 0 : session.elapsed}).then(started => {
@@ -1041,10 +1120,42 @@ async function enterHongdae(destination) {
   }
 }
 
+async function actInCity() {
+  if(hongdaePending) return;
+  const at=spot;
+  const building=cityBuilding();
+  resetControls();
+  if(at?.startsWith('activity:') && building) {
+    cityUi.play(building);
+    return;
+  }
+  hongdaePending=true;
+  hongdaeFeedback='';
+  paintMission();
+  try {
+    if(at==='city-enter' || at==='street-city-enter') {
+      cityReturn=area;
+      await world.enterCity();
+    }
+    else if(at==='city-exit') world.leaveCity();
+    else if(at==='room-exit') world.leaveBuilding();
+    else if(at?.startsWith('door:') && building) await world.enterBuilding(building.id);
+    audio.cue('step');
+  } catch(error) {
+    hongdaeFeedback='cityError';
+    console.warn('Seoul city transition failed.',error);
+  } finally {
+    hongdaePending=false;
+    paintMission();
+  }
+}
+
 function actInHongdae() {
   if (!canWalk() || !hongdaeContext() || hongdaeAction.disabled) return;
   hongdaeFeedback = '';
-  if (spot === 'hongdae-enter') {
+  if (spot==='city-enter' || spot==='street-city-enter' || inCity()) {
+    void actInCity();
+  } else if (spot === 'hongdae-enter') {
     void enterHongdae();
   } else if (spot === 'hongdae-exit') {
     resetControls();
@@ -1085,7 +1196,13 @@ function paintFestival() {
   const dots = [...byId('festival-dots').children];
   dots.forEach((dot,i) => {dot.className = encore ? (i<encore.lit?'hit':'') : festival.hits[i]?'hit':festival.missed(i)?'miss':'';});
   setText('festival-score',encore ? (playing ? `${encore.lit}/4` : finished ? `${words('festivalBest')} ${festivalBest}/8` : '') : `${festival.score}/8`);
-  byId('festival-tap').hidden = !playing;
+  byId('festival-tap').hidden = !playing || Boolean(encoreRecording);
+  if (encoreRecording) {
+    setText('festival-title',words('encoreWatch'));
+    if (phase==='relight') setText('festival-hint',words('encoreTitle'));
+    if (finished) setText('festival-score','');
+    byId('festival-leave').textContent=words('album');
+  }
   byId('festival-again').hidden = !finished;
   byId('encore-gift').hidden = !finished;
   if(finished) {
@@ -1103,7 +1220,7 @@ function awardEncorePrint() {
   if (encore?.phase!=='card' || encoreId) return;
   try {
     encorePhoto ??= {photo:world.captureEncorePhoto(stickColor(shopStick)), outfit:look.outfit, jacket:look.jacket,
-      stick:shopStick,wandColor:stickColor(shopStick)};
+      stick:shopStick,wandColor:stickColor(shopStick),waveTimes:encore.waveTimes};
     encoreId=saveLisaEncorePhoto(encorePhoto);
   } catch(error) {
     console.warn('Seoul Encore photocard could not be saved.',error);
@@ -1117,16 +1234,25 @@ function festivalTick(now) {
     const tap=byId('festival-tap');
     if(encore) {
       const previous=encore.phase;
+      const oldRows=encore.lit;
       encore.tick(now);
+      world.setFestivalTime(encore.elapsed);
+      if (encoreRecording && oldRows!==encore.lit) {
+        world.waveStick();
+        paintFestival();
+      }
       world.showEncore(encore);
       if(previous!==encore.phase) {
         paintFestival();
         if(encore.phase==='entrance') playAudio();
-        if(encore.phase==='relight') tap.focus({preventScroll:true});
+        if(encore.phase==='relight' && !encoreRecording) tap.focus({preventScroll:true});
         if(encore.phase==='card') {
           closeStageAudio();
           if(sound) stageApplause();
-          awardEncorePrint();
+          if (encoreRecording) {
+            encorePhoto=encoreRecording;
+            paintFestival();
+          } else awardEncorePrint();
           byId(encoreId?'encore-album':'encore-retry').focus({preventScroll:true});
           return;
         }
@@ -1145,6 +1271,7 @@ function festivalTick(now) {
         stageAudioRequested=false;
         encore=createLisaEncore();
         encore.tick(now);
+        world.setFestivalTime(encore.elapsed);
         world.showEncore(encore);
         paintFestival();
       }
@@ -1165,12 +1292,17 @@ function startFestival() {
   resetControls();
   audio.exit();
   closeStageAudio();
-  if(encore) world.festivalView(false);
+  if(encore) {world.festivalView(false); world.setFestivalTime(null);}
   encore=null;
   encorePhoto=null;
-  encoreId=null;
+  if (!encoreRecording) encoreId=null;
   world.festivalView(true,stickColor(shopStick));
   festival = createFestivalRound();
+  if(encoreRecording) {
+    encore=createLisaEncore(encoreRecording.waveTimes ?? originalEncoreCues);
+    world.setFestivalTime(0);
+    world.showEncore(encore);
+  }
   byId('festival-dots').replaceChildren(...festival.hits.map(()=>document.createElement('i')));
   byId('festival-panel').style.setProperty('--fan-color',stickColor(shopStick));
   setState('festival');
@@ -1181,7 +1313,7 @@ function startFestival() {
 }
 
 function tapFestival() {
-  if (!festival || phone.open || document.hidden) return;
+  if (!festival || encoreRecording || phone.open || document.hidden) return;
   // Let the animation frame own the transition to the result, including its last beat.
   if ((encore ?? festival).tap()) {
     world.waveStick();
@@ -1192,7 +1324,12 @@ function tapFestival() {
 function leaveFestival() {
   cancelAnimationFrame(festivalFrame);
   closeStageAudio();
+  if(encoreRecording) {
+    location.assign(byId('encore-album').href);
+    return;
+  }
   world.festivalView(false);
+  world.setFestivalTime(null);
   festival = null;
   encore=null;
   encorePhoto=null;
@@ -1292,12 +1429,19 @@ async function load() {
   const hash = location.hash.slice(1);
   if (hash) {
     const match = /^replay\/([a-z0-9]+)$/i.exec(hash);
+    const lisaMatch = /^lisa-encore\/([a-z0-9]+)$/i.exec(hash);
     replay = match && readDuet(match[1]);
-    if (!replay) {
+    encoreRecording = lisaMatch && readLisaEncorePhoto(lisaMatch[1]);
+    if (!replay && !encoreRecording) {
       showFailure('replay');
       return;
     }
-    look = {outfit: replay.outfit, wandColor: replay.wandColor, jacket: replay.jacket ?? true};
+    const saved = encoreRecording ?? replay;
+    look = {outfit:saved.outfit,wandColor:saved.wandColor,jacket:saved.jacket ?? true};
+    if(encoreRecording) {
+      shopStick=encoreRecording.stick;
+      encoreId=lisaMatch[1];
+    }
     game.dataset.replay = 'true';
   }
 
@@ -1323,7 +1467,10 @@ async function load() {
       },
     });
     updateLook();
-    if (replay) {
+    if (encoreRecording) {
+      await world.enterHongdae('festival');
+      startFestival();
+    } else if (replay) {
       if (replay.venue === 'arena') await world.prepareArena().catch(error => showFailure('arena', error));
       if (!world) return;
       startRound('replay', replay.venue ?? 'studio');
@@ -1331,7 +1478,10 @@ async function load() {
       setState('walk');
       paintMission();
       const entry = new URL(location.href);
-      if (entry.searchParams.get('start') === 'hongdae') {
+      if (entry.searchParams.get('start') === 'city') {
+        await enterHongdae('city-gate');
+        if (spot==='city-enter' || spot==='street-city-enter') await actInCity();
+      } else if (entry.searchParams.get('start') === 'hongdae') {
         const destination = entry.searchParams.get('at') === 'booth' ? 'booth' : 'gate';
         entry.searchParams.delete('start');
         entry.searchParams.delete('at');
@@ -1365,7 +1515,7 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   });
 }
 canvas.addEventListener('pointerdown', event => {
-  if (state !== 'walk' || event.button !== 0 || orbitPointer) return;
+  if (!canWalk() || event.button !== 0 || orbitPointer) return;
   orbitPointer = {id: event.pointerId, x: event.clientX, y: event.clientY};
   canvas.setPointerCapture(event.pointerId);
 });
@@ -1382,7 +1532,7 @@ canvas.addEventListener('webglcontextlost', event => {
 
 document.addEventListener('keydown', event => {
   const editing = event.target instanceof Element && event.target.matches('input, textarea, select, [contenteditable]');
-  if (event.altKey || event.ctrlKey || event.metaKey || editing || phone.open) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || editing || phone.open || cityUi.isOpen()) return;
   if (event.code === 'Escape') {
     if (!wardrobe.hidden) setWardrobe(false, true);
     else if (festival) leaveFestival();
@@ -1452,6 +1602,9 @@ byId('festival-tap').addEventListener('click', event => {
 byId('encore-retry').addEventListener('click',awardEncorePrint);
 byId('festival-again').addEventListener('click', startFestival);
 byId('festival-leave').addEventListener('click', leaveFestival);
+byId('city-map-open').addEventListener('click',()=>{
+  if(canWalk() && inCity()) cityUi.map(world.cityPosition());
+});
 phoneToggle.addEventListener('click', openPhone);
 byId('phone-close').addEventListener('click', closePhone);
 phone.addEventListener('cancel', event => {

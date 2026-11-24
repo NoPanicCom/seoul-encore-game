@@ -8,11 +8,12 @@
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../tour-icon.png">
   <link rel="apple-touch-icon" href="../tour-icon.png">
-  <link rel="stylesheet" href="./style.css?v=e8aee14544e1">
+  <link rel="stylesheet" href="./style.css?v=f15b59aea964">
+  <link rel="stylesheet" href="./city-activities.css?v=4345c7185c22">
   <title>Seoul Encore · Sofia</title>
   <script defer src="./vendor/babylon.js"></script>
   <script defer src="./vendor/babylonjs.loaders.js"></script>
-  <script type="module" src="./game-03fb46bea3ca.js"></script>
+  <script type="module" src="./game-37c78fa0b54e.js"></script>
 </head>
 <body>
   <main id="game" data-state="loading" data-area="street" data-replay="false" data-journey="false" data-venue="studio">
@@ -20,6 +21,7 @@
     <canvas id="scene" aria-label="Трёхмерная сцена Seoul Encore" data-label="sceneLabel"></canvas>
     <div class="screen-shade" aria-hidden="true"></div>
     <header class="game-header">
+      <button type="button" id="city-map-open" class="header-control" data-label="cityMap" aria-haspopup="dialog" hidden><span aria-hidden="true">⌖</span></button>
       <button type="button" id="sound" class="header-control" aria-pressed="true" aria-label="Звук включён">
         <span class="sound-glyph" aria-hidden="true">♪</span>
       </button>
@@ -50,6 +52,7 @@
       <div class="route" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       <p class="mission-area" id="area"></p>
       <h1 id="objective"></h1>
+      <p id="city-target" class="mission-route" hidden></p>
       <p id="hongdae-route" class="mission-route" data-text="hongdaeRoute" hidden></p>
     </section>
 

@@ -59,6 +59,7 @@ export function renderLobby(lang, count, total, hasReplay, resumeLabel = '', pho
     <div class="el-walks">
       <a class="el-3d" href="v2/"><img src="art/lobby/v2-concert.jpg" alt="" width="360" height="440"><span><small>YG · 3D</small><strong>${lang === 'ru' ? 'На сцену с Нари' : 'Nari’yle sahneye'}</strong></span></a>
       <a class="el-3d" href="v2/?start=hongdae"><img src="art/lobby/v2-hongdae.jpg" alt="" width="360" height="440"><span><small>HONGDAE · 3D</small><strong>${lang === 'ru' ? 'Прогулка с Пикселем' : 'Pixel’le gezintiye'}</strong></span></a>
+      <a class="el-3d el-city" href="v2/?start=city"><img src="art/lobby/v2-city.jpg" alt="" width="640" height="280"><span><small>SEOUL · 3D</small><strong>${lang === 'ru' ? 'Открыть кварталы Сеула' : 'Seul mahallelerini keşfet'}</strong></span></a>
     </div>
     <button type="button" class="el-chapter" data-act="chapter"><span class="el-chapter-copy"><strong>${lang === 'ru' ? 'Два дня в Сеуле' : 'Seul’de İki Gün'}</strong><small>${lang === 'ru' ? 'Из отеля на сцену с Нари' : 'Otelden Nari’yle sahneye'}</small></span><span class="el-chapter-arrow" aria-hidden="true">→</span></button>
     <button type="button" class="el-start" data-act="random">
