@@ -10,6 +10,11 @@ const WALK_CYCLE_METERS = .98;
 const STANCE_PHASE = .55;
 const STUDIO_Z = -10;
 const NARI_X = .86;
+const PLAZA_Z = 13;
+const ARENA_START_Z = 23.3;
+const ARENA_STAGE_Z = 27;
+const ARENA_END_Z = 30.05;
+const FOLLOW_GAP = .95;
 const TAU = Math.PI * 2;
 const MOVE_DURATION = 800;
 const DANCE_MOVES = new Set(['side', 'spin', 'heart', 'step', 'jump']);
@@ -42,14 +47,17 @@ function damping(rate, elapsed) {
 }
 
 function areaAt(z) {
+  if (z >= ARENA_START_Z) return 'arena';
+  if (z >= PLAZA_Z) return 'plaza';
   if (z > 3) return 'street';
   if (z > -4) return 'lobby';
   return 'practice';
 }
 
-function walkable(x, z) {
-  if (Math.abs(x) > 4.6 - PLAYER_RADIUS || Math.abs(z) > 13 - PLAYER_RADIUS) return false;
-  if (Math.hypot(x - NARI_X, z - STUDIO_Z) < .66) return false;
+function walkable(x, z, journey = false) {
+  const furthest = journey ? ARENA_END_Z : PLAZA_Z - PLAYER_RADIUS;
+  if (Math.abs(x) > 4.6 - PLAYER_RADIUS || z < -13 + PLAYER_RADIUS || z > furthest) return false;
+  if (!journey && Math.hypot(x - NARI_X, z - STUDIO_Z) < .66) return false;
   return Math.abs(x) <= OPENING - PLAYER_RADIUS || PORTALS.every(({ low, high }) =>
     z <= low - PLAYER_RADIUS || z >= high + PLAYER_RADIUS);
 }
@@ -58,6 +66,9 @@ const CAMERA_WALLS = [
   { min: [-6.15, 0, -14.2], max: [-5.75, 5, 3.4] },
   { min: [5.75, 0, -14.2], max: [6.15, 5, 3.4] },
   { min: [-6, 0, -14.3], max: [6, 5, -13.8] },
+  { min: [-12, 0, 30.32], max: [12, 8, 31.25] },
+  { min: [-9.5, 0, 26.2], max: [-5.93, 6, 30.6] },
+  { min: [5.93, 0, 26.2], max: [9.5, 6, 30.6] },
   ...PORTALS.flatMap(({ low, high }) => [
     { min: [-6.05, 0, low], max: [-OPENING, 5, high] },
     { min: [OPENING, 0, low], max: [6.05, 5, high] },
@@ -95,6 +106,17 @@ function cameraLimit(target, offset) {
 
 function color(B, hex) {
   return B.Color3.FromHexString(hex).toLinearSpace();
+}
+
+function addArenaLight(B, scene, actors) {
+  const position = new B.Vector3(-2.6, 4.8, 23.6);
+  const direction = new B.Vector3(0, .9, ARENA_STAGE_Z).subtract(position).normalize();
+  const spot = new B.SpotLight('Arena spotlight', position, direction, Math.PI * .49, 2, scene);
+  // Keep the shader's light list stable when the show starts or a replay opens directly on stage.
+  spot.intensity = 0;
+  spot.range = 14;
+  spot.includedOnlyMeshes = actors;
+  return spot;
 }
 
 function lightWorld(B, scene) {
@@ -176,6 +198,8 @@ async function loadActor(B, scene, file, name, x, z, shadowMaterial) {
     offsetZ: 0,
     yaw: name === 'player' ? Math.PI : 0,
     skeletonYaw: 0,
+    idlePhase: name === 'player' ? 0 : .42,
+    walkCycle: 0,
     x, z,
   };
 }
@@ -317,7 +341,13 @@ function animateActor(actor, style, time, elapsed, effort = 1) {
   actor.offsetZ += (travelZ - actor.offsetZ) * speed;
   actor.skeletonYaw = blendAngle(actor.skeletonYaw, turn, speed);
   actor.hips.position.y = actor.hipHeight + Math.min(0, actor.height);
-  actor.pivot.position.set(actor.x + actor.offsetX, Math.max(0, actor.height), actor.z + actor.offsetZ);
+  const facingX = Math.sin(actor.yaw);
+  const facingZ = Math.cos(actor.yaw);
+  actor.pivot.position.set(
+    actor.x + facingZ * actor.offsetX + facingX * actor.offsetZ,
+    Math.max(0, actor.height),
+    actor.z + facingZ * actor.offsetZ - facingX * actor.offsetX,
+  );
   actor.pivot.rotation.y = actor.yaw + actor.skeletonYaw;
   actor.shadow.position.set(actor.pivot.position.x, .016, actor.pivot.position.z);
   const spread = 1 + Math.max(0, actor.height) * .45;
@@ -351,6 +381,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
 
   const rim = lightWorld(B, scene);
   const shadow = makeShadowMaterial(B, scene);
+  const glow = new B.GlowLayer('Neon glow', scene, { mainTextureRatio: .36, blurKernelSize: 32 });
+  glow.intensity = .30;
   let player;
   let nari;
   try {
@@ -368,8 +400,6 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     for (const part of OUTFIT_PARTS) {
       if (!player.materials.has(part)) throw new Error('Sofia modelinde kostüm malzemesi eksik: ' + part);
     }
-    const glow = new B.GlowLayer('Neon glow', scene, { mainTextureRatio: .36, blurKernelSize: 32 });
-    glow.intensity = .30;
     for (const mesh of [...building.meshes, ...player.meshes]) {
       const name = mesh.material?.name;
       if (name && (NEON_MATERIAL.test(name) || name === 'Wand')) glow.addIncludedOnlyMesh(mesh);
@@ -391,19 +421,75 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   let inputX = 0;
   let inputY = 0;
   let time = 0;
-  let walkCycle = 0;
   let discoveredMovement = false;
   let orbitAdjusted = false;
   let establishing = 1;
   let currentArea = areaAt(player.z);
   let nearNari = false;
   let exploration = null;
+  let journey = null;
+  let arena = null;
+  let arenaPending = null;
   let action = null;
   let photo = false;
   let lookPreview = null;
   let viewHeight = canvas.clientHeight;
   let disposed = false;
+  const defaultWand = color(B, '#ff9acb');
+  const spotlightWhite = B.Color3.White();
+  let audienceTint = defaultWand;
   const originalOutfit = OUTFIT_PARTS.map(part => player.materials.get(part).albedoColor.clone());
+
+  async function loadArena() {
+    const model = await B.SceneLoader.LoadAssetContainerAsync(MODEL_URL, 'arena.glb', scene);
+    let spotlight;
+    try {
+      if (disposed) throw new Error('Sahne kapatıldı');
+      const neon = model.materials.find(material => material.name === 'Arena Glow');
+      const crowd = model.materials.find(material => material.name === 'Crowd Sticks');
+      if (!neon?.emissiveColor || !crowd?.emissiveColor) throw new Error('Konser sahnesinin ışık malzemeleri eksik');
+      const glowMeshes = model.meshes.filter(mesh => {
+        mesh.isPickable = false;
+        return mesh.material === neon || mesh.material === crowd || NEON_MATERIAL.test(mesh.material?.name);
+      });
+      model.addAllToScene();
+      for (const mesh of glowMeshes) glow.addIncludedOnlyMesh(mesh);
+      spotlight = addArenaLight(B, scene, [...player.meshes, ...nari.meshes]);
+      await scene.whenReadyAsync();
+      if (disposed) throw new Error('Sahne kapatıldı');
+      return {
+        neon, crowd, spotlight,
+        neonColor: neon.emissiveColor.clone(),
+        crowdColor: crowd.emissiveColor.clone(),
+        crowdPaint: crowd.albedoColor.clone(),
+        crowdIntensity: crowd.emissiveIntensity,
+      };
+    } catch (error) {
+      spotlight?.dispose();
+      model.dispose();
+      throw error;
+    }
+  }
+
+  async function prepareArena() {
+    if (disposed) throw new Error('Sahne kapatıldı');
+    if (arena) return;
+    if (!arenaPending) {
+      arenaPending = loadArena().then(loaded => { arena = loaded; }).finally(() => { arenaPending = null; });
+    }
+    await arenaPending;
+  }
+
+  function lightConcert(elapsed) {
+    const phase = elapsed * TAU / .465;
+    const pulse = .5 + .5 * Math.cos(phase);
+    arena.neonColor.scaleToRef(.89 + pulse * .30, arena.neon.emissiveColor);
+    arena.crowd.albedoColor.copyFrom(audienceTint);
+    arena.crowd.emissiveColor.copyFrom(audienceTint);
+    arena.crowd.emissiveIntensity = 1.05 + .42 * pulse;
+    arena.spotlight.intensity = .62 + .26 * pulse;
+    B.Color3.LerpToRef(spotlightWhite, audienceTint, .30, arena.spotlight.diffuse);
+  }
 
   function updateCamera(elapsed, cardCapture = false) {
     const smoothing = elapsed ? damping(13, elapsed) : 1;
@@ -411,34 +497,38 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     const portrait = aspect < .85;
     const staged = exploration !== null;
     const shortLandscape = !portrait && viewHeight <= 560;
-    const reveal = !discoveredMovement && !orbitAdjusted && !lookPreview && !staged;
+    const reveal = !journey && !discoveredMovement && !orbitAdjusted && !lookPreview && !staged;
     const opening = clamp((time - .82) / 1.60, 0, 1);
     const wideShot = reveal ? 1 - .65 * opening * opening * (3 - 2 * opening) : 0;
     establishing += (wideShot - establishing) * (elapsed ? damping(4.6, elapsed) : 1);
+    const panorama = journey && !orbitAdjusted && !lookPreview ?
+      clamp(Math.min((player.z - 12.5) / 3, (25.3 - player.z) / 3), 0, 1) : 0;
 
     camera.fov = staged ? (portrait || cardCapture ? .88 : .77) :
-      (portrait ? 1.04 + .22 * establishing : .84 + .14 * establishing);
+      (portrait ? 1.04 + .22 * establishing + .22 * panorama : .84 + .14 * establishing + .13 * panorama);
     let distance = portrait ? 4.7 : 4.45;
 
     if (staged) {
+      const stage = exploration.venue === 'arena';
+      const side = stage ? -1 : 1;
       const compactPhoto = photo && portrait && !cardCapture ? clamp((800 - viewHeight) / 120, 0, 1) : 0;
       const aimHeight = cardCapture ? .86 : photo ? (portrait ? .42 - .27 * compactPhoto : .37) : .74;
-      desiredFocus.set(shortLandscape && !cardCapture ? 1.05 : 0, aimHeight, STUDIO_Z);
-      cameraYaw = photo ? .13 : .04;
+      desiredFocus.set(shortLandscape && !cardCapture ? side * 1.05 : 0, aimHeight, stage ? ARENA_STAGE_Z : STUDIO_Z);
+      cameraYaw = (stage ? Math.PI : 0) + (photo ? .13 : .04);
       cameraPitch = photo ? .18 : .21;
       const danceWidth = photo ? 2.36 : 2.88;
       distance = Math.max(photo ? 3.95 + 1.65 * compactPhoto : 4.25,
         danceWidth / (2 * Math.tan(camera.fov / 2) * aspect));
     } else {
-      const aimHeight = lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) : 1.16 + .62 * establishing;
-      distance += (portrait ? 4.7 : 3.4) * establishing;
+      const aimHeight = lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) : 1.16 + .62 * establishing + .56 * panorama;
+      distance += (portrait ? 4.7 : 3.4) * establishing + 3.2 * panorama;
       desiredFocus.set(player.x, aimHeight, player.z);
       focus.x += (desiredFocus.x - focus.x) * smoothing;
       focus.y += (desiredFocus.y - focus.y) * smoothing;
       focus.z += (desiredFocus.z - focus.z) * smoothing;
       // At a jamb, interpolating between two valid positions can cross the corner.
-      if (!walkable(focus.x, focus.z)) focus.copyFrom(desiredFocus);
-      cameraYaw = blendAngle(cameraYaw, orbitYaw + .43 * establishing, smoothing);
+      if (!walkable(focus.x, focus.z, journey !== null)) focus.copyFrom(desiredFocus);
+      cameraYaw = blendAngle(cameraYaw, orbitYaw + .43 * establishing - .25 * panorama, smoothing);
       cameraPitch += (orbitPitch - .075 * establishing - cameraPitch) * smoothing;
     }
     if (staged) focus.copyFrom(desiredFocus);
@@ -458,7 +548,9 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   function showBoundaries() {
     const area = areaAt(player.z);
     const distance = Math.hypot(player.x - nari.x, player.z - nari.z);
-    const near = area === 'practice' && distance <= (nearNari ? 2.35 : 2.12);
+    const near = journey ? area === 'arena' && player.z >= (nearNari ? 25.45 : 25.7) &&
+      Math.abs(player.x) <= (nearNari ? 2.4 : 2.2) && distance <= 2.75 :
+      area === 'practice' && distance <= (nearNari ? 2.35 : 2.12);
     if (currentArea !== area) {
       currentArea = area;
       onArea?.(area);
@@ -469,32 +561,79 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     }
   }
 
+  function advanceActor(actor, deltaX, deltaZ, elapsed) {
+    const beforeX = actor.x;
+    const beforeZ = actor.z;
+    const steps = Math.max(1, Math.ceil(Math.hypot(deltaX, deltaZ) / .12));
+    for (let step = 0; step < steps; step++) {
+      const x = actor.x + deltaX / steps;
+      const z = actor.z + deltaZ / steps;
+      if (walkable(x, actor.z, journey !== null)) actor.x = x;
+      if (walkable(actor.x, z, journey !== null)) actor.z = z;
+    }
+    const distance = Math.hypot(actor.x - beforeX, actor.z - beforeZ);
+    if (distance > .0001) {
+      const direction = Math.atan2(actor.x - beforeX, actor.z - beforeZ);
+      actor.yaw = blendAngle(actor.yaw, direction, damping(20, elapsed));
+    }
+    return distance;
+  }
+
+  function recordTrail(distance) {
+    journey.distance += distance;
+    if (journey.distance - journey.trail.at(-1).distance < .14) return;
+    const nearDoor = PORTALS.some(({ low, high }) => player.z > low - .72 && player.z < high + .72);
+    const margin = nearDoor ? OPENING - PLAYER_RADIUS - .025 : 4.6 - PLAYER_RADIUS;
+    const x = clamp(player.x + journey.side * .78, -margin, margin);
+    journey.trail.push({ x, z: player.z, distance: journey.distance });
+  }
+
+  function followTrail(elapsed) {
+    // Use the walked route through both doorways. A direct pursuit would cut across the jambs.
+    let remaining = elapsed * WALK_SPEED * 1.18;
+    let walked = 0;
+    while (remaining > .0001 && journey.trail.length > 1) {
+      const point = journey.trail[0];
+      if (journey.distance - point.distance < FOLLOW_GAP) break;
+      const dx = point.x - nari.x;
+      const dz = point.z - nari.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance < .045) {
+        journey.trail.shift();
+        continue;
+      }
+      const stride = Math.min(distance, remaining);
+      const moved = advanceActor(nari, dx * stride / distance, dz * stride / distance, elapsed);
+      if (moved < .0001) break;
+      walked += moved;
+      remaining -= stride;
+    }
+    return walked;
+  }
+
   function move(elapsed) {
     if (!inputX && !inputY) return 0;
 
-    const beforeX = player.x;
-    const beforeZ = player.z;
     const forwardX = -Math.sin(orbitYaw);
     const forwardZ = -Math.cos(orbitYaw);
     const deltaX = (inputX * -forwardZ + inputY * forwardX) * elapsed * WALK_SPEED;
     const deltaZ = (inputX * forwardX + inputY * forwardZ) * elapsed * WALK_SPEED;
-    const steps = Math.max(1, Math.ceil(Math.hypot(deltaX, deltaZ) / .12));
-    for (let step = 0; step < steps; step++) {
-      const x = player.x + deltaX / steps;
-      const z = player.z + deltaZ / steps;
-      if (walkable(x, player.z)) player.x = x;
-      if (walkable(player.x, z)) player.z = z;
-    }
-    const moved = Math.hypot(player.x - beforeX, player.z - beforeZ);
+    const moved = advanceActor(player, deltaX, deltaZ, elapsed);
     if (moved > .0001) {
-      player.yaw = blendAngle(player.yaw, Math.atan2(player.x - beforeX, player.z - beforeZ), damping(20, elapsed));
+      if (journey) recordTrail(moved);
       if (!discoveredMovement) {
         discoveredMovement = true;
         onMove?.();
       }
-      showBoundaries();
     }
     return moved;
+  }
+
+  function animateWalk(actor, distance, elapsed) {
+    const walking = distance > .0001;
+    const effort = walking ? clamp(distance / (elapsed * WALK_SPEED), 0, 1) : 0;
+    if (walking) actor.walkCycle = (actor.walkCycle + elapsed * WALK_SPEED / WALK_CYCLE_METERS * (.5 + .5 * effort)) % 1;
+    animateActor(actor, walking ? 'walk' : 'idle', walking ? actor.walkCycle : time + actor.idlePhase, elapsed, effort);
   }
 
   function updateActors(elapsed) {
@@ -506,18 +645,18 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       const nariMove = active && action.actor !== 'sofia' ? action.move : 'idle';
       animateActor(player, photo ? 'photo' : sofiaMove, sofiaMove === 'idle' ? time : progress, elapsed);
       animateActor(nari, photo ? 'photo' : nariMove, nariMove === 'idle' ? time + .42 : progress, elapsed);
+      if (exploration.venue === 'arena') lightConcert(photo ? 0 : (active ? now - action.start : now - exploration.startedAt) / 1000);
       return;
     }
     const moved = lookPreview ? 0 : move(elapsed);
-    const walking = moved > .0001;
-    const effort = walking ? clamp(moved / (elapsed * WALK_SPEED), 0, 1) : 0;
-    if (walking) walkCycle = (walkCycle + elapsed * WALK_SPEED / WALK_CYCLE_METERS * (.5 + .5 * effort)) % 1;
+    const followed = journey && !lookPreview ? followTrail(elapsed) : 0;
+    if (moved > .0001 || followed > .0001) showBoundaries();
     if (lookPreview) player.yaw = blendAngle(player.yaw, cameraYaw, elapsed ? damping(12, elapsed) : 1);
-    if (nearNari) {
+    if (!journey && nearNari) {
       nari.yaw = blendAngle(nari.yaw, Math.atan2(player.x - nari.x, player.z - nari.z), damping(9, elapsed));
     }
-    animateActor(player, walking ? 'walk' : 'idle', walking ? walkCycle : time, elapsed, effort);
-    animateActor(nari, 'idle', time + .42, elapsed);
+    animateWalk(player, moved, elapsed);
+    animateWalk(nari, followed, elapsed);
   }
 
   function resize() {
@@ -540,23 +679,91 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     }
   }
 
-  function startDance() {
+  function startDance(venue = 'studio') {
     if (exploration) return;
+    if (venue !== 'studio' && venue !== 'arena') throw new RangeError('Dans mekânı geçersiz: ' + venue);
+    const concert = venue === 'arena';
+    if (concert && !arena) throw new Error('Konser sahnesi yüklenmedi');
     setLookPreview(false);
-    exploration = { x: player.x, z: player.z, yaw: player.yaw };
-    player.x = -.69;
-    player.z = STUDIO_Z + .02;
-    player.yaw = .05;
-    nari.x = .69;
-    nari.z = STUDIO_Z - .02;
-    nari.yaw = -.05;
+    exploration = {
+      venue,
+      startedAt: performance.now(),
+      player: { x: player.x, z: player.z, yaw: player.yaw },
+      nari: { x: nari.x, z: nari.z, yaw: nari.yaw },
+    };
+    const facing = concert ? Math.PI : 0;
+    const side = concert ? -1 : 1;
+    const centerZ = concert ? ARENA_STAGE_Z : STUDIO_Z;
+    player.x = -.69 * side;
+    player.z = centerZ + .02 * side;
+    player.yaw = facing + .05;
+    nari.x = .69 * side;
+    nari.z = centerZ - .02 * side;
+    nari.yaw = facing - .05;
     inputX = 0;
     inputY = 0;
     photo = false;
     action = null;
+    if (concert) {
+      lightConcert(0);
+    }
     animateActor(player, 'idle', time, 0);
     animateActor(nari, 'idle', time + .42, 0);
     updateCamera(0);
+    const area = areaAt(centerZ);
+    if (currentArea !== area) {
+      currentArea = area;
+      onArea?.(area);
+    }
+  }
+
+  function endDance() {
+    if (!exploration) return;
+    Object.assign(player, exploration.player);
+    Object.assign(nari, exploration.nari);
+    if (exploration.venue === 'arena') {
+      arena.spotlight.intensity = 0;
+      arena.neon.emissiveColor.copyFrom(arena.neonColor);
+      arena.crowd.emissiveColor.copyFrom(arena.crowdColor);
+      arena.crowd.albedoColor.copyFrom(arena.crowdPaint);
+      arena.crowd.emissiveIntensity = arena.crowdIntensity;
+    }
+    exploration = null;
+    action = null;
+    photo = false;
+    inputX = 0;
+    inputY = 0;
+    cameraYaw = orbitYaw;
+    cameraPitch = orbitPitch;
+    updateActors(0);
+    updateCamera(0);
+    showBoundaries();
+  }
+
+  function beginJourney() {
+    if (!arena) throw new Error('Konser sahnesi yüklenmedi');
+    if (journey) return;
+    endDance();
+    setLookPreview(false);
+    if (areaAt(player.z) !== 'practice') {
+      player.x = -.55;
+      player.z = -9.15;
+    }
+    journey = {
+      side: player.x <= nari.x ? 1 : -1,
+      distance: 0,
+      trail: [{ x: player.x, z: player.z, distance: 0 }],
+    };
+    player.yaw = 0;
+    nari.yaw = 0;
+    inputX = 0;
+    inputY = 0;
+    orbitYaw = cameraYaw = Math.PI;
+    orbitPitch = cameraPitch = .23;
+    orbitAdjusted = false;
+    updateActors(0);
+    updateCamera(0);
+    showBoundaries();
   }
 
   function poseForPhoto() {
@@ -582,6 +789,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   });
 
   return {
+    prepareArena,
+    beginJourney,
     setInput(x, y) {
       const length = Math.max(1, Math.hypot(x, y));
       inputX = x / length;
@@ -601,23 +810,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       photo = false;
       action = { move, actor, start: performance.now(), duration: clamp(durationMs, 300, 2200) };
     },
-    endDance() {
-      if (!exploration) return;
-      Object.assign(player, exploration);
-      nari.x = NARI_X;
-      nari.z = STUDIO_Z;
-      nari.yaw = Math.atan2(player.x - nari.x, player.z - nari.z);
-      exploration = null;
-      action = null;
-      photo = false;
-      inputX = 0;
-      inputY = 0;
-      cameraYaw = orbitYaw;
-      cameraPitch = orbitPitch;
-      updateActors(0);
-      updateCamera(0);
-      showBoundaries();
-    },
+    endDance,
     outfit(choice) {
       const palette = OUTFITS[choice];
       if (choice !== 'default' && !Array.isArray(palette)) throw new RangeError('Kostüm geçersiz: ' + choice);
@@ -632,11 +825,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     setLookPreview,
     setWand(hex) {
       player.wand.setEnabled(Boolean(hex));
+      audienceTint = hex ? color(B, hex) : defaultWand;
       if (hex) {
         const material = player.materials.get('Wand');
-        const tint = color(B, hex);
-        material.albedoColor = tint;
-        material.emissiveColor = tint.scale(1.35);
+        material.albedoColor = audienceTint;
+        material.emissiveColor = audienceTint.scale(1.35);
       }
     },
     poseForPhoto,

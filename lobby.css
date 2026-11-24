@@ -545,3 +545,5 @@
 .el-3d img {position:absolute; z-index:-2; right:0; top:0; width:44%; height:100%; object-fit:cover; object-position:50% 39%;}
 .el-3d::before {content:""; position:absolute; z-index:-1; inset:0; background:linear-gradient(90deg,#382547 26%,#382547ed 55%,#38254700 72%);}
 .el-3d b {position:absolute; right:8px; bottom:7px; padding:2px 6px; border-radius:8px; background:#32233fbb; font-size:14px;}
+.v2-photo[data-venue="arena"] {background:linear-gradient(110deg,#41254d,#2e1738 70%,#482338);}
+.v2-photo[data-venue="arena"] small {color:#ffe2af;}

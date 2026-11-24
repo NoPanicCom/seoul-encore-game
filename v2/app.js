@@ -1,6 +1,7 @@
-import {readDuet, saveDuet, startingLook} from './album.js';
+import {clearInvitation, readDuet, readInvitation, saveDuet, saveInvitation, startingLook} from './album.js';
 import {createWorld} from './world.js';
 import {worldAudio as audio} from '../js/world-audio.js';
+import {setStageSound, stageApplause, startStageMusic, stopStageMusic} from './stage-music.js';
 
 const phrases = {
   ru: {
@@ -8,6 +9,7 @@ const phrases = {
     exit: 'Вернуться в основную игру',
     sceneLabel: 'Трёхмерная сцена Seoul Encore',
     routeLabel: 'Маршрут к Нари',
+    arenaRouteLabel: 'Маршрут к концертной арене',
     loading: 'Сеул зажигает огни',
     loadingDescription: 'Готовим улицу и репетиционный зал…',
     retryLoad: 'Загрузить снова',
@@ -23,6 +25,17 @@ const phrases = {
     practiceObjective: 'Подойди к Нари',
     nearObjective: 'Нари ждёт тебя на танцполе',
     startDuet: 'Танцевать с Нари',
+    nari: 'Нари',
+    plaza: 'Площадь у арены',
+    arena: 'Концертная арена',
+    journeyPractice: 'Выйди из студии вместе с Нари',
+    journeyLobby: 'Через лобби — на улицу',
+    journeyStreet: 'Иди прямо к концертной арене',
+    journeyPlaza: 'Пройди через площадь к входу на арену',
+    journeyArena: 'Иди к сцене и поднимись по пандусу',
+    stageReady: 'Нари рядом. Пора на сцену!',
+    startConcert: 'Начать концерт',
+    finaleLabel: 'Финальный жест',
     joystickLabel: 'Джойстик движения',
     moveTouch: 'Движение',
     moveKeyboard: 'WASD / Стрелки',
@@ -55,15 +68,25 @@ const phrases = {
     demoCue: 'Смотри на Нари',
     play: 'Теперь вместе',
     playCue: 'Нажми, когда полоска загорится',
+    concert: 'Прямой эфир · Арена',
+    concertCue: 'Лови ритм на сцене',
     replay: 'Запись дуэта',
     replayCue: 'Смотри сохранённый танец',
+    arenaReplay: 'Запись с арены',
     hit: 'В такт!',
     early: 'Подожди, пока загорится полоска',
     wrong: 'Повтори движение, которое показывает Нари',
     miss: 'Следи за полоской на следующем шаге',
     resultKicker: 'Репетиция окончена',
+    concertKicker: 'Концерт окончен · Аплодисменты!',
     scoreLabel: 'Попадания в ритм',
     resultCopy: 'Сохрани кадр с вашим дуэтом в альбом Софии.',
+    concertCopy: 'Сохрани фотокарту с твоего первого концерта с Нари.',
+    inviteCopy: 'Хочешь станцевать со мной на концерте? Арена совсем рядом!',
+    acceptInvite: 'Пойдём на концерт',
+    resumeInvite: 'Вернуться к приглашению Нари',
+    preparingArena: 'Готовим арену…',
+    arenaError: 'Арена не загрузилась. Попробуй ещё раз.',
     replayResult: 'Этот дуэт уже в альбоме Софии.',
     saved: 'Кадр сохранён в альбом Софии.',
     savedWithoutPhoto: 'Дуэт сохранён. Для фотографии не хватило места.',
@@ -75,12 +98,14 @@ const phrases = {
     album: 'Открыть альбом',
     backToWalk: 'Вернуться в зал',
     backToStreet: 'Вернуться на улицу',
+    backToArena: 'Вернуться на арену',
   },
   tr: {
     chapter: 'Sofia’nın bölümü',
     exit: 'Ana oyuna dön',
     sceneLabel: 'Seoul Encore üç boyutlu sahnesi',
     routeLabel: 'Nari’ye giden yol',
+    arenaRouteLabel: 'Konser arenasına giden yol',
     loading: 'Seul ışıklarını yakıyor',
     loadingDescription: 'Sokak ve prova salonu hazırlanıyor…',
     retryLoad: 'Yeniden yükle',
@@ -96,6 +121,17 @@ const phrases = {
     practiceObjective: 'Nari’ye yaklaş',
     nearObjective: 'Nari seni dans pistinde bekliyor',
     startDuet: 'Nari ile dans et',
+    nari: 'Nari',
+    plaza: 'Arena meydanı',
+    arena: 'Konser arenası',
+    journeyPractice: 'Nari’yle birlikte stüdyodan çık',
+    journeyLobby: 'Lobiden geçip sokağa çık',
+    journeyStreet: 'Düz ilerleyip konser arenasına yürü',
+    journeyPlaza: 'Meydanı geçip arena girişine git',
+    journeyArena: 'Sahneye yürü ve rampadan çık',
+    stageReady: 'Nari yanında. Sahneye çıkma zamanı!',
+    startConcert: 'Konseri başlat',
+    finaleLabel: 'Final hareketi',
     joystickLabel: 'Hareket kumandası',
     moveTouch: 'Hareket',
     moveKeyboard: 'WASD / Ok tuşları',
@@ -128,15 +164,25 @@ const phrases = {
     demoCue: 'Nari’yi izle',
     play: 'Şimdi birlikte',
     playCue: 'Çubuk parladığında dokun',
+    concert: 'Canlı · Arena',
+    concertCue: 'Sahnede ritmi yakala',
     replay: 'Düet kaydı',
     replayCue: 'Kaydettiğin dansı izle',
+    arenaReplay: 'Arena kaydı',
     hit: 'Tam ritminde!',
     early: 'Çubuk parlayana kadar bekle',
     wrong: 'Nari’nin gösterdiği hareketi yap',
     miss: 'Bir sonraki adımda çubuğu takip et',
     resultKicker: 'Prova tamamlandı',
+    concertKicker: 'Konser bitti · Alkışlar!',
     scoreLabel: 'Ritmi yakaladığın vuruşlar',
     resultCopy: 'Düetinizi Sofia’nın albümüne kaydet.',
+    concertCopy: 'Nari’yle ilk konserinin fotokartını albüme kaydet.',
+    inviteCopy: 'Konserde benimle dans eder misin? Arena çok yakın!',
+    acceptInvite: 'Konsere gidelim',
+    resumeInvite: 'Nari’nin davetine dön',
+    preparingArena: 'Arena hazırlanıyor…',
+    arenaError: 'Arena yüklenemedi. Yeniden dene.',
     replayResult: 'Bu düet Sofia’nın albümünde kayıtlı.',
     saved: 'Fotokart Sofia’nın albümüne kaydedildi.',
     savedWithoutPhoto: 'Düet kaydedildi. Fotoğraf için yer kalmadı.',
@@ -148,6 +194,7 @@ const phrases = {
     album: 'Albümü aç',
     backToWalk: 'Salona dön',
     backToStreet: 'Sokağa dön',
+    backToArena: 'Arenaya dön',
   },
 };
 
@@ -156,6 +203,10 @@ const game = byId('game');
 const canvas = byId('scene');
 const joystick = byId('joystick');
 const rehearsal = byId('rehearse');
+const startConcert = byId('start-concert');
+const inviteButton = byId('invite-nari');
+const resumeButton = byId('resume-invite');
+const watchCard = byId('watch-card');
 const wardrobe = byId('wardrobe');
 const lookToggle = byId('look-toggle');
 const soundButton = byId('sound');
@@ -165,6 +216,7 @@ const saveButton = byId('save-card');
 const outfits = [...wardrobe.querySelectorAll('[data-outfit]')];
 const wandOptions = wardrobe.querySelector('.wand-select > div');
 const moveButtons = [...byId('move-buttons').querySelectorAll('[data-move]')];
+const finaleButtons = [...byId('finale-select').querySelectorAll('[data-finale]')];
 const phraseMarks = [...byId('duet-banner').querySelectorAll('.phrase i')];
 
 const moves = {
@@ -174,16 +226,15 @@ const moves = {
   heart: {icon: '♡', note: 2},
   step: {icon: '⇢', note: 0},
 };
-const rhythm = {
-  duration: 2180,
-  center: 1090,
-  tolerance: 500,
-  demoDuration: 1390,
-  demoCue: 280,
-  replayDuration: 1320,
-  replayCue: 220,
+const timings = {
+  demo: {duration: 1390, cue: 280},
+  play: {duration: 2180, cue: 1090, tolerance: 500},
+  concert: {duration: 1860, cue: 930, tolerance: 435},
+  replay: {duration: 1320, cue: 220},
 };
-const durations = {demo: rhythm.demoDuration, play: rhythm.duration, replay: rhythm.replayDuration};
+const arenaReplayTiming = {duration: timings.concert.duration, cue: 465};
+const stageBeatMs = timings.concert.duration / 4;
+const finales = new Set(finaleButtons.map(button => button.dataset.finale));
 const arrows = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 const directionKeys = new Set([...arrows, 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
 const keysHeld = new Set();
@@ -208,6 +259,13 @@ let lang = preference('encore1.lang') === 'tr' ? 'tr' : 'ru';
 let sound = preference('encore1.sound') !== 'off';
 let look = startingLook();
 look.jacket ??= true;
+const savedFinale = preference('encore.v2.finale');
+let selectedFinale = finales.has(savedFinale) ? savedFinale : 'heart';
+let invitation = readInvitation();
+let concertFinale = null;
+let arenaPending = false;
+let arenaError = false;
+let stageAudioRequested = false;
 let world;
 let state = 'loading';
 let area = 'street';
@@ -224,7 +282,12 @@ let joystickInput = {x: 0, y: 0};
 
 const words = key => phrases[lang][key];
 const setText = (id, value) => { byId(id).textContent = value; };
-const canWalk = () => state === 'walk' && wardrobe.hidden;
+const canWalk = () => state === 'walk' && wardrobe.hidden && !arenaPending;
+const journey = () => concertFinale !== null;
+const arenaRound = () => round?.venue === 'arena';
+const rhythmState = phase => phase === 'play' || phase === 'concert';
+const timing = () => state === 'replay' && arenaRound() ? arenaReplayTiming : timings[state];
+const concertPlan = () => replay && !arenaRound() ? replay : invitation;
 const albumHref = byId('album-link').getAttribute('href');
 
 function paintSaveStatus() {
@@ -234,24 +297,58 @@ function paintSaveStatus() {
   byId('result-copy').hidden = cardId !== null;
   saveButton.textContent = words(cardId ? 'savedButton' : 'save');
   saveButton.disabled = cardId !== null;
+  watchCard.hidden = cardId === null;
+  if (cardId) watchCard.href = `./#replay/${cardId}`;
 }
 
 function paintMission() {
   setText('area', words(area));
-  setText('objective', words(nearNari ? 'nearObjective' : `${area}Objective`));
-  rehearsal.hidden = !nearNari;
+  byId('mission').setAttribute('aria-label', words(journey() ? 'arenaRouteLabel' : 'routeLabel'));
+  const journeyObjective = `journey${area[0].toUpperCase()}${area.slice(1)}`;
+  const objective = journey() || area === 'arena' || area === 'plaza'
+    ? (nearNari ? 'stageReady' : journeyObjective)
+    : (nearNari ? 'nearObjective' : `${area}Objective`);
+  setText('objective', words(objective));
+  rehearsal.hidden = journey() || !nearNari;
+  startConcert.hidden = !journey() || !nearNari;
+  paintInvitation();
 }
 
 function paintResult() {
   setText('result-title', words('duet'));
-  setText('result-copy', words(replay ? 'replayResult' : 'resultCopy'));
+  setText('result-kicker', words(arenaRound() ? 'concertKicker' : 'resultKicker'));
+  setText('result-copy', words(replay ? 'replayResult' : arenaRound() ? 'concertCopy' : 'resultCopy'));
   setText('repeat-duet', words(replay ? 'watchAgain' : 'repeat'));
-  setText('return-explore', words(replay ? 'backToStreet' : 'backToWalk'));
+  const returnLabel = replay ? (arenaRound() ? 'album' : 'backToStreet') : (arenaRound() ? 'backToArena' : 'backToWalk');
+  setText('return-explore', words(returnLabel));
+  byId('return-explore').hidden = Boolean(replay) && arenaRound();
   const score = byId('result-score');
   score.hidden = Boolean(replay) || !round;
   if (round) score.textContent = `${words('scoreLabel')} · ${round.hits}/${round.moves.length}`;
   saveButton.hidden = Boolean(replay);
   paintSaveStatus();
+  paintInvitation();
+}
+
+function paintInvitation() {
+  byId('concert-invite').hidden = !concertPlan() || journey() || arenaRound();
+  resumeButton.hidden = !invitation || Boolean(replay) || journey() || area !== 'street';
+  setText('invite-nari', words(arenaPending ? 'preparingArena' : 'acceptInvite'));
+  setText('resume-invite', words(arenaPending ? 'preparingArena' : 'resumeInvite'));
+  for (const button of [inviteButton, resumeButton]) {
+    button.disabled = arenaPending;
+    button.setAttribute('aria-busy', String(arenaPending));
+  }
+  lookToggle.disabled = arenaPending;
+  for (const id of ['invite-status', 'walk-invite-status']) {
+    setText(id, arenaError ? words('arenaError') : '');
+    byId(id).hidden = !arenaError || (id === 'walk-invite-status' && resumeButton.hidden);
+  }
+}
+
+function paintFinale() {
+  byId('finale-select').hidden = journey();
+  for (const button of finaleButtons) button.setAttribute('aria-pressed', String(button.dataset.finale === selectedFinale));
 }
 
 function paintSound() {
@@ -264,12 +361,13 @@ function paintSound() {
 function paintFailure() {
   if (!failure) return;
   const missingReplay = failure === 'replay';
+  const failedArena = failure === 'arena';
   setText('failure-title', words(missingReplay ? 'replayError' : 'loadError'));
-  setText('failure-detail', words(missingReplay ? 'replayErrorDetail' : 'loadErrorDetail'));
+  setText('failure-detail', words(missingReplay ? 'replayErrorDetail' : failedArena ? 'arenaError' : 'loadErrorDetail'));
   byId('retry-load').hidden = missingReplay;
   const link = byId('error-back');
-  link.href = missingReplay ? albumHref : byId('exit-game').href;
-  link.textContent = words(missingReplay ? 'album' : 'exit');
+  link.href = missingReplay || replay ? albumHref : byId('exit-game').href;
+  link.textContent = words(missingReplay || replay ? 'album' : 'exit');
 }
 
 function paintLanguage() {
@@ -286,26 +384,27 @@ function paintLanguage() {
   languageButton.title = nextLanguage;
   paintSound();
   paintJacket();
+  paintFinale();
   paintMission();
   paintResult();
   paintFailure();
-  if (round && Object.hasOwn(durations, state)) paintCue();
+  if (round && Object.hasOwn(timings, state)) paintCue();
 }
 
 function setState(next) {
   state = next;
   game.dataset.state = next;
   const walking = next === 'walk';
-  const dancing = Object.hasOwn(durations, next);
+  const dancing = Object.hasOwn(timings, next);
   byId('startup').hidden = next !== 'loading';
   byId('failure').hidden = next !== 'error';
   byId('mission').hidden = !walking;
   byId('walk-controls').hidden = !walking;
   byId('duet-banner').hidden = !dancing;
   byId('dance-panel').hidden = !dancing;
-  byId('move-buttons').hidden = next !== 'play';
+  byId('move-buttons').hidden = !rhythmState(next);
   byId('result').hidden = next !== 'result';
-  if (next !== 'play') delete game.dataset.beat;
+  if (!rhythmState(next)) delete game.dataset.beat;
   if (!dancing) delete game.dataset.currentMove;
 }
 
@@ -356,7 +455,24 @@ function setWardrobe(open, restoreFocus = false) {
 }
 
 function playAudio() {
-  if (sound) void audio.enter();
+  if (!sound) return;
+  if (!arenaRound()) {
+    void audio.enter();
+  } else if ((state === 'concert' || state === 'replay') && !stageAudioRequested) {
+    stageAudioRequested = true;
+    const current = round;
+    void startStageMusic({beatMs: stageBeatMs}).then(started => {
+      if (!started && round === current) stageAudioRequested = false;
+    }).catch(error => {
+      if (round === current) stageAudioRequested = false;
+      console.warn('Seoul Encore concert audio could not play.', error);
+    });
+  }
+}
+
+function closeStageAudio() {
+  stopStageMusic();
+  stageAudioRequested = false;
 }
 
 function moveInput() {
@@ -411,7 +527,7 @@ function paintCue() {
   const current = sequence[index];
   game.dataset.currentMove = current;
   setText('duet-title', words('duet'));
-  setText('duet-mode', words(state));
+  setText('duet-mode', words(state === 'replay' && arenaRound() ? 'arenaReplay' : state));
   setText('cue-phase', words(state + 'Cue'));
   setText('cue-icon', moves[current].icon);
   setText('cue-title', words(current));
@@ -427,33 +543,37 @@ function paintCue() {
 }
 
 function paintBeat() {
-  const offset = round.elapsed - rhythm.center;
+  const {duration, cue, tolerance} = timing();
+  const offset = round.elapsed - cue;
   if (round.beats.has(round.index)) game.dataset.beat = 'hit';
-  else if (offset < -rhythm.tolerance) game.dataset.beat = 'early';
-  else if (offset > rhythm.tolerance) game.dataset.beat = 'late';
+  else if (offset < -tolerance) game.dataset.beat = 'early';
+  else if (offset > tolerance) game.dataset.beat = 'late';
   else game.dataset.beat = 'open';
-  const progress = Math.min(100, 100 * round.elapsed / rhythm.duration);
+  const progress = Math.min(100, 100 * round.elapsed / duration);
   byId('beat-marker').style.setProperty('--progress', `${progress}%`);
 }
 
 function announceDance(move, actor) {
   world.dance(move, actor, 920);
-  audio.note(moves[move].note);
+  if (!arenaRound()) audio.note(moves[move].note);
 }
 
-function startRound(next) {
+function startRound(next, venue = 'studio') {
   cancelAnimationFrame(frame);
   resetControls();
   setWardrobe(false);
+  closeStageAudio();
   cardId = null;
   saveStatus = '';
-  const finale = replay?.finalMove ?? 'heart';
+  const finale = replay?.finalMove ?? (venue === 'arena' ? concertFinale : selectedFinale);
   round = {
-    moves: ['side', 'jump', finale], index: 0, elapsed: 0, lastTime: null,
+    venue, moves: ['side', 'jump', finale], index: 0, elapsed: 0, lastTime: null,
     shown: false, beats: new Set(), hits: 0, feedback: '',
   };
-  world.startDance();
-  if (replay) game.dataset.area = 'practice';
+  if (venue === 'arena') audio.exit();
+  world.startDance(venue);
+  game.dataset.venue = venue;
+  if (replay) game.dataset.area = venue === 'arena' ? 'arena' : 'practice';
   game.dataset.hits = '0';
   setState(next);
   paintCue();
@@ -461,13 +581,19 @@ function startRound(next) {
 }
 
 function nextBeat() {
-  const missed = state === 'play' && !round.beats.has(round.index);
+  const missed = rhythmState(state) && !round.beats.has(round.index);
   if (++round.index === round.moves.length) {
     if (state === 'demo') {
       startRound('play');
     } else {
       world.poseForPhoto();
-      audio.cue('delivery');
+      if (arenaRound()) {
+        closeStageAudio();
+        if (sound) stageApplause();
+      } else {
+        audio.cue('delivery');
+        if (!replay) rememberInvitation({...look, finalMove: round.moves.at(-1)});
+      }
       setState('result');
       paintResult();
       byId('result').focus({preventScroll: true});
@@ -484,26 +610,26 @@ function nextBeat() {
 function tick(now) {
   if (round.lastTime !== null) round.elapsed += Math.min(125, now - round.lastTime);
   round.lastTime = now;
-  const cue = state === 'demo' ? rhythm.demoCue : state === 'play' ? rhythm.center : rhythm.replayCue;
+  const {cue, duration} = timing();
   if (!round.shown && round.elapsed >= cue) {
     round.shown = true;
-    audio.groove(round.index);
+    if (!arenaRound()) audio.groove(round.index);
     if (!round.beats.has(round.index)) {
       announceDance(round.moves[round.index], state === 'replay' ? 'both' : 'nari');
     }
   }
-  if (round.elapsed >= durations[state]) {
+  if (round.elapsed >= duration) {
     const previous = state;
     nextBeat();
     // Starting a new phase schedules its own frame.
     if (state !== previous) return;
   }
-  if (state === 'play') paintBeat();
+  if (rhythmState(state)) paintBeat();
   frame = requestAnimationFrame(tick);
 }
 
 function answer(move) {
-  if (state !== 'play' || round.beats.has(round.index)) return;
+  if (!rhythmState(state) || round.beats.has(round.index)) return;
   if (game.dataset.beat !== 'open') {
     round.feedback = game.dataset.beat === 'late' ? 'miss' : 'early';
   } else if (move !== round.moves[round.index]) {
@@ -519,22 +645,81 @@ function answer(move) {
   paintBeat();
 }
 
+function rememberInvitation(plan) {
+  const {outfit, wandColor, jacket, finalMove} = plan;
+  invitation = {outfit, wandColor, jacket: jacket ?? true, finalMove};
+  try {
+    saveInvitation(invitation);
+  } catch (error) {
+    console.warn('Seoul Encore invitation could not be saved.', error);
+  }
+}
+
+function clearReplay() {
+  if (replay) history.replaceState(null, '', location.pathname + location.search);
+  replay = null;
+  game.dataset.replay = 'false';
+}
+
+async function beginConcertWalk() {
+  const plan = concertPlan();
+  if (!plan || journey() || arenaPending || arenaRound() || (state !== 'result' && !canWalk())) return;
+  const activeWorld = world;
+  arenaError = false;
+  arenaPending = true;
+  resetControls();
+  paintInvitation();
+  try {
+    await activeWorld.prepareArena();
+    if (world !== activeWorld) return;
+
+    rememberInvitation(plan);
+    look = {outfit: plan.outfit, wandColor: plan.wandColor, jacket: plan.jacket ?? true};
+    updateLook();
+    concertFinale = plan.finalMove;
+    nearNari = false;
+    activeWorld.beginJourney();
+    clearReplay();
+    round = null;
+    game.dataset.journey = 'true';
+    game.dataset.venue = 'arena';
+    paintFinale();
+    setState('walk');
+    paintMission();
+    lookToggle.focus({preventScroll: true});
+    audio.cue('spotlight');
+  } catch (error) {
+    concertFinale = null;
+    arenaError = true;
+    console.warn('Seoul Encore concert venue could not load.', error);
+  } finally {
+    arenaPending = false;
+    paintInvitation();
+  }
+}
+
 function backToWalk() {
+  if (arenaPending) return;
   cancelAnimationFrame(frame);
+  closeStageAudio();
+  if (replay && arenaRound()) {
+    location.assign(albumHref);
+    return;
+  }
   if (replay) {
-    history.replaceState(null, '', location.pathname + location.search);
     look = startingLook();
     look.jacket ??= true;
     updateLook();
   }
-  replay = null;
+  clearReplay();
   round = null;
-  game.dataset.replay = 'false';
   game.dataset.area = area;
+  game.dataset.venue = journey() ? 'arena' : 'studio';
   world.endDance();
   setState('walk');
   paintMission();
-  (nearNari ? rehearsal : lookToggle).focus({preventScroll: true});
+  (nearNari ? (journey() ? startConcert : rehearsal) : lookToggle).focus({preventScroll: true});
+  playAudio();
 }
 
 function saveCard() {
@@ -542,9 +727,18 @@ function saveCard() {
   try {
     const photo = world.capturePhoto();
     if (!/^data:image\/(?:webp|jpeg);base64,/.test(photo)) throw new Error('Photo capture returned an unsupported image');
-    cardId = saveDuet({...look, finalMove: round.moves.at(-1), photo});
+    cardId = saveDuet({...look, finalMove: round.moves.at(-1), venue: round.venue, photo});
     saveStatus = readDuet(cardId)?.photo ? 'saved' : 'savedWithoutPhoto';
-    audio.cue('spotlight');
+    if (arenaRound() && saveStatus === 'saved') {
+      invitation = null;
+      try {
+        clearInvitation();
+      } catch (error) {
+        console.warn('Seoul Encore invitation could not be cleared.', error);
+      }
+    } else if (!arenaRound()) {
+      audio.cue('spotlight');
+    }
   } catch (error) {
     console.warn('Seoul Encore photo could not be saved.', error);
     saveStatus = 'saveError';
@@ -555,6 +749,7 @@ function saveCard() {
 function showFailure(kind, error) {
   cancelAnimationFrame(frame);
   resetControls();
+  closeStageAudio();
   audio.exit();
   world?.dispose();
   world = undefined;
@@ -595,8 +790,11 @@ async function load() {
       },
     });
     updateLook();
-    if (replay) startRound('replay');
-    else {
+    if (replay) {
+      if (replay.venue === 'arena') await world.prepareArena().catch(error => showFailure('arena', error));
+      if (!world) return;
+      startRound('replay', replay.venue ?? 'studio');
+    } else {
       setState('walk');
       paintMission();
     }
@@ -646,7 +844,7 @@ document.addEventListener('keydown', event => {
   if (event.altKey || event.ctrlKey || event.metaKey || editing) return;
   if (event.code === 'Escape') {
     if (!wardrobe.hidden) setWardrobe(false, true);
-    else if (state === 'result' || Object.hasOwn(durations, state)) backToWalk();
+    else if (state === 'result' || Object.hasOwn(timings, state)) backToWalk();
     return;
   }
   if (canWalk() && directionKeys.has(event.code)) {
@@ -658,9 +856,8 @@ document.addEventListener('keydown', event => {
     event.preventDefault();
     world.orbit(event.code === 'KeyQ' ? 15 : -15, 0);
   } else if (canWalk() && nearNari && event.code === 'KeyF' && !event.repeat) {
-    playAudio();
-    startRound('demo');
-  } else if (state === 'play' && !event.repeat) {
+    enterPerformance();
+  } else if (rhythmState(state) && !event.repeat) {
     const index = /^(?:Digit|Numpad)([1-5])$/.exec(event.code);
     if (index) {
       event.preventDefault();
@@ -677,6 +874,7 @@ window.addEventListener('hashchange', () => location.reload());
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
   resetControls();
+  if (arenaRound()) closeStageAudio();
   if (round) round.lastTime = null;
 });
 
@@ -689,6 +887,14 @@ jacketButton.addEventListener('click', () => {
   audio.cue('step');
 });
 wardrobe.addEventListener('click', event => {
+  const finale = event.target.closest('[data-finale]');
+  if (finale) {
+    selectedFinale = finale.dataset.finale;
+    storePreference('encore.v2.finale', selectedFinale);
+    paintFinale();
+    audio.cue('step');
+    return;
+  }
   const button = event.target.closest('[data-outfit], [data-wand]');
   if (!button) return;
   if (button.dataset.outfit) {
@@ -701,20 +907,27 @@ wardrobe.addEventListener('click', event => {
   updateLook();
   audio.cue('step');
 });
-rehearsal.addEventListener('click', () => {
-  if (canWalk() && nearNari) {
-    playAudio();
-    startRound('demo');
-  }
-});
+function enterPerformance() {
+  if (!canWalk() || !nearNari) return;
+  if (journey()) startRound('concert', 'arena');
+  else startRound('demo');
+  playAudio();
+}
+
+rehearsal.addEventListener('click', enterPerformance);
+startConcert.addEventListener('click', enterPerformance);
+inviteButton.addEventListener('click', () => void beginConcertWalk());
+resumeButton.addEventListener('click', () => void beginConcertWalk());
 for (const button of moveButtons) button.addEventListener('click', () => {
   playAudio();
   answer(button.dataset.move);
 });
 byId('stop-duet').addEventListener('click', backToWalk);
 byId('repeat-duet').addEventListener('click', () => {
+  if (arenaPending) return;
+  const venue = round.venue;
+  startRound(replay ? 'replay' : venue === 'arena' ? 'concert' : 'demo', venue);
   playAudio();
-  startRound(replay ? 'replay' : 'demo');
 });
 byId('return-explore').addEventListener('click', backToWalk);
 saveButton.addEventListener('click', saveCard);
@@ -729,10 +942,13 @@ soundButton.addEventListener('click', () => {
   sound = !sound;
   storePreference('encore1.sound', sound ? 'on' : 'off');
   audio.setEnabled(sound);
+  setStageSound(sound);
+  if (!sound) stageAudioRequested = false;
   paintSound();
   playAudio();
 });
 
 audio.setEnabled(sound);
+setStageSound(sound);
 paintLanguage();
 void load();

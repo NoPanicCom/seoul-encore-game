@@ -8,14 +8,14 @@
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../tour-icon.png">
   <link rel="apple-touch-icon" href="../tour-icon.png">
-  <link rel="stylesheet" href="./style.css?v=3075bbdc2242">
+  <link rel="stylesheet" href="./style.css?v=663dbb7088d5">
   <title>Seoul Encore · Sofia</title>
   <script defer src="./vendor/babylon.js"></script>
   <script defer src="./vendor/babylonjs.loaders.js"></script>
-  <script type="module" src="./game-f65ea6fb75b4.js"></script>
+  <script type="module" src="./game-3383cd562a54.js"></script>
 </head>
 <body>
-  <main id="game" data-state="loading" data-area="street" data-replay="false">
+  <main id="game" data-state="loading" data-area="street" data-replay="false" data-journey="false" data-venue="studio">
     <div class="loading-backdrop"></div>
     <canvas id="scene" aria-label="Трёхмерная сцена Seoul Encore" data-label="sceneLabel"></canvas>
     <div class="screen-shade" aria-hidden="true"></div>
@@ -38,7 +38,7 @@
     </header>
 
     <section id="mission" class="mission" aria-label="Маршрут" data-label="routeLabel" aria-live="polite" hidden>
-      <div class="route" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="route" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       <p class="mission-area" id="area"></p>
       <h1 id="objective"></h1>
     </section>
@@ -75,6 +75,9 @@
       </div>
       <div class="walk-actions">
         <button id="rehearse" type="button" class="primary" hidden><span data-text="startDuet">Танцевать с Нари</span><span aria-hidden="true">↗</span></button>
+        <button id="resume-invite" type="button" class="primary" hidden></button>
+        <button id="start-concert" type="button" class="primary" hidden><span data-text="startConcert">Начать концерт</span><span aria-hidden="true">♪</span></button>
+        <p id="walk-invite-status" class="walk-status" role="status" hidden></p>
         <button id="look-toggle" type="button" class="secondary" aria-controls="wardrobe" aria-expanded="false"><span aria-hidden="true">✦</span><span data-text="look">Образ</span></button>
         <p class="touch-hint" data-text="cameraTouch">Свайп по сцене — камера</p>
         <p class="keyboard-hint" data-text="cameraKeyboard">Потяни сцену или нажми Q / E</p>
@@ -100,6 +103,14 @@
           <button type="button" data-wand="#9e8aff" style="--swatch:#9e8aff" data-label="wandViolet" aria-label="Лиловый" aria-pressed="false"></button>
           <button type="button" data-wand="#71ddff" style="--swatch:#71ddff" data-label="wandBlue" aria-label="Голубой" aria-pressed="false"></button>
           <button type="button" data-wand="#fff2ca" style="--swatch:#fff2ca" data-label="wandGold" aria-label="Тёплый белый" aria-pressed="false"></button>
+        </div>
+      </div>
+      <div id="finale-select" class="finale-select" role="group" aria-label="Финальный жест" data-label="finaleLabel">
+        <span data-text="finaleLabel">Финальный жест</span>
+        <div>
+          <button type="button" data-finale="spin" aria-pressed="false"><span aria-hidden="true">↻</span> <span data-text="spin">Поворот</span></button>
+          <button type="button" data-finale="heart" aria-pressed="true"><span aria-hidden="true">♡</span> <span data-text="heart">Сердце</span></button>
+          <button type="button" data-finale="step" aria-pressed="false"><span aria-hidden="true">⇢</span> <span data-text="step">Шаг</span></button>
         </div>
       </div>
     </section>
@@ -131,9 +142,16 @@
       <p class="result-kicker"><span aria-hidden="true">✦</span> <span id="result-kicker" data-text="resultKicker">Репетиция окончена</span></p>
       <h2 id="result-title">София × Нари</h2>
       <p id="result-score" class="result-score" hidden></p>
+      <div id="concert-invite" class="concert-invite" hidden>
+        <p class="invite-speaker" data-text="nari">Нари</p>
+        <p data-text="inviteCopy">Хочешь станцевать со мной на концерте? Арена совсем рядом!</p>
+        <button id="invite-nari" type="button" class="secondary"></button>
+        <p id="invite-status" class="invite-status" role="status" hidden></p>
+      </div>
       <p id="result-copy" data-text="resultCopy">Сохрани кадр с вашим дуэтом в альбом Софии.</p>
       <button id="save-card" type="button" class="primary" data-text="save">Сохранить фотокарту</button>
       <p id="save-status" class="save-status" role="status" hidden></p>
+      <a id="watch-card" class="secondary" data-text="watchAgain" hidden>Смотреть снова</a>
       <div class="result-actions">
         <button id="repeat-duet" type="button" class="secondary" data-text="repeat">Танцевать снова</button>
         <a id="album-link" class="secondary" href="../?v=kulisa#chapter-album/sofia" data-text="album">Открыть альбом</a>

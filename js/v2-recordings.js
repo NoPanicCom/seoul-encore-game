@@ -1,5 +1,6 @@
 import { stickColor, stickId } from './lightstick.js';
 const prefix = 'encore.v2.duet.';
+const invitationKey = 'encore.v2.nari-invitation';
 const validId = (id) => /^[a-z0-9]{8,48}$/.test(id);
 const hex = (v) => typeof v === 'string' && /^#[a-f0-9]{6}$/i.test(v);
 const outfit = (v) => v === 'rose' || v === 'midnight';
@@ -9,6 +10,7 @@ function isDuet(value) {
         return false;
     const card = value;
     return outfit(card.outfit) && hex(card.wandColor) && ['heart', 'step', 'spin'].some(move => move === card.finalMove)
+        && (card.venue === undefined || card.venue === 'studio' || card.venue === 'arena')
         && (card.jacket === undefined || typeof card.jacket === 'boolean')
         && (card.photo === undefined || validPhoto(card.photo));
 }
@@ -23,10 +25,46 @@ export function startingLook() {
         return { outfit: 'rose', wandColor: '#ff91ba' };
     }
 }
-export function saveDuet(input) {
-    const card = { outfit: input.outfit, wandColor: input.wandColor, finalMove: input.finalMove };
+function danceChoices(input) {
+    const choices = { outfit: input.outfit, wandColor: input.wandColor, finalMove: input.finalMove };
     if (input.jacket !== undefined)
-        card.jacket = input.jacket;
+        choices.jacket = input.jacket;
+    return choices;
+}
+export function saveInvitation(input) {
+    const invitation = danceChoices(input);
+    if (!isDuet(invitation))
+        throw new Error('Invalid invitation');
+    try {
+        localStorage.setItem(invitationKey, JSON.stringify(invitation));
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+export function readInvitation() {
+    try {
+        const raw = localStorage.getItem(invitationKey);
+        if (!raw)
+            return null;
+        const parsed = JSON.parse(raw);
+        return isDuet(parsed) ? danceChoices(parsed) : null;
+    }
+    catch {
+        return null;
+    }
+}
+export function clearInvitation() {
+    try {
+        localStorage.removeItem(invitationKey);
+    }
+    catch { /* Storage can be disabled for this session. */ }
+}
+export function saveDuet(input) {
+    const card = danceChoices(input);
+    if (input.venue !== undefined)
+        card.venue = input.venue;
     if (validPhoto(input.photo))
         card.photo = input.photo;
     if (!isDuet(card))
@@ -80,8 +118,11 @@ export function v2Album(lang) {
         const card = readDuet(id);
         if (!card)
             return '';
-        const title = lang === 'ru' ? 'София и Нари · Студия YG' : 'Sofia ve Nari · YG Stüdyosu';
+        const concert = card.venue === 'arena';
+        const title = concert ? (lang === 'ru' ? 'Первая сцена с Нари' : 'Nari’yle ilk sahne') : (lang === 'ru' ? 'София и Нари · Студия YG' : 'Sofia ve Nari · YG Stüdyosu');
+        const location = concert ? 'SEOUL LIVE' : 'YG STUDIO';
+        const poster = concert ? 'art/lobby/v2-concert.jpg' : 'art/lobby/v2-duet.jpg';
         const finale = lang === 'ru' ? { heart: 'Сердце', spin: 'Поворот', step: 'Шаг' } : { heart: 'Kalp', spin: 'Dönüş', step: 'Adım' };
-        return `<a class="v2-photo" href="v2/#replay/${id}" style="--v2-wand:${card.wandColor}"><img loading="lazy" alt="" src="${card.photo ?? 'art/lobby/v2-duet.jpg'}"><span><small>YG STUDIO · 3D</small><strong>${title}</strong><em>${finale[card.finalMove]} · ${lang === 'ru' ? 'Смотреть танец' : 'Dansı izle'} ▷</em></span></a>`;
+        return `<a class="v2-photo" data-venue="${concert ? 'arena' : 'studio'}" href="v2/#replay/${id}" style="--v2-wand:${card.wandColor}"><img loading="lazy" alt="" src="${card.photo ?? poster}"><span><small>${location} · 3D</small><strong>${title}</strong><em>${finale[card.finalMove]} · ${lang === 'ru' ? 'Смотреть танец' : 'Dansı izle'} ▷</em></span></a>`;
     }).join('');
 }
