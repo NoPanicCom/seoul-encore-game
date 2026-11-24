@@ -240,3 +240,27 @@
 .sumi-berry::before { position: absolute; inset: -16% 6% auto; height: 33%; border-radius: 80% 30%; background: #85bb6e; content: ""; }
 .sumi-saucer { position: absolute; z-index: 0; inset: auto 13% 10%; height: 10%; border-radius: 50%; background: #d292ba78; }
 .sumi-glass:is([data-fill="tray"], [data-fill="delivered"]) :is(.sumi-straw, .sumi-berry) { display: block; }
+
+.sumi-glass[data-recipe="chocolate"] { background: radial-gradient(ellipse at center, #c58b604a, #211524 79%); }
+.sumi-glass[data-recipe="chocolate"] .sumi-puree { background: linear-gradient(#926047, #52302d); }
+.sumi-glass[data-recipe="chocolate"][data-fill="ice"] .sumi-puree { height: 26%; }
+.sumi-glass[data-recipe="chocolate"][data-fill="ice"] .sumi-milk { height: 82%; }
+.sumi-glass[data-recipe="chocolate"][data-stirs="1"] .sumi-puree { background: linear-gradient(168deg, #e6bc93, #895540); }
+.sumi-glass[data-recipe="chocolate"][data-stirs="2"] .sumi-puree { background: linear-gradient(164deg, #d2a27e, #8a5743); }
+.sumi-glass[data-recipe="chocolate"]:is([data-fill="tray"], [data-fill="delivered"]) .sumi-milk {
+  background: linear-gradient(#d4a683 4%, #a37557 44%, #724637 94%);
+}
+.sumi-ice {
+  display: none;
+  position: absolute;
+  z-index: 3;
+  top: 18%;
+  width: 26%;
+  aspect-ratio: 1;
+  border: 1px solid #fff7edcc;
+  border-radius: 2px;
+  background: linear-gradient(145deg, #fceeeef0, #baaed96b);
+}
+.sumi-ice-left { left: 25%; transform: rotate(-18deg); }
+.sumi-ice-right { left: 53%; top: 25%; transform: rotate(21deg); }
+.sumi-glass[data-recipe="chocolate"]:is([data-fill="stir"], [data-fill="tray"], [data-fill="delivered"]) .sumi-ice { display: block; }

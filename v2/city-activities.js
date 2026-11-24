@@ -1,5 +1,5 @@
 import {CITY_BOUNDS, CITY_BUILDINGS, CITY_ROADS, CITY_TYPES, SUMI_CAFE_ID} from './city-grid.js';
-import {createSumiOrder, SUMI_ORDER_TITLE, SUMI_PREPARATION_STAMP, SUMI_STAMP} from './sumi-order.js';
+import {createSumiOrder, SUMI_ORDER_TITLES, SUMI_PREPARATION_STAMP, SUMI_STAMP} from './sumi-order.js';
 
 const pair = (ru, tr) => ({ru, tr});
 const activity = (mechanic, icon, title, instruction, reward, data) =>
@@ -559,8 +559,9 @@ export function createCityActivities({
     }
   });
 
-  function openSumi(place, phase) {
-    if (!sumiSession) {
+  function openSumi(place, phase, recipe) {
+    if (!Object.hasOwn(SUMI_ORDER_TITLES, recipe)) throw new RangeError('Invalid Sumi recipe');
+    if (sumiSession?.recipe !== recipe) {
       let completed = false;
       try {
         completed = localStorage.getItem(stampKey + '.' + place.id) === SUMI_STAMP;
@@ -568,7 +569,7 @@ export function createCityActivities({
         console.warn('Seoul Encore Sumi order could not be read.', error);
       }
       sumiSession = createSumiOrder({
-        locale, element, button, completed, initialPhase: phase,
+        locale, element, button, completed, recipe, initialPhase: phase,
         onAction: onSumiAction,
         onAccept: onSumiAccept,
         onPickup: onSumiPickup,
@@ -582,14 +583,14 @@ export function createCityActivities({
       });
     }
     sumiSession.sync(phase);
-    round = {building: place, theme: {title: SUMI_ORDER_TITLE}, sumi: sumiSession};
+    round = {building: place, theme: {title: SUMI_ORDER_TITLES[recipe]}, sumi: sumiSession};
     open('activity');
   }
 
-  function finishSumiDelivery(building) {
+  function finishSumiDelivery(building, recipe = 'strawberry') {
     const place = known.get(building?.id);
     if (place?.id !== SUMI_CAFE_ID) throw new RangeError('Unknown Sumi delivery building');
-    openSumi(place, 'delivered');
+    openSumi(place, 'delivered', recipe);
     sumiSession.deliver();
   }
 
@@ -598,13 +599,13 @@ export function createCityActivities({
     return sumiSession?.callNext() ?? false;
   }
 
-  function play(building, phase = 'ordering') {
+  function play(building, phase = 'ordering', recipe = 'strawberry') {
     const place = known.get(building?.id);
     if (place?.id === SUMI_CAFE_ID) {
       if (phase === 'delivered') {
-        finishSumiDelivery(place);
+        finishSumiDelivery(place, recipe);
       } else {
-        openSumi(place, phase);
+        openSumi(place, phase, recipe);
         sumiSession.resume();
         renderActivity();
       }

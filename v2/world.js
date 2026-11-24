@@ -3,6 +3,7 @@ import {
   districtWalkable, DISTRICT_X, HONGDAE_CAMERA_WALLS, HONGDAE_CITY_GATE, HONGDAE_ENTRY, YG_CITY_GATE, YG_GATE,
 } from './hongdae-world.js';
 import { createLightstick, createPixel, HONGDAE_LIGHTSTICKS } from './hongdae-props.js';
+import { sumiRecipeForVisitor } from './sumi-menu.js';
 
 import { createStreetStage } from './street-stage.js';
 
@@ -1065,7 +1066,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       roomVisit.sumiElapsed += elapsed;
       advanceSumiDelivery(elapsed);
       const paidAtCounter = sumiOrder === 'paying' && roomVisit.model.sumiDelivery.state === 'paying';
-      roomVisit.model.updateSumi(elapsed, paidAtCounter ? 'serve' : roomVisit.sumiAction);
+      roomVisit.model.updateSumi(elapsed, paidAtCounter ? 'serve' : roomVisit.sumiAction, sumiRecipe());
     }
     if (cityVisit && !roomVisit) {
       const x = player.x - CITY_X;
@@ -1359,6 +1360,10 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
 
   function sumiDeliveryState() {
     return roomVisit?.sumi ? sumiOrder : null;
+  }
+
+  function sumiRecipe() {
+    return sumiRecipeForVisitor(Number(sumiGuestId.slice('sumi-guest-'.length)));
   }
 
   function reportSumiState() {
@@ -1691,6 +1696,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     faceCityDoor,
     setSumiAction,
     sumiDeliveryState,
+    sumiRecipe,
     acceptSumiOrder,
     pickupSumiDrink,
     deliverSumiDrink,

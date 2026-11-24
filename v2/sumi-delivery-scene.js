@@ -1,4 +1,5 @@
 import {createSumiGuest} from './city-pedestrians.js';
+import {sumiRecipeForVisitor} from './sumi-menu.js';
 import {createPaymentProps, createSumiDrink, createSumiMaterials, createTableMarks} from './sumi-service-props.js';
 
 export const SUMI_DELIVERY_LAYOUT = Object.freeze({
@@ -55,6 +56,7 @@ export function createSumiDelivery(B, scene, parent, walkable) {
   const localMouth = new B.Vector3();
   const inverse = B.Matrix.Identity();
   let visitorId = 'sumi-guest-1';
+  let recipe = sumiRecipeForVisitor(1);
   let guest = instantiateGuest(visitorId);
   let phase = 'idle';
   let path = [];
@@ -75,8 +77,8 @@ export function createSumiDelivery(B, scene, parent, walkable) {
     return result;
   }
 
-  function drinkProp(name, onTray, empty = false) {
-    const drink = createSumiDrink(B, scene, parent, props, name, onTray);
+  function drinkProp(name, empty = false, flavor = recipe) {
+    const drink = createSumiDrink(B, scene, parent, props, name, true, flavor);
     if (empty) drink.setFill(0);
     drinks.add(drink.root);
     return {
@@ -87,16 +89,28 @@ export function createSumiDelivery(B, scene, parent, walkable) {
     };
   }
 
-  const placed = drinkProp('Sumi table strawberry milk', true);
-  placed.root.position.set(table.x + .185, table.y, table.z + .066);
-  placed.root.rotation.y = -.23;
-  placed.glassRoot.name = 'Sumi drinking glass';
-  placed.glassRoot.metadata = {fill: 1};
-  const returned = drinkProp('Sumi returned empty glass', true, true);
-  returned.root.position.set(.71, .965, -2.393);
-  returned.root.rotation.y = .42;
+  function createServiceSet(flavor) {
+    const placed = drinkProp('Sumi table strawberry milk', false, flavor);
+    placed.root.position.set(table.x + .185, table.y, table.z + .066);
+    placed.root.rotation.y = -.23;
+    placed.glassRoot.name = 'Sumi drinking glass';
+    const returned = drinkProp('Sumi returned empty glass', true, flavor);
+    returned.root.position.set(.71, .965, -2.393);
+    returned.root.rotation.y = .42;
+    const tableMarks = createTableMarks(B, scene, parent, props, table, flavor);
+    return {
+      placed, returned, tableMarks,
+      dispose() {
+        placed.dispose();
+        returned.dispose();
+        tableMarks.dirty.dispose();
+        tableMarks.cloth.dispose();
+      },
+    };
+  }
+
+  let service = createServiceSet(recipe);
   const payment = createPaymentProps(B, scene, parent, props);
-  const tableMarks = createTableMarks(B, scene, parent, props, table);
 
   function status(action) {
     if (state !== action) {
@@ -346,6 +360,7 @@ export function createSumiDelivery(B, scene, parent, walkable) {
   }
 
   function positionCup() {
+    const {placed, returned} = service;
     placed.root.setEnabled(CUP_ON_TABLE.has(phase));
     returned.root.setEnabled(RETURNED.has(phase));
     const glass = placed.glassRoot;
@@ -365,7 +380,6 @@ export function createSumiDelivery(B, scene, parent, walkable) {
       glass.rotation.x = 0;
     }
     placed.setFill(amount);
-    glass.metadata.fill = amount;
   }
 
   function positionPayment() {
@@ -381,6 +395,7 @@ export function createSumiDelivery(B, scene, parent, walkable) {
   }
 
   function refreshTable() {
+    const {tableMarks} = service;
     const dirty = (DRAINED.has(phase) || state === 'drunk') && state !== 'clean';
     const cleaning = state === 'wiping';
     const {patches, napkin, cloth} = tableMarks;
@@ -450,22 +465,28 @@ export function createSumiDelivery(B, scene, parent, walkable) {
     restore,
     setVisitorId(id) {
       if (id === visitorId) return;
+      const nextRecipe = sumiRecipeForVisitor(Number(/^sumi-guest-([1-9]\d*)$/.exec(id)?.[1]));
       const replacement = instantiateGuest(id);
+      if (nextRecipe !== recipe) {
+        const replacementSet = createServiceSet(nextRecipe);
+        service.dispose();
+        service = replacementSet;
+        recipe = nextRecipe;
+      }
       guest.dispose();
       guest = replacement;
       visitorId = id;
       restore('idle');
     },
-    createDrink: (name = 'Sumi strawberry milk') => drinkProp(name,true),
-    createEmptyDrink: (name = 'Sumi empty glass') => drinkProp(name,true,true),
+    createDrink: (name = recipe === 'chocolate' ? 'Sumi iced chocolate' : 'Sumi strawberry milk') => drinkProp(name),
+    createEmptyDrink: (name = 'Sumi empty glass') => drinkProp(name,true),
     dispose() {
       guest.dispose();
+      service.dispose();
       for (const root of drinks) if (!root.isDisposed()) root.dispose();
       drinks.clear();
       payment.terminal.dispose();
       payment.card.dispose();
-      tableMarks.dirty.dispose();
-      tableMarks.cloth.dispose();
       props.dispose();
     },
   };

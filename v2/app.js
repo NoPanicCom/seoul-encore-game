@@ -27,7 +27,9 @@ const phrases = {
     sumiCarrying: 'Неси поднос к столику с клубникой',
     sumiDelivered: 'Гость получил клубничное молоко',
     sumiDrinking: 'Гость пробует клубничное молоко',
-    sumiPaying: 'Гость идёт платить за молоко',
+    chocolateDelivered: 'Гость получил шоколад со льдом',
+    chocolateDrinking: 'Гость пробует холодный шоколад',
+    sumiPaying: 'Гость идёт к кассе',
     sumiLeaving: 'Гость уходит. Можно выйти следом',
     sumiDirty: 'Забери пустой стакан со столика',
     sumiClearing: 'Отнеси пустой стакан на стойку',
@@ -217,6 +219,8 @@ const phrases = {
     sumiCarrying: 'Tepsiyi çilek işaretli masaya götür',
     sumiDelivered: 'Çilekli süt müşteriye ulaştı',
     sumiDrinking: 'Müşteri çilekli sütünü içiyor',
+    chocolateDelivered: 'Buzlu çikolata müşteriye ulaştı',
+    chocolateDrinking: 'Müşteri buzlu çikolatasını içiyor',
     sumiPaying: 'Müşteri ödeme için kasaya gidiyor',
     sumiLeaving: 'Müşteri çıkıyor. Peşinden yürüyebilirsin',
     sumiDirty: 'Masadaki boş bardağı al',
@@ -669,7 +673,9 @@ function paintMission() {
   const sumiPhase=area==='interior' && building?.id===SUMI_CAFE_ID ? world?.sumiDeliveryState() : null;
   if (sumiPhase) {
     game.dataset.sumiDelivery=sumiPhase;
-    objectiveText=words(sumiObjectives[sumiPhase]);
+    const chocolateHint = world.sumiRecipe() === 'chocolate' &&
+      ({delivered:'chocolateDelivered', drinking:'chocolateDrinking'})[sumiPhase];
+    objectiveText=words(chocolateHint || sumiObjectives[sumiPhase]);
   } else delete game.dataset.sumiDelivery;
   setText('objective',objectiveText);
   rehearsal.hidden = journey() || !nearNari || inHongdae() || Boolean(context);
@@ -1217,15 +1223,15 @@ async function actInCity() {
     const phase = world.sumiDeliveryState();
     const control = sumiControl(phase, atTable);
     if (!control) return;
-    if (phase === 'ordering' || phase === 'preparing') cityUi.play(building, phase);
+    if (phase === 'ordering' || phase === 'preparing') cityUi.play(building, phase, world.sumiRecipe());
     else if (phase === 'carrying' && world.deliverSumiDrink()) {
       audio.cue('delivery');
-      cityUi.finishSumiDelivery(building);
+      cityUi.finishSumiDelivery(building, world.sumiRecipe());
     } else if (phase === 'dirty' && world.collectSumiCup()) audio.cue('glass');
     else if (phase === 'clearing' && world.returnSumiCup()) audio.cue('glass');
     else if (phase === 'wiping' && world.resetSumiTable()) audio.cue('cloth');
     else if (phase === 'ready') {
-      if (cityUi.sumiDeliveryNeedsSave()) cityUi.play(building, 'delivered');
+      if (cityUi.sumiDeliveryNeedsSave()) cityUi.play(building, 'delivered', world.sumiRecipe());
       else cityUi.callNextSumi(building);
     }
     return;

@@ -41,7 +41,7 @@ function batch(B, scene, root, material) {
 }
 
 export function createSumiMaterials(B, scene) {
-  const solid = new B.StandardMaterial('Sumi strawberry service', scene);
+  const solid = new B.StandardMaterial('Sumi service details', scene);
   solid.diffuseColor = B.Color3.White();
   solid.specularColor.set(.13, .085, .10);
   const glass = new B.StandardMaterial('Sumi clear glass', scene);
@@ -61,10 +61,26 @@ export function createSumiMaterials(B, scene) {
 }
 
 const GLASS_CENTER = Object.freeze({x: .021, y: .040, z: -.013});
+const FLAVORS = {
+  strawberry: {
+    layers: ['#ce8295','#e8a7b6','#f2ced9'],
+    residue: ['#d997a6','#e6afbc'],
+    stains: ['#d78f98','#efc4b4','#cd9490'],
+  },
+  chocolate: {
+    layers: ['#714637','#7a4b38','#8e5c44'],
+    residue: ['#9f6246','#bd8763'],
+    stains: ['#ae7150','#d9a77d','#b67f62'],
+  },
+};
 
-export function createSumiDrink(B, scene, parent, materials, name, onTray) {
+export function createSumiDrink(B, scene, parent, materials, name, onTray, recipe) {
+  const flavor = FLAVORS[recipe];
+  const iced = recipe === 'chocolate';
   const root = node(B, scene, parent, name);
   const glassRoot = onTray ? node(B, scene, root, name + ' glass') : root;
+  root.metadata = {recipe};
+  glassRoot.metadata = {recipe, fill: 1};
   if (onTray) {
     glassRoot.position.set(GLASS_CENTER.x, GLASS_CENTER.y, GLASS_CENTER.z);
     const tray = batch(B, scene, root, materials.solid);
@@ -89,28 +105,37 @@ export function createSumiDrink(B, scene, parent, materials, name, onTray) {
   const milk = node(B, scene, glassRoot, name + ' milk level');
   milk.position.y = .012;
   const layers = batch(B, scene, milk, materials.solid);
-  layers.disk('#ce8295',0,.024,0,.105,.048,.105);
-  layers.disk('#e8a7b6',0,.067,0,.114,.043,.114);
-  layers.disk('#f2ced9',0,.100,0,.119,.028,.119);
+  layers.disk(flavor.layers[0],0,.024,0,.097,.048,.097);
+  layers.disk(flavor.layers[1],0,.067,0,.104,.043,.104);
+  layers.disk(flavor.layers[2],0,.100,0,.112,.028,.112);
   layers.finish();
-  const foam = node(B, scene, glassRoot, name + ' foam');
-  const top = batch(B, scene, foam, materials.solid);
-  top.disk('#fff1df',0,.007,0,.122,.015,.122);
-  top.orb('#c7717f',-.018,.023,.008,.035,.038,.031);
-  top.orb('#71865d',-.018,.034,.010,.028,.007,.021);
+  const surface = node(B, scene, glassRoot, name + (iced ? ' ice cubes' : ' foam'));
+  const top = batch(B, scene, surface, materials.solid);
+  if (iced) {
+    top.box('#bfdde4',-.022,.009,-.020,.041,.037,.038).rotation.set(-.19,.38,.18);
+    top.box('#d9eef4',.025,.012,-.010,.037,.036,.040).rotation.set(.22,-.39,.24);
+    top.box('#a8c8d1',-.016,.006,.025,.037,.032,.037).rotation.set(.25,.54,-.18);
+    top.box('#ebf7fb',-.020,.027,-.025,.024,.003,.023).rotation.set(-.19,.38,.18);
+    top.box('#f3fbfd',.022,.029,-.007,.021,.003,.023).rotation.set(.22,-.39,.24);
+  } else {
+    top.disk('#fff1df',0,.007,0,.122,.015,.122);
+    top.orb('#c7717f',-.018,.023,.008,.035,.038,.031);
+    top.orb('#71865d',-.018,.034,.010,.028,.007,.021);
+  }
   top.finish();
-  const residue = node(B, scene, glassRoot, name + ' strawberry residue');
+  const residue = node(B, scene, glassRoot, name + (iced ? ' cocoa residue' : ' strawberry residue'));
   const traces = batch(B, scene, residue, materials.solid);
-  traces.disk('#d997a6',.008,.014,.005,.082,.006,.072);
-  traces.orb('#e6afbc',-.037,.027,-.021,.023,.024,.015);
+  traces.disk(flavor.residue[0],.008,.014,.005,.082,.006,.072);
+  traces.orb(flavor.residue[1],-.037,.027,-.021,.023,.024,.015);
   traces.finish();
 
   function setFill(fraction) {
     milk.setEnabled(fraction > .003);
-    foam.setEnabled(fraction > .06);
+    surface.setEnabled(fraction > .06);
     residue.setEnabled(fraction <= .003);
     milk.scaling.y = Math.max(.002, fraction);
-    foam.position.y = .012 + .107 * fraction;
+    surface.position.y = .012 + .107 * fraction;
+    glassRoot.metadata.fill = fraction;
   }
   setFill(onTray ? 1 : 0);
   return {root, glassRoot, glassCenter: GLASS_CENTER, setFill};
@@ -141,7 +166,8 @@ export function createPaymentProps(B, scene, parent, materials) {
   return {terminal, light, card};
 }
 
-export function createTableMarks(B, scene, parent, materials, table) {
+export function createTableMarks(B, scene, parent, materials, table, recipe) {
+  const stains = FLAVORS[recipe].stains;
   const dirty = node(B, scene, parent, 'Sumi dirty tabletop');
   dirty.position.set(table.x,table.y,table.z);
   const patches = [
@@ -151,8 +177,8 @@ export function createTableMarks(B, scene, parent, materials, table) {
     const root = node(B, scene, dirty, 'Sumi spill ' + (i+1));
     root.position.set(x,.003,z);
     const paint = batch(B, scene, root, materials.solid);
-    paint.orb('#d78f98',0,0,0,w,.005,d);
-    paint.orb('#efc4b4',.018,.002,-.007,w*.60,.004,d*.42);
+    paint.orb(stains[0],0,0,0,w,.005,d);
+    paint.orb(stains[1],.018,.002,-.007,w*.60,.004,d*.42);
     paint.finish();
     return root;
   });
@@ -161,7 +187,7 @@ export function createTableMarks(B, scene, parent, materials, table) {
   const paper = batch(B, scene, napkin, materials.solid);
   paper.box('#e5c8ad',0,.007,0,.126,.014,.092).rotation.y = .25;
   paper.box('#f2dcca',-.016,.015,.003,.104,.010,.079).rotation.set(.11,.42,.07);
-  paper.box('#cd9490',-.021,.021,.008,.039,.005,.024).rotation.y = .45;
+  paper.box(stains[2],-.021,.021,.008,.039,.005,.024).rotation.y = .45;
   paper.finish();
   const cloth = node(B, scene, parent, 'Sumi tabletop cloth');
   const fabric = batch(B, scene, cloth, materials.solid);

@@ -2,7 +2,10 @@ const phrase = (ru, tr) => ({ru, tr});
 
 export const SUMI_PREPARATION_STAMP = 'sumi-order-v1';
 export const SUMI_STAMP = 'sumi-delivery-v2';
-export const SUMI_ORDER_TITLE = phrase('Клубничное молоко с Суми', 'Sumi ile çilekli süt');
+export const SUMI_ORDER_TITLES = Object.freeze({
+  strawberry: phrase('Клубничное молоко с Суми', 'Sumi ile çilekli süt'),
+  chocolate: phrase('Готовим шоколад со льдом', 'Sumi ile buzlu çikolata'),
+});
 
 const text = {
   sumi: phrase('Суми', 'Sumi'),
@@ -32,22 +35,57 @@ const text = {
   watch: phrase('Понаблюдать за гостем', 'Müşteriyi izle'),
   drinkAlt: phrase('Стакан розового клубничного молока с ягодой на краю', 'Kenarında çilek olan bir bardak pembe çilekli süt'),
   saved: phrase('Заказ добавлен в паспорт.', 'Sipariş pasaporta eklendi.'),
-  savedAgain: phrase('Отметка о заказе уже есть в паспорте.', 'Bu siparişin damgası zaten pasaportunda.'),
+  savedAgain: phrase('Штамп кафе уже в паспорте.', 'Kafe damgası zaten pasaportunda.'),
   saveError: phrase('Не удалось сохранить заказ. Можно повторить без нового приготовления.', 'Sipariş kaydedilemedi. Yeniden hazırlamadan kaydetmeyi deneyebilirsin.'),
   retrySave: phrase('Повторить сохранение', 'Yeniden kaydet'),
   strawberry: phrase('Клубника', 'Çilek'),
   blueberry: phrase('Черника', 'Yaban mersini'),
   banana: phrase('Банан', 'Muz'),
   milkIngredient: phrase('Холодное молоко', 'Soğuk süt'),
+  cocoaIngredient: phrase('Какао', 'Kakao'),
+  iceIngredient: phrase('Кубики льда', 'Buz küpleri'),
+  coffee: phrase('Кофе', 'Kahve'),
+  sugar: phrase('Сахар', 'Şeker'),
   tea: phrase('Чай', 'Çay'),
   water: phrase('Вода', 'Su'),
 };
+const chocolate = {
+  ordering: phrase('Привет, София! Мне, пожалуйста, стакан холодного шоколада со льдом.', 'Merhaba Sofia! Buzlu çikolata alabilir miyim?'),
+  welcome: phrase(
+    'Я охлажу стакан. А ты помоги выбрать какао, молоко и лёд для шоколада.',
+    'Bardağı ben soğutayım. Buzlu çikolata için kakao, süt ve buzu sen seç.',
+  ),
+  cocoa: phrase('Выбери какао. Я размешаю его с каплей молока.', 'Kakaoyu seç. Ben onu biraz sütle karıştıracağım.'),
+  cocoaWrong: phrase('Для шоколадного вкуса нам нужен какао-порошок.', 'Çikolata tadı için kakao tozu gerekiyor.'),
+  milk: phrase('Какао на дне стакана. Добавь холодное молоко.', 'Kakao bardağın dibinde. Soğuk sütü ekle.'),
+  ice: phrase('Я придержу стакан. Добавь кубики льда, чтобы охладить напиток.', 'Bardağı ben tutayım. İçeceği soğutmak için buz küplerini ekle.'),
+  iceWrong: phrase('Чтобы охладить шоколад, нужны кубики льда.', 'Çikolatayı soğutmak için buz küpleri gerekiyor.'),
+  tray: phrase('Я поставила стакан на поднос. Отнеси его к столику с клубникой.', 'Bardağı tepsiye koydum. Tepsiyi çilek işaretli masaya götür.'),
+  thanks: phrase('Спасибо, София! Холодный шоколад со льдом получился чудесным.', 'Teşekkür ederim Sofia! Buzlu çikolata harika olmuş.'),
+  drinkAlt: phrase('Стакан шоколада с кубиками льда', 'Buz küpleriyle bir bardak soğuk çikolata'),
+};
 const fruit = [['blueberry', '🫐'], ['strawberry', '🍓'], ['banana', '🍌']];
 const drinks = [['tea', '☕'], ['water', '💧'], ['milk', '🥛']];
+const cocoa = [['coffee', '☕'], ['cocoa', '🍫'], ['strawberry', '🍓']];
+const ice = [['sugar', '◻'], ['ice', '🧊'], ['water', '💧']];
+const ingredientLabels = {milk: 'milkIngredient', cocoa: 'cocoaIngredient', ice: 'iceIngredient'};
+const milkStep = {phase: 'milk', choices: drinks, correct: 'milk', wrong: 'milkWrong'};
+const recipeSteps = {
+  strawberry: [{phase: 'fruit', choices: fruit, correct: 'strawberry', wrong: 'fruitWrong'}, milkStep],
+  chocolate: [
+    {phase: 'cocoa', choices: cocoa, correct: 'cocoa', wrong: 'cocoaWrong'}, milkStep,
+    {phase: 'ice', choices: ice, correct: 'ice', wrong: 'iceWrong'},
+  ],
+};
 
 export function createSumiOrder({
   locale, element, button, onAction, onAccept, onPickup, onReplay, onExit, onSave, onChange, completed, initialPhase,
+  recipe = 'strawberry',
 }) {
+  if (!Object.hasOwn(recipeSteps, recipe)) throw new RangeError('Invalid Sumi recipe');
+  const steps = recipeSteps[recipe];
+  const preparationPhases = new Set([...steps.map(step => step.phase), 'stir', 'tray']);
+  const recipeText = recipe === 'chocolate' ? chocolate : {};
   let phase = initialPhase === 'ordering' ? 'ordering' : 'welcome';
   let greeted = false;
   let stirs = 0;
@@ -56,13 +94,14 @@ export function createSumiOrder({
   let wasCompleted = completed;
   let resumePhase = null;
 
-  const words = key => text[key][locale()];
+  const words = key => (recipeText[key] ?? text[key])[locale()];
   const change = (selector) => onChange(selector);
 
   function makeGlass() {
     const figure = element('div', 'sumi-glass');
     figure.id = 'sumi-drink';
     figure.dataset.fill = phase;
+    figure.dataset.recipe = recipe;
     figure.dataset.stirs = String(stirs);
     if (phase === 'tray' || phase === 'delivered') {
       figure.setAttribute('role', 'img');
@@ -72,7 +111,12 @@ export function createSumiOrder({
     }
     const cup = element('div', 'sumi-cup');
     cup.append(element('i', 'sumi-puree'), element('i', 'sumi-milk'), element('i', 'sumi-reflection'));
-    figure.append(element('i', 'sumi-straw'), cup, element('i', 'sumi-berry'), element('i', 'sumi-saucer'));
+    figure.append(cup, element('i', 'sumi-saucer'));
+    if (recipe === 'chocolate') {
+      cup.append(element('i', 'sumi-ice sumi-ice-left'), element('i', 'sumi-ice sumi-ice-right'));
+    } else {
+      figure.append(element('i', 'sumi-straw'), element('i', 'sumi-berry'));
+    }
     return figure;
   }
 
@@ -87,7 +131,7 @@ export function createSumiOrder({
 
   function ingredientButton([ingredient, icon]) {
     const option = button('', 'city-choice sumi-choice');
-    const label = ingredient === 'milk' ? 'milkIngredient' : ingredient;
+    const label = ingredientLabels[ingredient] ?? ingredient;
     option.dataset.sumiIngredient = ingredient;
     const picture = element('span', '', icon);
     picture.setAttribute('aria-hidden', 'true');
@@ -99,12 +143,14 @@ export function createSumiOrder({
     const panel = element('section', 'sumi-order');
     panel.id = 'sumi-order';
     panel.dataset.phase = phase;
+    panel.dataset.recipe = recipe;
     panel.dataset.greeted = String(greeted);
 
     if (phase === 'delivered') {
       const result = element('div', 'sumi-result');
       result.id = 'sumi-result';
       result.dataset.saved = String(saved);
+      result.dataset.recipe = recipe;
       const layout = element('div', 'sumi-progress-hero');
       const copy = element('div', 'sumi-result-copy');
       const speaker = element('b', 'sumi-name', words('customer'));
@@ -144,7 +190,8 @@ export function createSumiOrder({
         panel.append(stir);
       } else {
         const choices = element('div', 'sumi-choices');
-        choices.append(...(phase === 'fruit' ? fruit : drinks).map(ingredientButton));
+        const currentStep = steps.find(step => step.phase === phase);
+        choices.append(...currentStep.choices.map(ingredientButton));
         panel.append(choices);
       }
     }
@@ -174,6 +221,8 @@ export function createSumiOrder({
 
   function handleClick(chosen) {
     const ingredient = chosen.dataset.sumiIngredient;
+    const stepIndex = steps.findIndex(step => step.phase === phase);
+    const step = steps[stepIndex];
     if (chosen.id === 'sumi-accept' && phase === 'ordering') {
       if (onAccept?.() === true) {
         phase = resumePhase ?? 'welcome';
@@ -191,26 +240,17 @@ export function createSumiOrder({
       onAction?.('greet');
       change('#sumi-start');
     } else if (chosen.id === 'sumi-start' && phase === 'welcome') {
-      phase = 'fruit';
+      phase = steps[0].phase;
       feedback = '';
       onAction?.('prepare');
       change('[data-sumi-ingredient]');
-    } else if (phase === 'fruit' && ingredient) {
-      if (ingredient === 'strawberry') {
-        phase = 'milk';
+    } else if (step && ingredient) {
+      if (ingredient === step.correct) {
+        phase = steps[stepIndex + 1]?.phase ?? 'stir';
         feedback = '';
         change('[data-sumi-ingredient]');
       } else {
-        feedback = 'fruitWrong';
-        change(`[data-sumi-ingredient="${ingredient}"]`);
-      }
-    } else if (phase === 'milk' && ingredient) {
-      if (ingredient === 'milk') {
-        phase = 'stir';
-        feedback = '';
-        change('[data-sumi-ingredient]');
-      } else {
-        feedback = 'milkWrong';
+        feedback = step.wrong;
         change(`[data-sumi-ingredient="${ingredient}"]`);
       }
     } else if (phase === 'stir' && ingredient === 'stir') {
@@ -258,7 +298,7 @@ export function createSumiOrder({
     return true;
   }
 
-  const preparing = () => ['fruit', 'milk', 'stir', 'tray'].includes(phase);
+  const preparing = () => preparationPhases.has(phase);
   function sync(visit) {
     if (visit === 'ordering' && phase !== 'ordering') {
       if (phase === 'welcome' || preparing()) resumePhase = phase;
@@ -288,7 +328,7 @@ export function createSumiOrder({
   }
 
   return {
-    render, handleClick, deliver, sync, callNext,
+    recipe, render, handleClick, deliver, sync, callNext,
     finished: () => phase === 'delivered',
     needsSave: () => phase === 'delivered' && !saved,
     resume: () => onAction?.(preparing() ? 'prepare' : 'idle'),

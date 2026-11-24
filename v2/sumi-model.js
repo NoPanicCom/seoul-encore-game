@@ -188,13 +188,19 @@ function buildArm(upper, lower, hand) {
   hand.oval(SKIN,[.021,-.019,.017],[.014,.027,.016],.31,6);
 }
 
-function makeDrink(s) {
-  s.lathe(ROSE,[[0,0],[0,.045],[.008,.049],[.047,.056],[.050,0]]);
-  s.lathe(GLASS,[[.045,.054],[.085,.058],[.106,.060],[.116,.056],[.117,0]]);
-  s.lathe(WHITE,[[.109,.061],[.117,.061],[.122,.057],[.124,0]]);
-  s.line('#d77e92',[[.022,.113,0],[.021,.161,.001],[.035,.183,.003]],.0045);
-  s.oval('#ce6d78',[-.023,.123,.016],[.015,.012,.017],.12,7);
-  s.oval('#819468',[-.024,.134,.017],[.011,.0038,.009],.17,6);
+function makeDrink(s, recipe) {
+  const chocolate = recipe === 'chocolate';
+  s.lathe(chocolate ? '#643c34' : ROSE,[[0,0],[0,.045],[.008,.049],[.047,.056],[.050,0]]);
+  s.lathe(chocolate ? '#9b6a4b' : GLASS,[[.045,.054],[.085,.058],[.106,.060],[.116,.056],[.117,0]]);
+  s.lathe(chocolate ? '#c7a287' : WHITE,[[.109,.061],[.117,.061],[.122,.057],[.124,0]]);
+  s.line(chocolate ? '#f3d7bb' : '#d77e92',[[.022,.113,0],[.021,.161,.001],[.035,.183,.003]],.0045);
+  if (chocolate) {
+    s.box('#eadbd0',[-.021,.131,.016],[.028,.026,.029],.31);
+    s.box('#ddc7b8',[.007,.126,-.021],[.026,.026,.027],-.18);
+  } else {
+    s.oval('#ce6d78',[-.023,.123,.016],[.015,.012,.017],.12,7);
+    s.oval('#819468',[-.024,.134,.017],[.011,.0038,.009],.17,6);
+  }
 }
 
 const ACTIONS = new Set(['idle','greet','prepare','serve']);
@@ -203,14 +209,13 @@ export function createSumi(B, scene, parent) {
   const root = new B.TransformNode('Sumi', scene);
   root.parent = parent;
   root.position.set(.035,0,-3.16);
-  root.metadata = {action:'idle'};
+  root.metadata = {action:'idle', recipe:'strawberry'};
   const material = new B.StandardMaterial('Sumi textiles', scene);
   material.diffuseColor = B.Color3.White();
   material.specularColor.set(.15,.114,.10);
   material.specularPower = 46;
   const body = posePart(B, scene, 'body', root, [0,0,0]);
   const head = posePart(B, scene, 'head', body, [0,1.499,.018]);
-  const drink = posePart(B, scene, 'strawberry-cup', root, [.175,.965,.52]);
   const create = joint => makePart(B, scene, material, joint);
   const legs = create(root);
   buildSkirt(legs);
@@ -221,9 +226,16 @@ export function createSumi(B, scene, parent) {
   const face = create(head);
   buildHead(face);
   face.finish();
-  const cup = create(drink);
-  makeDrink(cup);
-  cup.finish();
+  const cups = {};
+  for (const recipe of ['strawberry', 'chocolate']) {
+    const drink = posePart(B, scene, `${recipe}-cup`, root, [.175,.965,.52]);
+    drink.metadata = { recipe };
+    const cup = create(drink);
+    makeDrink(cup, recipe);
+    cup.finish();
+    drink.setEnabled(recipe === 'strawberry');
+    cups[recipe] = drink;
+  }
   const eyes = [];
   const arms = [];
   for (const side of [-1,1]) {
@@ -245,8 +257,17 @@ export function createSumi(B, scene, parent) {
   let total = 0;
   let phase = 0;
   let action = 'idle';
-  function update(dt = 0, next = 'idle') {
+  function update(dt = 0, next = 'idle', recipe = 'strawberry') {
     if (!ACTIONS.has(next)) throw new RangeError('Sumi hareketi geçersiz');
+    if (!Object.hasOwn(cups, recipe)) throw new RangeError('Sumi tarifi geçersiz');
+    const drink = cups[recipe];
+    if (root.metadata.recipe !== recipe) {
+      const previous = cups[root.metadata.recipe];
+      drink.position.copyFrom(previous.position);
+      previous.setEnabled(false);
+      drink.setEnabled(true);
+      root.metadata.recipe = recipe;
+    }
     const elapsed = Math.max(0, Math.min(.10, dt));
     if (action !== next) {
       phase = 0;
@@ -260,7 +281,8 @@ export function createSumi(B, scene, parent) {
     const wave = action === 'greet';
     const cook = action === 'prepare';
     const serve = action === 'serve';
-    const stir = Math.sin(phase * 9);
+    const whisk = phase * (recipe === 'chocolate' ? 7.5 : 9);
+    const stir = Math.sin(whisk);
     const reach = Math.min(1, phase * 1.9);
     const presentation = reach * reach * (3-2*reach);
     const [right,left] = arms;
@@ -272,7 +294,7 @@ export function createSumi(B, scene, parent) {
     right.lower.rotation.z = ease(right.lower.rotation.z, wave ? -.99 + .21*Math.sin(phase*13) : .08);
     right.upper.rotation.x = ease(right.upper.rotation.x, wave ? -.13 : cook ? -.59 : serve ? -1.06 : -.20);
     right.lower.rotation.x = ease(right.lower.rotation.x, wave ? -.22 : cook ? -.85+.18*stir : serve ? -.43 : -.59);
-    right.hand.rotation.z = ease(right.hand.rotation.z, wave ? .32*Math.sin(phase*13) : cook ? .17*Math.cos(phase*9) : 0);
+    right.hand.rotation.z = ease(right.hand.rotation.z, wave ? .32*Math.sin(phase*13) : cook ? .17*Math.cos(whisk) : 0);
     left.upper.rotation.z = ease(left.upper.rotation.z, cook || serve ? .06 : .13);
     left.upper.rotation.x = ease(left.upper.rotation.x, cook ? -.48 : serve ? -.72 : -.29);
     left.lower.rotation.x = ease(left.lower.rotation.x, cook ? -.92 : serve ? -.60 : -.54);
