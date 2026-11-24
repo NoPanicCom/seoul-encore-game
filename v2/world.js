@@ -4,6 +4,8 @@ import {
 } from './hongdae-world.js';
 import { createLightstick, createPixel, HONGDAE_LIGHTSTICKS } from './hongdae-props.js';
 
+import { createStreetStage } from './street-stage.js';
+
 const PORTALS = [
   { low: 2.68, high: 3.38 },
   { low: -4.24, high: -3.78 },
@@ -473,6 +475,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   let hongdaePending = null;
   let districtVisit = null;
   let districtEpoch = 0;
+  let festivalView = null;
+  let lastWave = -10;
+  const stageFocus = new B.Vector3(DISTRICT_X,1.34,-11.25);
+  const handRotation = new B.Quaternion();
+  const stickRotation = new B.Quaternion();
   let equippedStick = null;
   let wandVisible = false;
   let action = null;
@@ -546,13 +553,14 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       anchor.position.x = DISTRICT_X;
       model.populateRootNodes();
       for (const root of model.rootNodes) root.parent = anchor;
+      const festival = createStreetStage(B, scene, anchor, glow);
       props = addHongdaeProps(B, scene, anchor, createLightstick);
       addGlowingMeshes(model.meshes);
       for (const prop of props) addGlowingMeshes(prop.meshes);
       await scene.whenReadyAsync();
       if (disposed) throw new Error('Sahne kapatıldı');
       anchor.setEnabled(false);
-      return { anchor };
+      return { anchor, festival };
     } catch (error) {
       for (const prop of props) prop.dispose();
       model.dispose();
@@ -589,6 +597,14 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   }
 
   function updateCamera(elapsed, cardCapture = false) {
+    if (festivalView) {
+      const aspect = engine.getRenderWidth() / engine.getRenderHeight();
+      camera.fov = 1.03;
+      const distance = Math.max(5.4, 5.55 / (2 * Math.tan(camera.fov / 2) * aspect));
+      camera.position.set(DISTRICT_X + .24, 2.36, -11.25 + distance);
+      camera.setTarget(stageFocus);
+      return;
+    }
     const smoothing = elapsed ? damping(13, elapsed) : 1;
     const aspect = engine.getRenderWidth() / engine.getRenderHeight();
     const portrait = aspect < .85;
@@ -794,6 +810,18 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
   }
 
   function updateActors(elapsed) {
+    if (districtVisit) {
+      hongdae.festival.update(time, Boolean(festivalView), festivalView?.color ?? audienceTint);
+      if (festivalView) {
+        const phase = time-lastWave;
+        animateActor(player, phase < .7 ? 'greet' : 'booth-photo', Math.min(1,phase/.7), elapsed);
+        const stick = handSticks.get(equippedStick);
+        stick.parent.computeWorldMatrix(true).decompose(undefined, handRotation);
+        B.Quaternion.RotationYawPitchRollToRef(0,0,.12+.30*Math.sin(Math.min(.7,phase)*Math.PI/.7),stickRotation);
+        handRotation.conjugateInPlace().multiplyToRef(stickRotation,stick.rotationQuaternion);
+        return;
+      }
+    }
     if (exploration) {
       const now = performance.now();
       const active = action && now < action.start + action.duration;
@@ -1076,6 +1104,30 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     leaveHongdae,
     equipShopStick,
     captureBoothPhoto,
+    festivalView(active,hex) {
+      if (active && !festivalView && districtVisit && currentSpot === 'festival') {
+        const stick = handSticks.get(equippedStick);
+        festivalView = {x:player.x, z:player.z, yaw:player.yaw, color:color(B,hex), rotation:stick.rotationQuaternion};
+        stick.rotationQuaternion = B.Quaternion.Identity();
+        player.x = DISTRICT_X - .67;
+        player.z = -7.81;
+        player.yaw = Math.PI;
+        inputX = inputY = 0;
+        placePixel(player.x-.49,player.z+.18,Math.PI);
+      } else if (!active && festivalView) {
+        const {x,z,yaw,rotation} = festivalView;
+        Object.assign(player,{x,z,yaw});
+        handSticks.get(equippedStick).rotationQuaternion = rotation;
+        festivalView = null;
+      }
+      updateActors(0);
+      updateCamera(0);
+    },
+    waveStick() {
+      if (!festivalView) return;
+      lastWave = time;
+      hongdae.festival.wave(time);
+    },
     setInput(x, y) {
       const length = Math.max(1, Math.hypot(x, y));
       inputX = x / length;

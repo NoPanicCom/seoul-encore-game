@@ -8,11 +8,11 @@
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../tour-icon.png">
   <link rel="apple-touch-icon" href="../tour-icon.png">
-  <link rel="stylesheet" href="./style.css?v=d4f49b41cf27">
+  <link rel="stylesheet" href="./style.css?v=b1bf1903d6a1">
   <title>Seoul Encore · Sofia</title>
   <script defer src="./vendor/babylon.js"></script>
   <script defer src="./vendor/babylonjs.loaders.js"></script>
-  <script type="module" src="./game-00311ee28bc5.js"></script>
+  <script type="module" src="./game-daccb0598405.js"></script>
 </head>
 <body>
   <main id="game" data-state="loading" data-area="street" data-replay="false" data-journey="false" data-venue="studio">
@@ -92,6 +92,20 @@
         <button id="hongdae-action" type="button" class="context-action" hidden><span id="hongdae-action-icon" class="context-icon" aria-hidden="true"></span><span id="hongdae-action-label"></span></button>
       </div>
     </div>
+
+    <section id="festival-panel" class="festival-panel" hidden aria-labelledby="festival-title">
+      <div class="festival-info">
+        <h1 id="festival-title" data-text="festivalTitle">Волна Хондэ</h1>
+        <p id="festival-hint"></p>
+        <div id="festival-dots" aria-hidden="true"></div>
+        <p id="festival-score" aria-live="polite"></p>
+      </div>
+      <div class="festival-controls">
+        <button id="festival-leave" class="secondary" type="button" data-text="festivalLeave">На улицу</button>
+        <button id="festival-tap" type="button" data-label="festivalTap"><span aria-hidden="true">✦</span></button>
+        <button id="festival-again" class="primary" type="button" data-text="festivalAgain" hidden>Ещё раз</button>
+      </div>
+    </section>
 
     <section id="wardrobe" class="panel wardrobe" aria-labelledby="wardrobe-title" hidden>
       <header class="panel-heading">

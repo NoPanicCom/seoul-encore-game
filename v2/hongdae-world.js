@@ -37,6 +37,8 @@ export function districtArea(x) {
 
 export function districtWalkable(x, z, radius) {
   if (x < -3.6 + radius || x > SHOP_BACK - radius || z < -10 + radius || z > 12 - radius) return false;
+  // Audience banks leave a clear centre aisle in front of the stage.
+  if (z < -7.12 && Math.abs(x) > 1.59-radius) return false;
   if (x < SHOP_FRONT - radius) return true;
   if (x <= SHOP_FRONT + radius && Math.abs(z) > SHOP_OPENING - radius) return false;
   if (Math.abs(z) > SHOP_HALF_WIDTH - radius) return false;
@@ -50,6 +52,7 @@ export function districtSpot(x, z, previous) {
     const slot = SHELF_SLOTS.find(({ id, z: center }) => Math.abs(z - center) <= (previous === `shelf-${id}` ? .43 : .37));
     return slot ? `shelf-${slot.id}` : null;
   }
+  if (Math.abs(x) <= 1.65 && z <= -6.65) return 'festival';
   const radius = (id, threshold) => previous === id ? threshold + .16 : threshold;
   if (Math.hypot(x - HONGDAE_EXIT.x, z - HONGDAE_EXIT.z) <= radius('hongdae-exit', 1.03)) return 'hongdae-exit';
   if (Math.hypot(x - BOOTH.x, z - BOOTH.z) <= radius('booth', .90)) return 'booth';

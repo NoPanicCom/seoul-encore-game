@@ -1,3 +1,4 @@
+import {createFestivalRound, FESTIVAL_BEAT_MS} from './festival-round.js';
 import {clearInvitation, equipHongdaeStick, readDuet, readHongdaeStick, readInvitation, saveDuet, saveInvitation, savePixelPhoto, startingLook} from './album.js';
 import {createWorld} from './world.js';
 import {isShopStick, stickColor, stickName} from '../js/lightstick.js';
@@ -23,6 +24,16 @@ const phrases = {
     replayErrorDetail: 'Открой сохранённый танец в альбоме на устройстве, где ты его записала.',
     street: 'Улица в Сеуле',
     streetObjective: 'Войди в здание YG впереди',
+    festivalTitle: 'Волна Хондэ',
+    festivalJoin: 'На концерт',
+    festivalTap: 'Зажечь лайтстик',
+    festivalHint: 'Коснись звезды, когда кольца совпадут',
+    festivalRoute: 'Под вывеской HONGDAE начинается концерт',
+    festivalShop: 'Выбери лайтстик у Минхо и возвращайся на концерт',
+    festivalDone: 'До встречи, Хондэ!',
+    festivalBest: 'Твой рекорд',
+    festivalLeave: 'На улицу',
+    festivalAgain: 'Ещё раз',
     hongdae: 'Хондэ',
     minho: 'Магазин Минхо',
     hongdaeRoute: 'К Пикселю через указатель «Хондэ» справа',
@@ -156,6 +167,16 @@ const phrases = {
     replayErrorDetail: 'Albümdeki dansı kaydettiğin cihazdan açabilirsin.',
     street: 'Seul sokağı',
     streetObjective: 'İlerideki YG binasına gir',
+    festivalTitle: 'Hongdae ışık dalgası',
+    festivalJoin: 'Konsere katıl',
+    festivalTap: 'Lightstick’i yak',
+    festivalHint: 'Halkalar birleşince yıldıza dokun',
+    festivalRoute: 'HONGDAE tabelasının altında konser var',
+    festivalShop: 'Minho’dan bir lightstick seçip konsere dön',
+    festivalDone: 'Görüşürüz, Hongdae!',
+    festivalBest: 'En iyi skorun',
+    festivalLeave: 'Sokağa dön',
+    festivalAgain: 'Yeniden oyna',
     hongdae: 'Hongdae',
     minho: 'Minho’nun dükkânı',
     hongdaeRoute: 'Pixel için sağdaki Hongdae tabelasına yaklaş',
@@ -363,6 +384,9 @@ let hongdaeFeedback = '';
 let shopStick = readHongdaeStick();
 let booth = null;
 let boothTimer = 0;
+let festival = null;
+let festivalFrame = 0;
+let festivalBest = Number(preference('encore.v2.hongdae-wave.best')) || 0;
 let nearNari = false;
 let replay = null;
 let failure = null;
@@ -396,6 +420,7 @@ function shelfStick() {
 function hongdaeContext() {
   if (area === 'street' && spot === 'hongdae-enter') return hongdaeActions[spot];
   if (inHongdae() && spot === 'hongdae-exit') return hongdaeActions[spot];
+  if (area === 'hongdae' && spot === 'festival' && shopStick) return {label:'festivalJoin',icon:'♫'};
   if (area === 'hongdae' && spot === 'booth' && shopStick) return hongdaeActions[spot];
   const shelf = shelfStick();
   if (shelf) {
@@ -446,6 +471,10 @@ function paintMission() {
   const loadingDistrict = hongdaePending && !context;
   direction.textContent = words(loadingDistrict ? 'hongdaeLoading' : purchase ? 'stickCoupon' : 'hongdaeRoute');
   direction.hidden = !loadingDistrict && !purchase && (area !== 'street' || journey() || Boolean(context));
+  if (area === 'hongdae' && shopStick && !context) {
+    direction.hidden = false;
+    direction.textContent = words('festivalRoute');
+  }
   const journeyObjective = `journey${area[0].toUpperCase()}${area.slice(1)}`;
   let objective = journey() || area === 'arena' || area === 'plaza'
     ? (nearNari ? 'stageReady' : journeyObjective)
@@ -453,6 +482,7 @@ function paintMission() {
   if (inHongdae()) {
     if (area === 'hongdae') objective = shopStick ? 'hongdaeBoothObjective' : 'hongdaeObjective';
     else objective = shopStick ? 'minhoEquipped' : 'minhoObjective';
+    if (spot === 'festival') objective = shopStick ? 'festivalTitle' : 'festivalShop';
     if (spot === 'booth' && !shopStick) objective = 'boothNeedsStick';
   }
   setText('objective', context?.shelf ? stickName(context.shelf, lang) : words(objective));
@@ -554,6 +584,7 @@ function paintLanguage() {
   paintMission();
   paintResult();
   paintBooth();
+  if (festival) paintFestival();
   paintFailure();
   if (round && Object.hasOwn(timings, state)) paintCue();
 }
@@ -572,6 +603,7 @@ function setState(next) {
   byId('move-buttons').hidden = !rhythmState(next);
   byId('result').hidden = next !== 'result';
   paintBooth();
+  byId('festival-panel').hidden = next !== 'festival';
   if (!rhythmState(next)) delete game.dataset.beat;
   if (!dancing) delete game.dataset.currentMove;
 }
@@ -634,6 +666,7 @@ function openPhone() {
   phone.showModal();
   if (round) round.lastTime = null;
   if (stagePerformance()) pauseStageMusic();
+  if (festival) pauseFestival();
   phoneToggle.setAttribute('aria-expanded', 'true');
   byId('phone-close').focus({preventScroll: true});
 }
@@ -641,6 +674,7 @@ function openPhone() {
 function closePhone() {
   if (!phone.open) return;
   phone.close();
+  if (festival) playAudio();
   if (stagePerformance()) {
     resumeStageMusic();
     playAudio();
@@ -648,7 +682,17 @@ function closePhone() {
 }
 
 function playAudio() {
-  if (!sound || phone.open) return;
+  if (!sound || phone.open || document.hidden) return;
+  if (festival) {
+    if (!festival.complete && !stageAudioRequested) {
+      const session = festival;
+      stageAudioRequested = true;
+      void startStageMusic({beatMs:FESTIVAL_BEAT_MS, offsetMs:() => session.elapsed}).then(started => {
+        if (!started && session===festival) stageAudioRequested = false;
+      });
+    }
+    return;
+  }
   if (!arenaRound()) {
     void audio.enter();
   } else if (stagePerformance() && !stageAudioRequested) {
@@ -984,6 +1028,8 @@ function actInHongdae() {
     resetControls();
     world.leaveHongdae();
     if (!phone.open) phoneToggle.focus({preventScroll: true});
+  } else if (spot === 'festival') {
+    startFestival();
   } else if (spot === 'booth') {
     takeBoothPhoto();
   } else {
@@ -1000,6 +1046,81 @@ function actInHongdae() {
     }
     paintMission();
   }
+}
+
+function paintFestival() {
+  const finished = festival.complete;
+  const dots = [...byId('festival-dots').children];
+  dots.forEach((dot,i) => {dot.className = festival.hits[i] ? 'hit' : festival.missed(i) ? 'miss' : '';});
+  setText('festival-hint',words(finished ? 'festivalDone' : 'festivalHint'));
+  setText('festival-score',finished ? `${festival.score}/8 · ${words('festivalBest')} ${festivalBest}/8` : `${festival.score}/8`);
+  byId('festival-tap').hidden = finished;
+  byId('festival-again').hidden = !finished;
+}
+
+function festivalTick(now) {
+  if (!festival || festival.complete) return;
+  if (!phone.open && !document.hidden) {
+    festival.tick(now);
+    const tap = byId('festival-tap');
+    tap.style.setProperty('--fan-ring',festival.ring.toFixed(3));
+    tap.dataset.ready = String(festival.ready);
+    [...byId('festival-dots').children].forEach((dot,i)=>{
+      if (festival.missed(i) && !dot.classList.contains('miss')) dot.className='miss';
+    });
+    if (festival.complete) {
+      closeStageAudio();
+      if (festival.score > festivalBest) {
+        festivalBest = festival.score;
+        storePreference('encore.v2.hongdae-wave.best',String(festivalBest));
+      }
+      if (sound) stageApplause();
+      paintFestival();
+      byId('festival-again').focus({preventScroll:true});
+      return;
+    }
+  }
+  festivalFrame = requestAnimationFrame(festivalTick);
+}
+
+function pauseFestival() {
+  festival.pause();
+  closeStageAudio();
+}
+
+function startFestival() {
+  resetControls();
+  audio.exit();
+  closeStageAudio();
+  world.festivalView(true,stickColor(shopStick));
+  festival = createFestivalRound();
+  byId('festival-dots').replaceChildren(...festival.hits.map(()=>document.createElement('i')));
+  byId('festival-panel').style.setProperty('--fan-color',stickColor(shopStick));
+  setState('festival');
+  paintFestival();
+  byId('festival-tap').focus({preventScroll:true});
+  festivalTick(performance.now());
+  playAudio();
+}
+
+function tapFestival() {
+  if (!festival || festival.complete || phone.open || document.hidden) return;
+  // Let the animation frame own the transition to the result, including its last beat.
+  if (festival.tap()) {
+    world.waveStick();
+    paintFestival();
+  }
+}
+
+function leaveFestival() {
+  cancelAnimationFrame(festivalFrame);
+  closeStageAudio();
+  world.festivalView(false);
+  festival = null;
+  setState('walk');
+  paintMission();
+  hongdaeAction.focus({preventScroll:true});
+  playAudio();
 }
 
 function paintBooth() {
@@ -1070,6 +1191,8 @@ function closeBooth() {
 
 function showFailure(kind, error) {
   cancelAnimationFrame(frame);
+  cancelAnimationFrame(festivalFrame);
+  festival = null;
   clearTimeout(boothTimer);
   resetControls();
   closeStageAudio();
@@ -1181,6 +1304,7 @@ document.addEventListener('keydown', event => {
   if (event.altKey || event.ctrlKey || event.metaKey || editing || phone.open) return;
   if (event.code === 'Escape') {
     if (!wardrobe.hidden) setWardrobe(false, true);
+    else if (festival) leaveFestival();
     else if (state === 'booth') closeBooth();
     else if (state === 'result' || Object.hasOwn(timings, state)) backToWalk();
     return;
@@ -1228,12 +1352,24 @@ window.addEventListener('pageshow', event => {
 });
 window.addEventListener('hashchange', () => location.reload());
 document.addEventListener('visibilitychange', () => {
+  if (festival) {
+    if (document.hidden) pauseFestival();
+    else if (!phone.open) playAudio();
+  }
   if (!document.hidden) return;
   resetControls();
   if (arenaRound()) closeStageAudio();
   if (round) round.lastTime = null;
 });
 
+byId('festival-tap').addEventListener('pointerdown', event => {
+  if (event.isPrimary && event.button===0) tapFestival();
+});
+byId('festival-tap').addEventListener('click', event => {
+  if (event.detail===0) tapFestival();
+});
+byId('festival-again').addEventListener('click', startFestival);
+byId('festival-leave').addEventListener('click', leaveFestival);
 phoneToggle.addEventListener('click', openPhone);
 byId('phone-close').addEventListener('click', closePhone);
 phone.addEventListener('cancel', event => {

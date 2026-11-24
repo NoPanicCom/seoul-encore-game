@@ -245,7 +245,7 @@ export async function unlockStageAudio() {
   }
 }
 
-function playback(buffer, volume, loopStart) {
+function playback(buffer, volume, loopStart, offset = 0) {
   const source = context.createBufferSource();
   const output = context.createGain();
   source.buffer = buffer;
@@ -256,11 +256,11 @@ function playback(buffer, volume, loopStart) {
   }
   source.connect(output);
   output.connect(context.destination);
-  source.start();
+  source.start(0, offset);
   return {source, output};
 }
 
-export async function startStageMusic({beatMs = DEFAULT_BEAT_MS} = {}) {
+export async function startStageMusic({beatMs = DEFAULT_BEAT_MS, offsetMs} = {}) {
   const start = ++command;
   const ready = await unlockStageAudio();
   if (!ready || start !== command || !enabled || hidden() || context?.state !== 'running') return false;
@@ -276,7 +276,8 @@ export async function startStageMusic({beatMs = DEFAULT_BEAT_MS} = {}) {
       cachedBeat = tempo;
     }
     const loopFrame = Math.round(INTRO_BEATS * tempo / 1000 * SAMPLE_RATE);
-    music = playback(songBuffer, .49, loopFrame / SAMPLE_RATE);
+    const offset = offsetMs ? offsetMs()/1000 : 0;
+    music = playback(songBuffer, .49, loopFrame / SAMPLE_RATE, offset);
     return true;
   } catch (error) {
     report(error);
