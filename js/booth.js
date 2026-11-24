@@ -342,7 +342,7 @@ export function boothPhotoCount() {
 export function boothAlbum(lang) {
     const result = loadAlbum();
     const date = new Intl.DateTimeFormat(lang === 'tr' ? 'tr-TR' : 'ru-RU', { dateStyle: 'medium' });
-    const pixelPrints = pixelAlbum(lang);
+    const pixelPrints = pixelAlbum(lang, 'lisa') + pixelAlbum(lang);
     const photos = result.cards.map(card => `<li><figure data-booth-card="${card.id}" data-booth-outfit="${card.outfit}" data-booth-pieces="${card.pieces.join(',')}">
     ${printImage(card)}<figcaption><strong>${names[card.member]} + Pixel</strong><time datetime="${new Date(card.created).toISOString()}">${date.format(card.created)}</time></figcaption>
   </figure></li>`);

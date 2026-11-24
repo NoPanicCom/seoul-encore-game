@@ -755,3 +755,9 @@ button:active:not(.header-control, .close-button) { transform: scale(.97); }
 #festival-tap::before {content:"";position:absolute;inset:-3px;border:2px solid var(--fan-color);border-radius:50%;transform:scale(var(--fan-ring,1.6));opacity:.8;}
 #festival-tap[data-ready="true"] {background:var(--fan-color);color:#351b37;}
 @media(max-height:500px){.festival-info{top:max(6px,env(safe-area-inset-top));}.festival-controls{bottom:max(12px,env(safe-area-inset-bottom));}}
+
+.encore-gift {position:absolute;left:50%;top:50%;transform:translate(-50%,-45%);width:min(58vw,260px);padding:9px 9px 14px;text-align:center;border:1px solid var(--fan-color);border-radius:14px;background:#211328f5;box-shadow:0 8px 32px #10081ebd;pointer-events:auto;}
+.encore-gift img {display:block;width:auto;max-width:100%;height:auto;max-height:34dvh;margin:auto;border-radius:7px;}
+.encore-gift p {margin:8px 0;font-size:.88rem;color:#ffe9f6;}
+.encore-gift a,.encore-gift button {display:inline-flex;align-items:center;justify-content:center;min-height:42px;text-decoration:none;}
+@media(max-height:500px){.encore-gift{width:auto;min-width:165px;top:54%;}.encore-gift img{max-height:27dvh;}}

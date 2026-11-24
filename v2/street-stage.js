@@ -69,13 +69,16 @@ export function createStreetStage(B, scene, district, bloom) {
 
   const led = new B.DynamicTexture('Hongdae concert marquee',{width:1024,height:256},scene,false);
   const ctx = led.getContext();
-  const gradient = ctx.createLinearGradient(0,0,1024,256);
-  gradient.addColorStop(0,'#3e1645'); gradient.addColorStop(.52,'#1c102f'); gradient.addColorStop(1,'#492144');
-  ctx.fillStyle=gradient; ctx.fillRect(0,0,1024,256);
-  ctx.textAlign='center'; ctx.fillStyle='#ffb6dc';
-  ctx.font='bold 92px Helvetica, Arial, sans-serif'; ctx.fillText('BLACKPINK',512,116);
-  ctx.font='600 35px Helvetica, Arial, sans-serif'; ctx.fillStyle='#f7edff';
-  ctx.fillText('✦   H O N G D A E   L I V E   ✦',512,189); led.update();
+  function drawMarquee(solo) {
+    const gradient = ctx.createLinearGradient(0,0,1024,256);
+    gradient.addColorStop(0,'#3e1645'); gradient.addColorStop(.52,'#1c102f'); gradient.addColorStop(1,'#492144');
+    ctx.fillStyle=gradient; ctx.fillRect(0,0,1024,256);
+    ctx.textAlign='center'; ctx.fillStyle='#ffb6dc';
+    ctx.font='bold 92px Helvetica, Arial, sans-serif'; ctx.fillText(solo?'L I S A':'BLACKPINK',512,116);
+    ctx.font='600 35px Helvetica, Arial, sans-serif'; ctx.fillStyle='#f7edff';
+    ctx.fillText(solo?'✦   S E C R E T   E N C O R E   ✦':'✦   H O N G D A E   L I V E   ✦',512,189); led.update();
+  }
+  drawMarquee(false);
   const screen = B.MeshBuilder.CreatePlane('Festival marquee',{width:4.88,height:1.22},scene);
   const display = new B.StandardMaterial('Festival screen',scene);
   display.disableLighting=true; display.emissiveTexture=led;
@@ -140,6 +143,36 @@ export function createStreetStage(B, scene, district, bloom) {
     return {pivot,arms,legs,x};
   });
 
+  const lisa = dancers[3].pivot;
+  const jacket = group(lisa);
+  for (const side of [-1,1]) {
+    jacket.oval('#ca4384',side*.138,.831,.058,.17,.25,.23,side*.16);
+    jacket.oval('#fbd28a',side*.159,.937,.078,.115,.048,.17);
+    jacket.box('#ffd9a4',side*.099,.843,.183,.024,.19,.026,-side*.28);
+  }
+  jacket.box('#edb558',0,.702,.146,.31,.042,.027);
+  const costume=jacket.finish();
+  costume.setEnabled(false);
+
+  const soloPool=B.MeshBuilder.CreateDisc('Lisa solo spotlight',{radius:.85,tessellation:48,sideOrientation:B.Mesh.DOUBLESIDE},scene);
+  soloPool.parent=root;
+  soloPool.rotation.x=Math.PI/2;
+  soloPool.position.set(0,.637,-11.1);
+  const halo=new B.StandardMaterial('Encore floor light',scene);
+  halo.disableLighting=true;
+  halo.emissiveColor=B.Color3.FromHexString('#ffe7b5');
+  halo.alpha=.29;
+  halo.disableDepthWrite=true;
+  soloPool.material=halo;
+  soloPool.isPickable=false;
+  soloPool.setEnabled(false);
+  const key=new B.SpotLight('Lisa entrance spot',new B.Vector3(0,3.65,-10.0),new B.Vector3(0,-1,-.7),.99,2,scene);
+  key.parent=root;
+  key.diffuse=B.Color3.FromHexString('#fff0d5');
+  key.includedOnlyMeshes=lisa.getChildMeshes();
+  key.intensity=0;
+  let lastMode='group';
+
   // A narrow additive beam leaves the performers readable through the haze.
   const beams = [-1,1].map(side => {
     const mount = joint('Festival moving head '+side,root,side*2.86,3.64,-11.72);
@@ -187,14 +220,33 @@ export function createStreetStage(B, scene, district, bloom) {
   let hitAt=-20;
   return {
     wave(t) { hitAt=t; },
-    update(t,active,tint) {
+    update(t,active,tint,encore) {
+      const mode=encore?.phase ?? 'group';
+      const solo=!['group','bow','blackout'].includes(mode);
+      const dark=mode==='blackout';
+      if (lastMode!==mode) {
+        drawMarquee(solo);
+        screen.setEnabled(!dark);
+        costume.setEnabled(solo);
+        soloPool.setEnabled(solo);
+        for (const [i,dancer] of dancers.entries()) dancer.pivot.setEnabled(mode==='group' || mode==='bow' || (solo && i===3));
+        lastMode=mode;
+      }
+      const enter=encore?.entrance ?? 0;
+      const ease=enter*enter*(3-2*enter);
+      const lights=encore?.lit ?? 0;
+      const neonLevel=dark ? 0 : solo ? .16+lights*.23 : 1;
+      glow.emissiveColor.set(neonLevel,neonLevel,neonLevel);
       const beat=t*Math.PI*2/.55;
       dancers.forEach(({pivot,arms,legs,x},i)=>{
         const phase=beat*.5+i*.48;
-        pivot.position.x=x+.088*Math.sin(phase);
+        const lead=solo && i===3;
+        pivot.position.x=(lead ? 3.26-2.94*ease : x)+.088*Math.sin(phase);
+        pivot.position.z=lead ? -11.51+.56*ease : -11.24;
         pivot.position.y=.64+.05*Math.pow(Math.sin(phase),2);
-        pivot.rotation.y=.23*Math.sin(phase);
+        pivot.rotation.y=.23*Math.sin(phase)+(lead ? -.65*(1-ease)+.23*Math.sin(phase*2) : 0);
         pivot.rotation.z=.066*Math.sin(phase);
+        pivot.rotation.x=mode==='bow'?encore.bow*.58:0;
         arms.forEach((arm,j)=>{
           const side=j===0?-1:1;
           arm.rotation.z=side*(.50+.64*(1+Math.sin(phase+side*.8)));
@@ -202,15 +254,22 @@ export function createStreetStage(B, scene, district, bloom) {
           legs[j].rotation.x=side*.27*Math.sin(phase);
         });
       });
+      key.intensity=solo?1.45:0;
+      if(solo) {
+        soloPool.position.x=lisa.position.x;
+        soloPool.position.z=lisa.position.z;
+        key.position.x=lisa.position.x;
+      }
       for (const {mount,mist,side} of beams) {
         mount.rotation.z = -side*(.48+.32*Math.sin(beat*.18+side));
         const age=t-hitAt;
-        mist.alpha=.105+(active && age>=0 ? .14*Math.exp(-age*2.5) : 0);
+        mist.alpha=dark || (solo && !lights) ? 0 : .105+(active && age>=0 ? .14*Math.exp(-age*2.5) : 0);
       }
       banks.forEach((mat,i)=>{
         const age=t-hitAt-i*.135;
         const spread=active && age>=0 ? Math.exp(-age*2.85) : 0;
-        tint.scaleToRef(.13+.09*(1+Math.sin(beat*.25+i)) + spread*3.8,mat.emissiveColor);
+        const level=solo ? (i<lights ? 1.36+spread*2.7 : .016) : .13+.09*(1+Math.sin(beat*.25+i))+spread*3.8;
+        tint.scaleToRef(dark ? 0 : level,mat.emissiveColor);
       });
     },
   };

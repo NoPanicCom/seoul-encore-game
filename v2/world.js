@@ -811,7 +811,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
 
   function updateActors(elapsed) {
     if (districtVisit) {
-      hongdae.festival.update(time, Boolean(festivalView), festivalView?.color ?? audienceTint);
+      hongdae.festival.update(time, Boolean(festivalView), festivalView?.color ?? audienceTint, festivalView?.encore);
       if (festivalView) {
         const phase = time-lastWave;
         animateActor(player, phase < .7 ? 'greet' : 'booth-photo', Math.min(1,phase/.7), elapsed);
@@ -1027,7 +1027,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     action = null;
   }
 
-  function captureFrame(frameCamera, restoreCamera) {
+  function captureFrame(frameCamera, restoreCamera, decorate) {
     const frame = canvas.ownerDocument.createElement('canvas');
     frame.width = 360;
     frame.height = 440;
@@ -1035,7 +1035,9 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     try {
       frameCamera();
       scene.render();
-      frame.getContext('2d').drawImage(canvas, 0, 0);
+      const ctx=frame.getContext('2d');
+      ctx.drawImage(canvas, 0, 0);
+      if (decorate) decorate(ctx);
       return frame.toDataURL('image/jpeg', .86);
     } finally {
       resize();
@@ -1107,7 +1109,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
     festivalView(active,hex) {
       if (active && !festivalView && districtVisit && currentSpot === 'festival') {
         const stick = handSticks.get(equippedStick);
-        festivalView = {x:player.x, z:player.z, yaw:player.yaw, color:color(B,hex), rotation:stick.rotationQuaternion};
+        festivalView = {x:player.x, z:player.z, yaw:player.yaw, color:color(B,hex), rotation:stick.rotationQuaternion, exposure:scene.imageProcessingConfiguration.exposure};
         stick.rotationQuaternion = B.Quaternion.Identity();
         player.x = DISTRICT_X - .67;
         player.z = -7.81;
@@ -1115,6 +1117,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
         inputX = inputY = 0;
         placePixel(player.x-.49,player.z+.18,Math.PI);
       } else if (!active && festivalView) {
+        scene.imageProcessingConfiguration.exposure = festivalView.exposure;
         const {x,z,yaw,rotation} = festivalView;
         Object.assign(player,{x,z,yaw});
         handSticks.get(equippedStick).rotationQuaternion = rotation;
@@ -1122,6 +1125,45 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot } = {
       }
       updateActors(0);
       updateCamera(0);
+    },
+    showEncore(encore) {
+      if (!festivalView) return;
+      festivalView.encore=encore;
+      const exposure=encore.phase==='bow' ? festivalView.exposure : encore.phase==='blackout' ? .065 : .42+.18*encore.entrance+.12*encore.lit;
+      scene.imageProcessingConfiguration.exposure=exposure;
+    },
+    captureEncorePhoto(tint) {
+      if (festivalView?.encore?.lit!==4) throw new Error('Encore finale is not ready');
+      const saved={x:player.x,z:player.z,yaw:player.yaw};
+      return captureFrame(()=>{
+        player.x=DISTRICT_X-.61;
+        player.z=-10.79;
+        player.yaw=.16;
+        updateActors(0);
+        player.pivot.position.y+=.63;
+        camera.fov=.86;
+        camera.position.set(DISTRICT_X+.08,1.88,-7.47);
+        camera.setTarget(new B.Vector3(DISTRICT_X-.08,1.54,-10.9));
+      },()=>{
+        Object.assign(player,saved);
+        updateActors(0);
+        updateCamera(0);
+      },ctx=>{
+        const shade=ctx.createLinearGradient(0,320,0,440);
+        shade.addColorStop(0,'#20112400');
+        shade.addColorStop(1,'#170a20');
+        ctx.fillStyle=shade;
+        ctx.fillRect(0,320,360,120);
+        ctx.strokeStyle=tint; ctx.lineWidth=2; ctx.strokeRect(9,9,342,422);
+        ctx.textAlign='left'; ctx.fillStyle='#fff3de';
+        ctx.font='bold 29px Helvetica, Arial, sans-serif'; ctx.fillText('LISA',24,393);
+        ctx.fillStyle=tint; ctx.font='bold 12px Helvetica, Arial, sans-serif';
+        ctx.fillText('HONGDAE   /   SECRET ENCORE',25,414);
+        ctx.textAlign='right'; ctx.font='25px Georgia, serif'; ctx.fillText('✦',332,389);
+        const date=new Date();
+        const stamp=[date.getFullYear(),date.getMonth()+1,date.getDate()].map(v=>String(v).padStart(2,'0')).join('.');
+        ctx.font='12px Helvetica, Arial, sans-serif'; ctx.fillText(stamp,332,414);
+      });
     },
     waveStick() {
       if (!festivalView) return;

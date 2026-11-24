@@ -1,12 +1,21 @@
-import {createFestivalRound, FESTIVAL_BEAT_MS} from './festival-round.js';
-import {clearInvitation, equipHongdaeStick, readDuet, readHongdaeStick, readInvitation, saveDuet, saveInvitation, savePixelPhoto, startingLook} from './album.js';
+import {createLisaEncore, ENCORE_BEAT_MS, createFestivalRound, FESTIVAL_BEAT_MS} from './festival-round.js';
+import {saveLisaEncorePhoto, clearInvitation, equipHongdaeStick, readDuet, readHongdaeStick, readInvitation, saveDuet, saveInvitation, savePixelPhoto, startingLook} from './album.js';
 import {createWorld} from './world.js';
 import {isShopStick, stickColor, stickName} from '../js/lightstick.js';
 import {worldAudio as audio} from '../js/world-audio.js';
-import {pauseStageMusic, resumeStageMusic, setStageSound, stageApplause, startStageMusic, stopStageMusic} from './stage-music.js';
+import {silentStageBreak, pauseStageMusic, resumeStageMusic, setStageSound, stageApplause, startStageMusic, stopStageMusic} from './stage-music.js';
 
 const phrases = {
   ru: {
+    bowTitle: 'Спасибо, Хондэ!',
+    blackoutHint: 'В зале гаснет свет…',
+    encoreTitle: 'Секретный бис Лисы',
+    entranceHint: 'Один прожектор. Из-за кулис выходит Лиса.',
+    relightHint: 'В такт коснись звезды — зажги четыре ряда',
+    finaleHint: 'Весь зал сияет твоим цветом!',
+    encoreSaved: 'Твоя карточка с концерта уже в альбоме',
+    encoreError: 'Не удалось сохранить карточку на устройстве',
+    encoreRetry: 'Сохранить ещё раз',
     phone: 'Телефон Софии',
     openPhone: 'Открыть телефон',
     language: 'Язык',
@@ -150,6 +159,15 @@ const phrases = {
     backToArena: 'Вернуться на арену',
   },
   tr: {
+    bowTitle: 'Teşekkürler, Hongdae!',
+    blackoutHint: 'Salonda ışıklar sönüyor…',
+    encoreTitle: 'Lisa’nın gizli bisi',
+    entranceHint: 'Tek bir spot yanıyor. Lisa kulisten çıkıyor.',
+    relightHint: 'Ritimde yıldıza dokun, dört sırayı aydınlat',
+    finaleHint: 'Bütün salon senin renginde parlıyor!',
+    encoreSaved: 'Bu gecenin fotokartı albümünde',
+    encoreError: 'Fotokart bu cihaza kaydedilemedi',
+    encoreRetry: 'Kaydı yeniden dene',
     phone: 'Sofia’nın telefonu',
     openPhone: 'Telefonu aç',
     language: 'Dil',
@@ -385,6 +403,9 @@ let shopStick = readHongdaeStick();
 let booth = null;
 let boothTimer = 0;
 let festival = null;
+let encore = null;
+let encorePhoto = null;
+let encoreId = null;
 let festivalFrame = 0;
 let festivalBest = Number(preference('encore.v2.hongdae-wave.best')) || 0;
 let nearNari = false;
@@ -684,10 +705,11 @@ function closePhone() {
 function playAudio() {
   if (!sound || phone.open || document.hidden) return;
   if (festival) {
-    if (!festival.complete && !stageAudioRequested) {
+    const solo=encore && ['entrance','relight','finale'].includes(encore.phase);
+    if ((!festival.complete || solo) && !stageAudioRequested) {
       const session = festival;
       stageAudioRequested = true;
-      void startStageMusic({beatMs:FESTIVAL_BEAT_MS, offsetMs:() => session.elapsed}).then(started => {
+      void startStageMusic({beatMs:solo?ENCORE_BEAT_MS:FESTIVAL_BEAT_MS, solo:Boolean(solo), offsetMs:() => solo ? encore?.musicTime ?? 0 : session.elapsed}).then(started => {
         if (!started && session===festival) stageAudioRequested = false;
       });
     }
@@ -1049,42 +1071,93 @@ function actInHongdae() {
 }
 
 function paintFestival() {
-  const finished = festival.complete;
+  const phase=encore?.phase ?? 'group';
+  game.dataset.encore=phase;
+  const finished=phase==='card';
+  const playing=phase==='group' || phase==='relight';
+  const hints={group:'festivalHint',bow:'festivalDone',blackout:'blackoutHint',entrance:'entranceHint',relight:'relightHint',finale:'finaleHint',card:'finaleHint'};
+  setText('festival-title',words(phase==='group'?'festivalTitle':['blackout','bow'].includes(phase)?'bowTitle':'encoreTitle'));
+  setText('festival-hint',words(hints[phase]));
+  const dotsContainer=byId('festival-dots');
+  dotsContainer.hidden=!playing;
+  if (dotsContainer.childElementCount!==(encore?4:8))
+    dotsContainer.replaceChildren(...Array.from({length:encore?4:8},()=>document.createElement('i')));
   const dots = [...byId('festival-dots').children];
-  dots.forEach((dot,i) => {dot.className = festival.hits[i] ? 'hit' : festival.missed(i) ? 'miss' : '';});
-  setText('festival-hint',words(finished ? 'festivalDone' : 'festivalHint'));
-  setText('festival-score',finished ? `${festival.score}/8 · ${words('festivalBest')} ${festivalBest}/8` : `${festival.score}/8`);
-  byId('festival-tap').hidden = finished;
+  dots.forEach((dot,i) => {dot.className = encore ? (i<encore.lit?'hit':'') : festival.hits[i]?'hit':festival.missed(i)?'miss':'';});
+  setText('festival-score',encore ? (playing ? `${encore.lit}/4` : finished ? `${words('festivalBest')} ${festivalBest}/8` : '') : `${festival.score}/8`);
+  byId('festival-tap').hidden = !playing;
   byId('festival-again').hidden = !finished;
+  byId('encore-gift').hidden = !finished;
+  if(finished) {
+    const print=byId('encore-print');
+    if(encorePhoto && print.getAttribute('src')!==encorePhoto.photo) print.src=encorePhoto.photo;
+    print.hidden=!encorePhoto;
+    print.alt=words('encoreTitle');
+    setText('encore-status',words(encoreId?'encoreSaved':'encoreError'));
+    byId('encore-album').hidden=!encoreId;
+    byId('encore-retry').hidden=Boolean(encoreId);
+  }
+}
+
+function awardEncorePrint() {
+  if (encore?.phase!=='card' || encoreId) return;
+  try {
+    encorePhoto ??= {photo:world.captureEncorePhoto(stickColor(shopStick)), outfit:look.outfit, jacket:look.jacket,
+      stick:shopStick,wandColor:stickColor(shopStick)};
+    encoreId=saveLisaEncorePhoto(encorePhoto);
+  } catch(error) {
+    console.warn('Seoul Encore photocard could not be saved.',error);
+  }
+  paintFestival();
 }
 
 function festivalTick(now) {
-  if (!festival || festival.complete) return;
+  if (!festival || encore?.phase==='card') return;
   if (!phone.open && !document.hidden) {
-    festival.tick(now);
-    const tap = byId('festival-tap');
-    tap.style.setProperty('--fan-ring',festival.ring.toFixed(3));
-    tap.dataset.ready = String(festival.ready);
-    [...byId('festival-dots').children].forEach((dot,i)=>{
-      if (festival.missed(i) && !dot.classList.contains('miss')) dot.className='miss';
-    });
-    if (festival.complete) {
-      closeStageAudio();
-      if (festival.score > festivalBest) {
-        festivalBest = festival.score;
-        storePreference('encore.v2.hongdae-wave.best',String(festivalBest));
+    const tap=byId('festival-tap');
+    if(encore) {
+      const previous=encore.phase;
+      encore.tick(now);
+      world.showEncore(encore);
+      if(previous!==encore.phase) {
+        paintFestival();
+        if(encore.phase==='entrance') playAudio();
+        if(encore.phase==='relight') tap.focus({preventScroll:true});
+        if(encore.phase==='card') {
+          closeStageAudio();
+          if(sound) stageApplause();
+          awardEncorePrint();
+          byId(encoreId?'encore-album':'encore-retry').focus({preventScroll:true});
+          return;
+        }
       }
-      if (sound) stageApplause();
-      paintFestival();
-      byId('festival-again').focus({preventScroll:true});
-      return;
+    } else {
+      festival.tick(now);
+      [...byId('festival-dots').children].forEach((dot,i)=>{
+        if (festival.missed(i) && !dot.classList.contains('miss')) dot.className='miss';
+      });
+      if (festival.complete) {
+        if (festival.score>festivalBest) {
+          festivalBest=festival.score;
+          storePreference('encore.v2.hongdae-wave.best',String(festivalBest));
+        }
+        silentStageBreak();
+        stageAudioRequested=false;
+        encore=createLisaEncore();
+        encore.tick(now);
+        world.showEncore(encore);
+        paintFestival();
+      }
     }
+    const track=encore ?? festival;
+    tap.style.setProperty('--fan-ring',track.ring.toFixed(3));
+    tap.dataset.ready=String(track.ready);
   }
-  festivalFrame = requestAnimationFrame(festivalTick);
+  festivalFrame=requestAnimationFrame(festivalTick);
 }
 
 function pauseFestival() {
-  festival.pause();
+  (encore ?? festival).pause();
   closeStageAudio();
 }
 
@@ -1092,6 +1165,10 @@ function startFestival() {
   resetControls();
   audio.exit();
   closeStageAudio();
+  if(encore) world.festivalView(false);
+  encore=null;
+  encorePhoto=null;
+  encoreId=null;
   world.festivalView(true,stickColor(shopStick));
   festival = createFestivalRound();
   byId('festival-dots').replaceChildren(...festival.hits.map(()=>document.createElement('i')));
@@ -1104,9 +1181,9 @@ function startFestival() {
 }
 
 function tapFestival() {
-  if (!festival || festival.complete || phone.open || document.hidden) return;
+  if (!festival || phone.open || document.hidden) return;
   // Let the animation frame own the transition to the result, including its last beat.
-  if (festival.tap()) {
+  if ((encore ?? festival).tap()) {
     world.waveStick();
     paintFestival();
   }
@@ -1117,6 +1194,10 @@ function leaveFestival() {
   closeStageAudio();
   world.festivalView(false);
   festival = null;
+  encore=null;
+  encorePhoto=null;
+  encoreId=null;
+  delete game.dataset.encore;
   setState('walk');
   paintMission();
   hongdaeAction.focus({preventScroll:true});
@@ -1368,6 +1449,7 @@ byId('festival-tap').addEventListener('pointerdown', event => {
 byId('festival-tap').addEventListener('click', event => {
   if (event.detail===0) tapFestival();
 });
+byId('encore-retry').addEventListener('click',awardEncorePrint);
 byId('festival-again').addEventListener('click', startFestival);
 byId('festival-leave').addEventListener('click', leaveFestival);
 phoneToggle.addEventListener('click', openPhone);

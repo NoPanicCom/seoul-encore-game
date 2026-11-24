@@ -88,7 +88,7 @@ function writeIntro(samples, beat) {
   clap(samples, 1.75 * beat, .10);
 }
 
-function writeGroove(samples, beat) {
+function writeGroove(samples, beat, solo) {
   for (const [index, bar] of SCORE.entries()) {
     const at = step => (INTRO_BEATS + index * 4 + step / 4) * beat;
     for (const step of (index === 3 ? [0, 3, 8, 11, 14] : [0, 6, 8, 10, 14])) kick(samples, at(step));
@@ -110,21 +110,23 @@ function writeGroove(samples, beat) {
           pitch, step === 0 ? .060 : .043, [.42, .14], .032);
       }
     }
-    for (const [step, pitch, duration] of bar.lead) {
+    const soloHook = [[0,bar.chord[2]+12,.76],[5,bar.chord[1]+12,.32],
+      [7,bar.chord[2]+12,.30],[10,bar.chord[3]+12,.55],[14,bar.chord[1]+12,.27]];
+    for (const [step, pitch, duration] of solo ? soloHook : bar.lead) {
       note(samples, at(step), duration * beat, pitch, .152, [.38, .12], .011);
       note(samples, at(step) + beat * .37, duration * beat, pitch, .034, [.15, .06], .021);
     }
   }
 }
 
-function makeSong(context, beatMs) {
+function makeSong(context, beatMs, solo) {
   const beat = beatMs / 1000;
   const start = Math.round(INTRO_BEATS * beat * SAMPLE_RATE);
   const frames = Math.round((INTRO_BEATS + SCORE.length * 4) * beat * SAMPLE_RATE);
   const buffer = context.createBuffer(1, frames, SAMPLE_RATE);
   const samples = buffer.getChannelData(0);
   writeIntro(samples, beat);
-  writeGroove(samples, beat);
+  writeGroove(samples, beat, solo);
   // Ease the two score boundaries so changing or repeating sections stays quiet.
   const ramp = Math.round(.008 * SAMPLE_RATE);
   for (let frame = 0; frame < ramp; frame++) {
@@ -170,6 +172,7 @@ let applause;
 let songBuffer;
 let applauseBuffer;
 let cachedBeat;
+let cachedSolo;
 let closeTimer;
 let suspendedContext;
 let command = 0;
@@ -260,19 +263,20 @@ function playback(buffer, volume, loopStart, offset = 0) {
   return {source, output};
 }
 
-export async function startStageMusic({beatMs = DEFAULT_BEAT_MS, offsetMs} = {}) {
+export async function startStageMusic({beatMs = DEFAULT_BEAT_MS, offsetMs, solo = false} = {}) {
   const start = ++command;
   const ready = await unlockStageAudio();
   if (!ready || start !== command || !enabled || hidden() || context?.state !== 'running') return false;
   const tempo = Number.isFinite(beatMs) ? Math.min(800, Math.max(320, beatMs)) : DEFAULT_BEAT_MS;
-  if (music && cachedBeat === tempo) return true;
+  if (music && cachedBeat === tempo && cachedSolo === solo) return true;
   drop(music);
   drop(applause);
   music = undefined;
   applause = undefined;
   try {
-    if (cachedBeat !== tempo || !songBuffer) {
-      songBuffer = makeSong(context, tempo);
+    if (cachedBeat !== tempo || cachedSolo !== solo || !songBuffer) {
+      songBuffer = makeSong(context, tempo, solo);
+      cachedSolo = solo;
       cachedBeat = tempo;
     }
     const loopFrame = Math.round(INTRO_BEATS * tempo / 1000 * SAMPLE_RATE);
@@ -284,6 +288,12 @@ export async function startStageMusic({beatMs = DEFAULT_BEAT_MS, offsetMs} = {})
     closeWhenQuiet();
     return false;
   }
+}
+
+// Keep the gesture-unlocked context for the silent beat before Lisa walks on.
+export function silentStageBreak() {
+  clearTimeout(closeTimer);
+  stopPlayback();
 }
 
 export function stopStageMusic() {

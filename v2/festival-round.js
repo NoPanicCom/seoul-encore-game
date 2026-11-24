@@ -36,3 +36,45 @@ export function createFestivalRound() {
     missed(i) {return !hits[i] && elapsed>(i+1)*cueInterval+tolerance;},
   };
 }
+
+export const ENCORE_BEAT_MS = 480;
+const bowDuration = 1050;
+const revealAt = bowDuration+1900;
+const audienceAt = revealAt + 3 * ENCORE_BEAT_MS;
+
+// The audience has as many beats as it needs to light the four banks.
+export function createLisaEncore() {
+  let elapsed = 0, last = null, lit = 0, lastHit = -1, finaleAt = null;
+  const interval = 2 * ENCORE_BEAT_MS;
+  const beat = () => (elapsed-audienceAt)/interval;
+  return {
+    get phase() {
+      if (elapsed < bowDuration) return 'bow';
+      if (elapsed < revealAt) return 'blackout';
+      if (elapsed < audienceAt) return 'entrance';
+      if (finaleAt === null) return 'relight';
+      return elapsed-finaleAt < 1450 ? 'finale' : 'card';
+    },
+    get lit() {return lit;},
+    get bow() {return Math.sin(Math.PI*Math.min(1,elapsed/bowDuration));},
+    get entrance() {return Math.min(1,Math.max(0,(elapsed-revealAt)/(audienceAt-revealAt)));},
+    get musicTime() {return Math.max(0,elapsed-revealAt);},
+    get ring() {return 1+1.56*Math.abs(beat()-Math.round(beat()));},
+    get ready() {
+      const i = Math.round(beat());
+      return this.phase==='relight' && i>=1 && lastHit!==i && Math.abs(beat()-i)*interval<=265;
+    },
+    tick(now) {
+      if(last!==null) elapsed+=Math.max(0,now-last);
+      last=now;
+    },
+    pause() {last=null;},
+    tap() {
+      if(!this.ready) return false;
+      lastHit=Math.round(beat());
+      lit++;
+      if(lit===4) finaleAt=elapsed;
+      return true;
+    },
+  };
+}

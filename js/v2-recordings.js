@@ -1,6 +1,7 @@
 import { isShopStick, stickColor, stickId, stickName } from './lightstick.js';
 const prefix = 'encore.v2.duet.';
 const pixelPrefix = 'encore.v2.pixel-photo.';
+const encorePhotoPrefix = 'encore.v2.lisa-encore.photo.';
 const invitationKey = 'encore.v2.nari-invitation';
 const validId = (id) => /^[a-z0-9]{8,48}$/.test(id);
 const hex = (v) => typeof v === 'string' && /^#[a-f0-9]{6}$/i.test(v);
@@ -47,13 +48,22 @@ export function savePixelPhoto(input) {
     localStorage.setItem(pixelPrefix + id, JSON.stringify({ photo, outfit, jacket, stick, wandColor }));
     return id;
 }
-export function pixelAlbum(lang) {
+export function saveLisaEncorePhoto(input) {
+    if (!isPixelPhoto(input) || input.wandColor !== stickColor(input.stick))
+        throw new Error('Invalid Lisa encore photo');
+    const id = newCardId();
+    localStorage.setItem(encorePhotoPrefix + id, JSON.stringify(input));
+    return id;
+}
+export function pixelAlbum(lang, kind = 'pixel') {
+    const encore = kind === 'lisa';
+    const prefix = encore ? encorePhotoPrefix : pixelPrefix;
     const ids = [];
     try {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key?.startsWith(pixelPrefix)) {
-                const id = key.slice(pixelPrefix.length);
+            if (key?.startsWith(prefix)) {
+                const id = key.slice(prefix.length);
                 if (validId(id))
                     ids.push(id);
             }
@@ -66,20 +76,20 @@ export function pixelAlbum(lang) {
     return ids.sort().reverse().map(id => {
         let card;
         try {
-            card = JSON.parse(localStorage.getItem(pixelPrefix + id) ?? 'null');
+            card = JSON.parse(localStorage.getItem(prefix + id) ?? 'null');
         }
         catch {
             return '';
         }
         if (!isPixelPhoto(card))
             return '';
-        const title = tr ? 'Sofia ve Pixel' : 'София и Пиксель';
+        const title = encore ? (tr ? 'Lisa’nın gizli bisi' : 'Секретный бис Лисы') : (tr ? 'Sofia ve Pixel' : 'София и Пиксель');
         const open = tr ? 'Fotoğrafı büyüt' : 'Увеличить фото';
         const close = tr ? 'Küçült' : 'Свернуть';
-        return `<details class="pixel-print" data-pixel-photo="${id}" data-stick="${card.stick}">
+        return `<details class="pixel-print" data-${encore ? 'encore' : 'pixel'}-photo="${id}" data-stick="${card.stick}">
       <summary class="v2-photo" data-venue="hongdae" style="--v2-wand:${card.wandColor}">
-        <img loading="lazy" src="${card.photo}" alt="${tr ? 'Hongdae fotokabininde Sofia ve Pixel' : 'София и Пиксель в фотобудке Хондэ'}">
-        <span><small>HONGDAE · PHOTO CLUB</small><strong>${title}</strong><em>${stickName(card.stick, lang)}</em>
+        <img loading="lazy" src="${card.photo}" alt="${encore ? title : tr ? 'Hongdae fotokabininde Sofia ve Pixel' : 'София и Пиксель в фотобудке Хондэ'}">
+        <span><small>HONGDAE · ${encore ? 'SECRET ENCORE' : 'PHOTO CLUB'}</small><strong>${title}</strong><em>${stickName(card.stick, lang)}</em>
         <b class="print-zoom"><i>${open} ＋</i><i>${close} −</i></b></span>
       </summary></details>`;
     }).join('');
