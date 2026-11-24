@@ -766,3 +766,5 @@ button:active:not(.header-control, .close-button) { transform: scale(.97); }
 #game:is([data-area="city"],[data-area="interior"]) .route {display:none;}
 #city-map-open span {font:26px/1 system-ui;}
 #city-target {color:#ffe19b;}
+
+#game[data-aerial="true"] :is(.nav-cluster, .walk-actions, #mission) {display:none;}

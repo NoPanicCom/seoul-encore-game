@@ -32,6 +32,17 @@ const NEON_MATERIAL = /tube|filament|lettering/i;
 const MODEL_URL = new URL('./models/', import.meta.url).href;
 const CITY_X = 100;
 const ROOM_X = 320;
+const WORLD_CAMERA_FAR = 140;
+const CITY_CAMERA_FAR = 680;
+const AERIAL_CAMERA_FAR = 950;
+const CITY_WEATHER = {
+  clear: [0, .0045, .0018], cloudy: [.47, .0055, .0023], rain: [.68, .0072, .0030],
+  fog: [.58, .015, .0051], snow: [.36, .0060, .0026], storm: [.84, .0084, .0036],
+};
+const DEFAULT_CITY_ENVIRONMENT = Object.freeze({
+  hour: 14, date: '', day: 1, daylight: 1, night: 0, weather: 'clear',
+  windKph: 0, temperature: 17, sunriseHour: 6.5, sunsetHour: 18.5, source: 'simulation',
+});
 const SHOP_STATIONS = { intro: 'host', work: 'work', display: 'display', decision: 'host', done: 'host' };
 const SHOP_STATION_REACH = .72;
 const SHOP_DOOR_SPAWN = 2.05;
@@ -172,7 +183,7 @@ function lightWorld(B, scene) {
   const rim = new B.DirectionalLight('Lavender bounce', new B.Vector3(.52, -.2, .67), scene);
   rim.diffuse = new B.Color3(.64, .57, 1);
   rim.intensity = .51;
-  return rim;
+  return { sky, key, rim };
 }
 
 function makeShadowMaterial(B, scene) {
@@ -458,10 +469,15 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   const camera = new B.FreeCamera('Third-person camera', new B.Vector3(0, 2.7, 14), scene);
   camera.fov = .86;
   camera.minZ = .045;
-  camera.maxZ = 140;
+  camera.maxZ = WORLD_CAMERA_FAR;
   scene.activeCamera = camera;
 
-  const rim = lightWorld(B, scene);
+  const { sky, key, rim } = lightWorld(B, scene);
+  const worldLighting = {
+    clear: scene.clearColor.clone(), fog: scene.fogColor.clone(), fogDensity: scene.fogDensity,
+    skyDiffuse: sky.diffuse.clone(), skyGround: sky.groundColor.clone(), skyIntensity: sky.intensity,
+    keyDiffuse: key.diffuse.clone(), keyIntensity: key.intensity, rimIntensity: rim.intensity,
+  };
   const shadow = makeShadowMaterial(B, scene);
   const glow = new B.GlowLayer('Neon glow', scene, { mainTextureRatio: .36, blurKernelSize: 32 });
   glow.intensity = .30;
@@ -539,6 +555,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   let cityState = null;
   let cityPending = null;
   let cityVisit = null;
+  let cityAerial = null;
+  let cityEnvironment = DEFAULT_CITY_ENVIRONMENT;
   let roomVisit = null;
   let roomPending = null;
   let sumiInterior = null;
@@ -552,6 +570,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   let festivalView = null;
   let lastWave = -10;
   const stageFocus = new B.Vector3(DISTRICT_X,1.34,-11.25);
+  const aerialFocus = new B.Vector3(CITY_X, 4, -8);
   const handRotation = new B.Quaternion();
   const stickRotation = new B.Quaternion();
   let equippedStick = null;
@@ -648,16 +667,23 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   }
 
   async function loadCity() {
-    const [grid, layouts, citizens] = await Promise.all([
+    const [grid, layouts, citizens, skylines, atmospheres] = await Promise.all([
       import('./city-grid.js'), import('./cityscape.js'), import('./city-pedestrians.js'),
+      import('./city-skyline.js'), import('./city-atmosphere.js'),
     ]);
     if (disposed) throw new Error('Sahne kapatıldı');
     const anchor = new B.TransformNode('City district', scene);
     anchor.position.x = CITY_X;
+    anchor.setEnabled(false);
     let layout;
     let pedestrians;
+    let skyline;
+    let atmosphere;
     try {
       layout = layouts.createCityscape(B, scene, anchor);
+      skyline = skylines.createCitySkyline(B, scene, anchor);
+      atmosphere = atmospheres.createCityAtmosphere(B, scene, anchor);
+      atmosphere.setActive(false);
       pedestrians = citizens.createCityPedestrians(B, scene, anchor, {
         onSumiGuestEnter: ({ buildingId, visitorId }) => {
           if (buildingId === grid.SUMI_CAFE_ID && visitorId === sumiGuestId) guestReachedDoor = true;
@@ -667,13 +693,14 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       pedestrians.update(grid.CITY_ENTRY.x, grid.CITY_ENTRY.z, 0);
       await scene.whenReadyAsync();
       if (disposed) throw new Error('Sahne kapatıldı');
-      anchor.setEnabled(false);
       const walls = offsetWalls(grid.CITY_BUILDINGS.map(({ x, z, width, depth, height }) => ({
         min: [x - width / 2, 0, z - depth / 2],
         max: [x + width / 2, height, z + depth / 2],
       })), CITY_X);
-      return { anchor, layout, pedestrians, grid, walls };
+      return { anchor, layout, pedestrians, skyline, atmosphere, grid, walls };
     } catch (error) {
+      atmosphere?.dispose();
+      skyline?.dispose();
       pedestrians?.dispose();
       layout?.dispose();
       anchor.dispose();
@@ -733,7 +760,37 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     return { yaw: preferred, distance };
   }
 
+  function updateAerialCamera(elapsed) {
+    const turn = elapsed ? damping(12, elapsed) : 1;
+    cityAerial.yaw = blendAngle(cityAerial.yaw, cityAerial.orbitYaw, turn);
+    cityAerial.zoom += (cityAerial.targetZoom - cityAerial.zoom) * turn;
+    const { yaw, pitch, corners, zoom } = cityAerial;
+    const aspect = engine.getRenderWidth() / engine.getRenderHeight();
+    camera.fov = aspect < .85 ? 1.39 : 1.06;
+    const vertical = Math.tan(camera.fov / 2) * .94;
+    const horizontal = vertical * aspect;
+    const bearingX = Math.sin(yaw), bearingZ = Math.cos(yaw);
+    const elevation = Math.sin(pitch), run = Math.cos(pitch);
+    let distance = 145;
+    // Fit the playable footprint and the landmark while orbiting, including on narrow screens.
+    for (const { x, y, z } of corners) {
+      const localX = CITY_X + x - aerialFocus.x;
+      const localY = y - aerialFocus.y;
+      const localZ = z - aerialFocus.z;
+      const forward = bearingX * localX + bearingZ * localZ;
+      const right = bearingZ * localX - bearingX * localZ;
+      const up = run * localY - elevation * forward;
+      const depth = run * forward + elevation * localY;
+      distance = Math.max(distance, depth + Math.max(Math.abs(right) / horizontal, Math.abs(up) / vertical));
+    }
+    const viewingDistance = distance * zoom;
+    camera.position.set(aerialFocus.x + bearingX * run * viewingDistance, aerialFocus.y + elevation * viewingDistance,
+      aerialFocus.z + bearingZ * run * viewingDistance);
+    camera.setTarget(aerialFocus);
+  }
+
   function updateCamera(elapsed, cardCapture = false) {
+    if (cityAerial) return updateAerialCamera(elapsed);
     if (festivalView) {
       const aspect = engine.getRenderWidth() / engine.getRenderHeight();
       camera.fov = 1.03;
@@ -755,6 +812,9 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       clamp(Math.min((player.z - 12.5) / 3, (25.3 - player.z) / 3), 0, 1) : 0;
     const districtWide = districtVisit && !cityVisit && !orbitAdjusted && !lookPreview && districtArea(player.x - DISTRICT_X) === 'hongdae' ?
       clamp((player.z - 1.2) / 4.4, 0, 1) : 0;
+    const riverfront = cityVisit && !roomVisit && !lookPreview && player.z < -61 &&
+      Math.abs(player.x - CITY_X + 16) < (player.z < -74.9 ? 8 : 2.7);
+    const vistaProgress = riverfront ? clamp((-player.z - 61) / 17, 0, 1) : 0;
     const shelfView = districtVisit && currentSpot?.startsWith('shelf-') && !orbitAdjusted && !lookPreview && !inputX && !inputY;
     const sumiView = showingSumi();
     const watchingCafe = roomVisit?.sumi && !lookPreview && !inputX && !inputY;
@@ -764,7 +824,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     const carryView = player.carrying && !orbitAdjusted && !lookPreview;
     const compactInterior = (hostView || sumiView || paymentView || servingView) && portrait ? clamp((800 - viewHeight) / 180, 0, 1) : 0;
 
-    camera.fov = servingView || hostView ? (portrait ? 1.20 : .96) : staged ? (portrait || cardCapture ? .88 : .77) :
+    camera.fov = riverfront ? (portrait ? 1.44 + .18 * vistaProgress : 1.34 + .15 * vistaProgress) :
+      servingView || hostView ? (portrait ? 1.20 : .96) : staged ? (portrait || cardCapture ? .88 : .77) :
       (portrait ? 1.04 + .33 * establishing + .22 * panorama + .13 * districtWide :
         .84 + .14 * establishing + .13 * panorama + .08 * districtWide);
     let distance = portrait ? 4.7 : 4.45;
@@ -785,12 +846,13 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     } else {
       const indoors = districtVisit && !cityVisit && districtArea(player.x - DISTRICT_X) === 'minho';
       const tableAim = sumiOrder === 'delivered' ? (portrait ? .54 - .54 * compactInterior : .85) : .86;
-      const aimHeight = servingView ? tableAim :
+      const aimHeight = riverfront ? 3.40 + 1.48 * vistaProgress : servingView ? tableAim :
         hostView || sumiView || paymentView ? (portrait ? .64 - .64 * compactInterior : .88) : lookPreview && portrait ? (viewHeight < 720 ? .20 : .34) :
           1.16 + .62 * establishing + .56 * panorama + .24 * districtWide;
       distance += (portrait ? 4.7 : 3.4) * establishing + 3.2 * panorama + 1.12 * districtWide;
       if (indoors) distance = shelfView ? 3.65 : 3.25;
       if (cityVisit) distance = roomVisit ? 3.55 : 5.25;
+      if (riverfront) distance = 6.55 + 1.65 * vistaProgress;
       if (servingView) {
         const { chair } = roomVisit.model.sumiDelivery;
         const sideGap = (player.x - ROOM_X - chair.x) * .91 + (player.z - chair.z) * .41;
@@ -836,7 +898,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       const desiredYaw = servingView ? tableYaw : hostView ? hostYaw : paymentView ? .84 : sumiView ? .72 : shelfView ? -1.34 :
         orbitYaw + .32 * establishing - .25 * panorama - .16 * districtWide + (carryView ? .55 : 0);
       cameraYaw = blendAngle(cameraYaw, desiredYaw, smoothing);
-      const desiredPitch = servingView ? (portrait ? .34 + .12 * compactInterior : .29) :
+      const desiredPitch = riverfront ? clamp(orbitPitch - .44 - .25 * vistaProgress, -.49, .36) :
+        servingView ? (portrait ? .34 + .12 * compactInterior : .29) :
         hostView || sumiView || paymentView ? (portrait ? .26 + .12 * compactInterior : .18) : orbitPitch - .075 * establishing + (carryView ? .16 : 0);
       cameraPitch += (desiredPitch - cameraPitch) * smoothing;
     }
@@ -895,6 +958,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   }
 
   function citySpot() {
+    if (cityAerial) return null;
     if (roomVisit) {
       const { exit, activity } = roomVisit.model;
       const x = player.x - ROOM_X;
@@ -975,7 +1039,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   }
 
   function move(elapsed) {
-    if (!inputX && !inputY) return 0;
+    if (cityAerial || (!inputX && !inputY)) return 0;
 
     const forwardX = -Math.sin(orbitYaw);
     const forwardZ = -Math.cos(orbitYaw);
@@ -1144,7 +1208,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     } else {
       animateWalk(player, moved, elapsed);
     }
-    followPixel(elapsed);
+    followPixel(cityAerial ? 0 : elapsed);
     if (districtVisit || cityVisit) return;
     if (!journey && time < greetingEnds) {
       animateActor(nari, 'greet', 1 - (greetingEnds - time) / GREETING_DURATION, elapsed);
@@ -1163,7 +1227,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   }
 
   function setLookPreview(active) {
-    if (exploration || active === Boolean(lookPreview)) return;
+    if (exploration || cityAerial || active === Boolean(lookPreview)) return;
     if (active) {
       lookPreview = { yaw: player.yaw };
       inputX = inputY = 0;
@@ -1183,6 +1247,70 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   function setDistrictVisible(visible) {
     hongdae.anchor.setEnabled(visible);
     setYGVisible(!visible);
+  }
+
+  function applyCityEnvironment() {
+    const { daylight, night, weather } = cityEnvironment;
+    const [cloudCover, streetFog, aerialFog] = CITY_WEATHER[weather];
+    const sun = daylight * (1 - cloudCover * .63);
+    camera.minZ = cityAerial ? 1.6 : .045;
+    camera.maxZ = cityAerial ? AERIAL_CAMERA_FAR : CITY_CAMERA_FAR;
+    scene.clearColor.set(.065 + sun * .46, .090 + sun * .54, .162 + sun * .58, 1);
+    scene.fogColor.set(.10 + daylight * (.48 - cloudCover * .11), .13 + daylight * .50, .22 + daylight * .52);
+    scene.fogDensity = (cityAerial ? aerialFog : streetFog) * (1 + .16 * night);
+    sky.diffuse.set(.55 + daylight * .32, .65 + daylight * .25, .88 + daylight * .11);
+    sky.groundColor.set(.25 + sun * .29, .24 + sun * .25, .39 + sun * .14);
+    sky.intensity = .93 + .28 * sun;
+    key.diffuse.set(.67 + .33 * daylight, .74 + .19 * daylight, .94 - .10 * sun);
+    key.intensity = .30 + 1.02 * sun;
+    rim.intensity = .31 + .18 * night;
+  }
+
+  function setCityVisible(visible) {
+    cityState.anchor.setEnabled(visible);
+    cityState.atmosphere.setActive(visible);
+    if (visible) {
+      applyCityEnvironment();
+      return;
+    }
+    cityState.layout.setAerial(false);
+    camera.minZ = .045;
+    camera.maxZ = WORLD_CAMERA_FAR;
+    scene.clearColor.copyFrom(worldLighting.clear);
+    scene.fogColor.copyFrom(worldLighting.fog);
+    scene.fogDensity = worldLighting.fogDensity;
+    sky.diffuse.copyFrom(worldLighting.skyDiffuse);
+    sky.groundColor.copyFrom(worldLighting.skyGround);
+    sky.intensity = worldLighting.skyIntensity;
+    key.diffuse.copyFrom(worldLighting.keyDiffuse);
+    key.intensity = worldLighting.keyIntensity;
+    rim.intensity = worldLighting.rimIntensity;
+  }
+
+  function setCityEnvironment(sample) {
+    if (!sample || !Number.isFinite(sample.hour) || !Number.isFinite(sample.daylight) ||
+        !Number.isFinite(sample.night) || !Object.hasOwn(CITY_WEATHER, sample.weather)) {
+      throw new RangeError('Seul şehir havası bilgisi geçersiz');
+    }
+    cityEnvironment = { ...sample, daylight: clamp(sample.daylight, 0, 1), night: clamp(sample.night, 0, 1) };
+    if (cityVisit && !roomVisit) applyCityEnvironment();
+  }
+
+  function setCityAerial(enabled) {
+    if (disposed || !cityVisit || roomVisit || roomPending || enabled === Boolean(cityAerial)) return false;
+    if (enabled) {
+      setLookPreview(false);
+      const { minX, maxX, minZ, maxZ } = cityState.grid.CITY_BOUNDS;
+      const { x, z } = cityState.skyline.landmark;
+      const corners = [minX, maxX].flatMap(x => [minZ, maxZ].flatMap(z => [0, 8].map(y => ({ x, y, z }))));
+      corners.push({ x, y: 0, z }, { x, y: 54, z });
+      cityAerial = { yaw: .12, orbitYaw: .12, pitch: .82, zoom: 1, targetZoom: 1, corners };
+    } else cityAerial = null;
+    inputX = inputY = 0;
+    cityState.layout.setAerial(Boolean(cityAerial));
+    applyCityEnvironment();
+    renderTravel();
+    return true;
   }
 
   function saveLocation() {
@@ -1211,8 +1339,15 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   function renderTravel() {
     updateActors(0);
     updateCamera(0);
+    updateCityAtmosphere(0);
     scene.render();
     showBoundaries();
+  }
+
+  function updateCityAtmosphere(elapsed) {
+    if (!cityVisit || roomVisit) return;
+    cityState.skyline.update(cityEnvironment);
+    cityState.atmosphere.update(cityEnvironment, elapsed, player.x - CITY_X, player.z, Boolean(cityAerial));
   }
 
   async function enterHongdae(destination = 'gate') {
@@ -1244,7 +1379,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     setLookPreview(false);
     if (festivalView) toggleFestivalView(false);
     if (roomVisit) disposeRoom();
-    if (cityVisit) cityState.anchor.setEnabled(false);
+    if (cityVisit) setCityVisible(false);
+    cityAerial = null;
     cityVisit = null;
     districtVisit = null;
     restoreLocation(saved);
@@ -1270,13 +1406,13 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     placeLocation(CITY_X + entry.x, entry.z, entry.yaw + Math.PI, entry.yaw);
     if (visit) hongdae.anchor.setEnabled(false);
     else setYGVisible(false);
-    cityState.anchor.setEnabled(true);
+    setCityVisible(true);
     renderTravel();
   }
 
   function leaveCity() {
     if (!cityVisit) return;
-    if (roomVisit || currentSpot !== 'city-exit') throw new Error('Geri dönmek için şehir çıkışına yaklaş');
+    if (cityAerial || roomVisit || currentSpot !== 'city-exit') throw new Error('Geri dönmek için şehir çıkışına yaklaş');
     returnFromCity();
   }
 
@@ -1286,7 +1422,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     const { home, fromHongdae } = cityVisit;
     restoreLocation(home);
     cityVisit = null;
-    cityState.anchor.setEnabled(false);
+    cityAerial = null;
+    setCityVisible(false);
     if (fromHongdae) hongdae.anchor.setEnabled(true);
     else setYGVisible(true);
     renderTravel();
@@ -1332,7 +1469,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
         }
         const spawn = model.spawn;
         placeLocation(ROOM_X + spawn.x, spawn.z, spawn.yaw);
-        cityState.anchor.setEnabled(false);
+        setCityVisible(false);
         anchor.setEnabled(true);
         renderTravel();
         return;
@@ -1341,7 +1478,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       if (roomVisit?.anchor === anchor) {
         restoreLocation(roomVisit.previous);
         disposeRoom();
-        cityState.anchor.setEnabled(true);
+        setCityVisible(true);
       } else if (!cached) {
         shop?.view.dispose();
         model?.dispose();
@@ -1357,7 +1494,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   }
 
   async function enterBuilding(id) {
-    if (!cityVisit || roomVisit || currentSpot !== `door:${id}`) throw new Error('Binaya girmek için kapısına yaklaş');
+    if (!cityVisit || cityAerial || roomVisit || currentSpot !== `door:${id}`) throw new Error('Binaya girmek için kapısına yaklaş');
     const building = cityState.grid.getBuilding(id);
     if (!building) throw new RangeError('Bina bulunamadı: ' + id);
     if (!roomPending) roomPending = openRoom(building).finally(() => { roomPending = null; });
@@ -1385,7 +1522,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     setLookPreview(false);
     restoreLocation(roomVisit.previous);
     disposeRoom();
-    cityState.anchor.setEnabled(true);
+    setCityVisible(true);
     renderTravel();
   }
 
@@ -1402,20 +1539,19 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
   }
 
   function faceCityDoor(id) {
-    if (!cityVisit || roomVisit) return false;
+    if (!cityVisit || cityAerial || roomVisit) return false;
     const building = cityState.grid.getBuilding(id);
     if (!building) return false;
     const dx = CITY_X + building.door.x - player.x;
     const dz = building.door.z - player.z;
     orbitYaw = cameraYaw = Math.atan2(-dx, -dz);
     orbitAdjusted = true;
-    updateCamera(0);
-    scene.render();
+    renderTravel();
     return true;
   }
 
   function approachCityDoor(id) {
-    if (!cityVisit || roomVisit) return false;
+    if (!cityVisit || cityAerial || roomVisit) return false;
     const building = cityState.grid.getBuilding(id);
     if (!building) return false;
     const { x, z, nx, nz } = building.door;
@@ -1424,6 +1560,14 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     if (!cityState.grid.walkable(approachX, approachZ, PLAYER_RADIUS)) return false;
     setLookPreview(false);
     placeLocation(CITY_X + approachX, approachZ, Math.atan2(-nx, -nz));
+    renderTravel();
+    return true;
+  }
+
+  function approachRiverTerrace() {
+    if (!cityVisit || cityAerial || roomVisit) return false;
+    setLookPreview(false);
+    placeLocation(CITY_X - 16, -62.5, Math.PI, 0);
     renderTravel();
     return true;
   }
@@ -1789,6 +1933,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     time += elapsed;
     updateActors(elapsed);
     updateCamera(elapsed);
+    updateCityAtmosphere(elapsed);
     scene.render();
   });
 
@@ -1802,8 +1947,13 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
     enterBuilding,
     leaveBuilding,
     cityPosition,
+    cityLandmark() { return cityState?.skyline.landmark ?? null; },
+    isCityAerial() { return Boolean(cityAerial); },
+    setCityAerial,
+    setCityEnvironment,
     faceCityDoor,
     approachCityDoor,
+    approachRiverTerrace,
     shopStory,
     shopStoryTarget,
     setShopStoryProgress,
@@ -1870,12 +2020,18 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
       hongdae.festival.wave(lastWave);
     },
     setInput(x, y) {
+      if (cityAerial) return;
       const length = Math.max(1, Math.hypot(x, y));
       inputX = x / length;
       inputY = y / length;
     },
     orbit(dx, dy) {
       if (exploration) return;
+      if (cityAerial) {
+        cityAerial.orbitYaw = (cityAerial.orbitYaw - dx * .008) % TAU;
+        cityAerial.targetZoom = clamp(cityAerial.targetZoom * Math.exp(dy * .0045), .56, 1);
+        return;
+      }
       orbitAdjusted = true;
       orbitYaw = (orbitYaw - dx * .008) % TAU;
       orbitPitch = clamp(orbitPitch + dy * .0055, -.05, .73);
@@ -1929,6 +2085,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove, onSpot, onSu
         sumiInterior.anchor.dispose();
       }
       if (cityState) {
+        cityState.atmosphere.dispose();
+        cityState.skyline.dispose();
         cityState.pedestrians.dispose();
         cityState.layout.dispose();
         cityState.anchor.dispose();

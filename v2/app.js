@@ -1,3 +1,5 @@
+import {createCityWeather} from './city-weather.js';
+import {createCityWeatherUI} from './city-weather-ui.js';
 import {getBuilding, CITY_TYPES, SUMI_CAFE_ID} from './city-grid.js';
 import {createShopJournal} from './shop-journal.js';
 import {createShopStoryUI} from './shop-story-ui.js';
@@ -13,6 +15,7 @@ const phrases = {
   ru: {
     storyTalk: 'Поговорить',
     shopRoute: 'Задание в этом месте',
+    riverWalk: 'Пройди по настилу к башне',
     storyWork: 'За работу',
     storyDisplay: 'Показать',
     storyRecall: 'Вспомнить',
@@ -214,6 +217,7 @@ const phrases = {
   tr: {
     storyTalk: 'Konuş',
     shopRoute: 'Mekândaki görev',
+    riverWalk: 'Ahşap yoldan kuleye doğru yürü',
     storyWork: 'İşe başla',
     storyDisplay: 'Göster',
     storyRecall: 'Hatırla',
@@ -527,8 +531,44 @@ let joystickInput = {x: 0, y: 0};
 const words = key => phrases[lang][key];
 const setText = (id, value) => { byId(id).textContent = value; };
 let cityTarget=null;
+let riverWalk=false;
 let cityReturn='hongdae';
 let directionTimer=0;
+const cityWeather = createCityWeather();
+let weatherTimer;
+const weatherUi = createCityWeatherUI({
+  lang: () => lang,
+  onPanel: open => { if (open) resetControls(); },
+  onView: changeCityView,
+  onTime(action) { cityWeather.jump(action); paintWeather(); },
+});
+
+function changeCityView(enabled) {
+  if (area !== 'city' || !world || state !== 'walk' || hongdaePending || cityUi.isOpen() || phone.open) return;
+  resetControls();
+  weatherUi.close();
+  world.setCityAerial(enabled);
+  paintMission();
+}
+
+function paintWeather() {
+  clearTimeout(weatherTimer);
+  const outdoors = area === 'city' && state === 'walk' && world;
+  const aerial = Boolean(outdoors && world.isCityAerial());
+  game.dataset.aerial = String(aerial);
+  if (!outdoors) {
+    weatherUi.update({visible:false,aerial:false});
+    return;
+  }
+  const sample = cityWeather.sample();
+  world.setCityEnvironment(sample);
+  weatherUi.update({visible:!cityUi.isOpen() && !phone.open && wardrobe.hidden, aerial, sample, landmark:world.cityLandmark()});
+  if (!document.hidden) {
+    void cityWeather.refresh();
+    weatherTimer = setTimeout(paintWeather, 500);
+  }
+}
+
 const shopJournal = createShopJournal(() => localStorage);
 const storyStations = {intro:'host', work:'work', display:'display', decision:'host', done:'host'};
 
@@ -574,10 +614,11 @@ const cityUi=createCityActivities({
   onSumiAccept:()=>world.acceptSumiOrder(),
   onSumiPickup:()=>world.pickupSumiDrink(),
   onSumiReplay:()=>world.restartSumiVisit(),
-  onTarget:building=>{cityTarget=building; paintMission();},
+  onTarget:building=>{riverWalk=false; cityTarget=building; paintMission();},
 });
 const inCity=()=>area==='city' || area==='interior';
-const canWalk = () => !cityUi.isOpen() && !shopUi.isOpen() && state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending && !hongdaePending;
+const canOrbit = () => !cityUi.isOpen() && !shopUi.isOpen() && state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending && !hongdaePending;
+const canWalk = () => canOrbit() && !world?.isCityAerial();
 const journey = () => concertFinale !== null;
 const arenaRound = () => round?.venue === 'arena';
 const rhythmState = phase => phase === 'play' || phase === 'concert';
@@ -605,7 +646,7 @@ function paintCityTarget() {
   const story = area === 'interior' && state === 'walk' && world?.shopStory();
   const step = story && shopJournal.read(story.id).stage;
   const guide = story && (story.id !== SUMI_CAFE_ID || (step !== 'intro' && step !== 'done')) && world.shopStoryTarget();
-  const pos = area === 'city' && state === 'walk' && cityTarget && world?.cityPosition();
+  const pos = area === 'city' && state === 'walk' && (riverWalk || cityTarget) && world?.cityPosition();
   label.hidden = !guide && !pos;
   if (guide) {
     dx = guide.x - guide.playerX;
@@ -615,10 +656,10 @@ function paintCityTarget() {
       {work:'Çalışma tezgâhı', display:'Sergi alanı'};
     name = stationNames[step] || story.host[lang];
   } else if (pos) {
-    dx = cityTarget.door.approachX - pos.x;
-    dz = cityTarget.door.approachZ - pos.z;
+    dx = (riverWalk ? -16 : cityTarget.door.approachX) - pos.x;
+    dz = (riverWalk ? -77 : cityTarget.door.approachZ) - pos.z;
     yaw = pos.cameraYaw;
-    name = cityTarget.name;
+    name = riverWalk ? (lang === 'tr' ? 'Nehir terası' : 'Терраса у реки') : cityTarget.name;
   } else return;
   const distance = Math.round(Math.hypot(dx,dz));
   const right = dx*Math.cos(yaw) - dz*Math.sin(yaw);
@@ -627,6 +668,11 @@ function paintCityTarget() {
   const arrow = distance<=1 ? '⌖' : ['↑','↗','→','↘','↓','↙','←','↖'][sector];
   const hint = arrow + ' ' + name + ' · ' + distance + ' ' + words('meters');
   if (label.textContent !== hint) label.textContent = hint;
+  if (riverWalk && pos) {
+    const near = Math.hypot(dx,dz) <= 2.5;
+    const objective = near ? (lang === 'tr' ? 'Seul Gök Kulesi' : 'Лазурная башня Сеула') : words('riverWalk');
+    if (byId('objective').textContent !== objective) setText('objective',objective);
+  }
   directionTimer=setTimeout(paintCityTarget,400);
 }
 
@@ -713,6 +759,7 @@ function paintPhotoPreview() {
 }
 
 function paintMission() {
+  paintWeather();
   const building=inCity()?cityBuilding():null;
   const type=building && CITY_TYPES[building.typeIndex];
   setText('area',type ? type[lang] : words(area));
@@ -743,7 +790,7 @@ function paintMission() {
     if (spot === 'festival') objective = shopStick ? 'festivalTitle' : 'festivalShop';
     if (spot === 'booth' && !shopStick) objective = 'boothNeedsStick';
   }
-  if (area==='city') objective=cityTarget?'followTarget':'cityObjective';
+  if (area==='city') objective=riverWalk?'riverWalk':cityTarget?'followTarget':'cityObjective';
   if (area==='interior') objective='interiorObjective';
   let objectiveText=building?.name ?? (context?.shelf ? stickName(context.shelf,lang) : words(objective));
   const sumiPhase=area==='interior' && building?.id===SUMI_CAFE_ID ? world?.sumiDeliveryState() : null;
@@ -874,6 +921,7 @@ function paintLanguage() {
 function setState(next) {
   state = next;
   game.dataset.state = next;
+  paintWeather();
   const walking = next === 'walk';
   const dancing = Object.hasOwn(timings, next);
   byId('startup').hidden = next !== 'loading';
@@ -945,7 +993,9 @@ function openPhone() {
   if (!wardrobe.hidden) setWardrobe(false);
   resetControls();
   paintInvitation();
+  weatherUi.close();
   phone.showModal();
+  paintWeather();
   if (round) round.lastTime = null;
   if (stagePerformance()) pauseStageMusic();
   if (festival) pauseFestival();
@@ -956,6 +1006,7 @@ function openPhone() {
 function closePhone() {
   if (!phone.open) return;
   phone.close();
+  paintWeather();
   if (festival) playAudio();
   if (stagePerformance()) {
     resumeStageMusic();
@@ -1701,6 +1752,11 @@ async function load() {
           else world.approachCityDoor(cityTarget.id);
           paintCityTarget();
         }
+        if (area === 'city' && visit === 'terrace') {
+          riverWalk = world.approachRiverTerrace();
+          paintMission();
+        }
+        if (area === 'city' && entry.searchParams.get('view') === 'aerial') changeCityView(true);
       } else if (entry.searchParams.get('start') === 'hongdae') {
         const destination = entry.searchParams.get('at') === 'booth' ? 'booth' : 'gate';
         entry.searchParams.delete('start');
@@ -1735,7 +1791,7 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   });
 }
 canvas.addEventListener('pointerdown', event => {
-  if (!canWalk() || event.button !== 0 || orbitPointer) return;
+  if (!canOrbit() || event.button !== 0 || orbitPointer) return;
   orbitPointer = {id: event.pointerId, x: event.clientX, y: event.clientY};
   canvas.setPointerCapture(event.pointerId);
 });
@@ -1754,13 +1810,18 @@ document.addEventListener('keydown', event => {
   const editing = event.target instanceof Element && event.target.matches('input, textarea, select, [contenteditable]');
   if (event.altKey || event.ctrlKey || event.metaKey || editing || phone.open || cityUi.isOpen() || shopUi.isOpen()) return;
   if (event.code === 'Escape') {
-    if (!wardrobe.hidden) setWardrobe(false, true);
+    if (weatherUi.isOpen()) weatherUi.close();
+    else if (world?.isCityAerial()) changeCityView(false);
+    else if (!wardrobe.hidden) setWardrobe(false, true);
     else if (festival) leaveFestival();
     else if (state === 'booth') closeBooth();
     else if (state === 'result' || Object.hasOwn(timings, state)) backToWalk();
     return;
   }
-  if (canWalk() && directionKeys.has(event.code)) {
+  if (canOrbit() && area === 'city' && event.code === 'KeyV' && !event.repeat) {
+    event.preventDefault();
+    changeCityView(!world.isCityAerial());
+  } else if (canWalk() && directionKeys.has(event.code)) {
     event.preventDefault();
     playAudio();
     keysHeld.add(event.code);
@@ -1802,7 +1863,10 @@ window.addEventListener('pageshow', event => {
   paintLanguage();
 });
 window.addEventListener('hashchange', () => location.reload());
+window.addEventListener('pagehide', () => cityWeather.save());
 document.addEventListener('visibilitychange', () => {
+  cityWeather.pause(document.hidden);
+  paintWeather();
   if (festival) {
     if (document.hidden) pauseFestival();
     else if (!phone.open) playAudio();
@@ -1823,7 +1887,11 @@ byId('encore-retry').addEventListener('click',awardEncorePrint);
 byId('festival-again').addEventListener('click', startFestival);
 byId('festival-leave').addEventListener('click', leaveFestival);
 byId('city-map-open').addEventListener('click',()=>{
-  if(canWalk() && inCity()) cityUi.map(world.cityPosition(), cityTarget);
+  if(canOrbit() && inCity()) {
+    weatherUi.close();
+    cityUi.map(world.cityPosition(), cityTarget);
+    paintWeather();
+  }
 });
 phoneToggle.addEventListener('click', openPhone);
 byId('phone-close').addEventListener('click', closePhone);

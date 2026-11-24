@@ -149,7 +149,7 @@ function signs(B, scene) {
     ...CITY_BUILDINGS.map(building => ({ id: building.id, title: building.name, accent: ARCHITECTURE[building.type][2] })),
     ...ROADS_X.map((title, i) => ({ id: `x${i}`, title, accent: '9DE3DE' })),
     ...ROADS_Z.map((title, i) => ({ id: `z${i}`, title, accent: '9DE3DE' })),
-    { id: 'entry', title: 'SEOUL AFTER DARK', accent: 'F1C3E8' },
+    { id: 'entry', title: 'SEOUL ENCORE', accent: 'F1C3E8' },
     { id: 'exit', title: 'HONGDAE', accent: 'FFCC9E' },
   ];
   const width = 2048, height = 1024, columns = 10, cw = 204, ch = 45;
@@ -388,7 +388,7 @@ function tree(out, x, z, variant) {
   diamond(out, x - .24, 1.67, z + .10, .33, .90, tint(leaves, .87));
 }
 
-function pavement(block, solid, detail) {
+function pavement(block, solid) {
   const { x, z, row, column } = block;
   const w = BLOCK_WIDTH / 2, d = BLOCK_DEPTH / 2;
   const stone = paint('50495F');
@@ -408,7 +408,6 @@ function pavement(block, solid, detail) {
       const lampX = x + side * 11.76, lampZ = z + j * 8.74;
       box(solid, lampX, 1.235, lampZ, .076, 2.45, .076, paint('62566E'));
       box(solid, lampX, 2.45, lampZ + j * .15, .097, .081, .36, paint('72637A'));
-      box(detail, lampX, 2.391, lampZ + j * .252, .146, .057, .158, paint('FFDAA5'));
     }
   }
 }
@@ -499,22 +498,80 @@ function wayfinding(out, labels, uvs) {
   }
 }
 
-function farArchitecture(out) {
+function distantShops(out) {
   for (const building of CITY_BUILDINGS) {
     const { x, z, width, depth, height, type } = building;
     const color = tint(paint(ARCHITECTURE[type][0]), .72);
     box(out, x, height * .276, z, width * .93, height * .552, depth * .93, color);
   }
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 15; i++) {
-      const x = (i - 7) * 11.05 + Math.sin(i * 4.1) * 3.9;
-      const z = side * (79 + Math.cos(i * 2.73) * 5.5);
-      const h = 6.7 + (i * 13 % 9) * .94;
-      const color = paint(['3F4058', '44455F', '484461', '3D4359'][i % 4]);
-      box(out, x, h / 2, z, 5.7 + (i % 3) * 1.51, h, 6.5, color);
-      box(out, x + .45, h + .41, z, 3.84, .82, 3.84, tint(color, 1.05));
+}
+
+function aerialArchitecture(building, solid, lights) {
+  const {x,z,width:w,depth:d,height:h,door,variant,type,typeIndex} = building;
+  const [bodyHex,trimHex,accentHex,glassHex] = building.id === SUMI_CAFE_ID ?
+    ['A5756F','F2CF9F','FFE5A9','FFC98A'] : ARCHITECTURE[type];
+  const body = tint(paint(bodyHex),1.04+variant*.019);
+  const trim = paint(trimHex), accent = paint(accentHex), glass = paint(glassHex);
+  const shadow = tint(body,.57);
+  box(solid,x,h/2,z,w,h,d,body);
+  box(solid,x,h-.12,z,w+.075,.23,d+.075,trim);
+  roof(building,solid,lights,body,trim,accent);
+
+  const stories = h > 6.25 ? 3 : 2;
+  const slots = typeIndex%5===2 ? 3 : 4;
+  for (const side of [-1,1]) {
+    const faceZ = z+side*(d/2+.014);
+    const yaw = side===1 ? 0 : Math.PI;
+    for (let story=0;story<stories;story++) {
+      const y = 3.23+(h-3.46)*(story+.25)/stories;
+      panel(solid,x,y,faceZ,w-.52,.79,yaw,shadow);
+      for (let i=0;i<slots;i++) {
+        const wx = x+(i-(slots-1)*.5)*(w-.60)/slots;
+        const occupied = (i*3+story+variant+side+17)%7 > 1;
+        panel(occupied?lights:solid,wx,y,faceZ+side*.009,(w-.64)/slots-.21,.61,yaw,
+          occupied?tint(glass,.68+((variant+i+story)%4)*.082):tint(trim,.50));
+      }
+    }
+    const faceX = x+side*(w/2+.024);
+    for (const p of [-1,1]) {
+      const wz = z+p*d*.23;
+      panel(solid,faceX,h*.63,wz,d*.30,.92,side*Math.PI/2,shadow);
+      panel(lights,faceX+side*.012,h*.63,wz,d*.23,.62,side*Math.PI/2,tint(glass,.65+typeIndex%3*.07));
     }
   }
+
+  const doorSide = door.nz;
+  const signZ = door.z+doorSide*.040;
+  box(solid,x,2.33,door.z+doorSide*.25,w-.35,.17,.58,trim);
+  panel(lights,x,2.70,signZ,w-.64,.45,door.yaw,tint(accent,.81));
+  for (const side of [-1,1]) {
+    panel(lights,x+side*1.43,1.18,signZ,.94,1.16,door.yaw,tint(glass,.64));
+    ground(lights,x+side*1.43-.52,x+side*1.43+.52,
+      Math.min(door.z,door.z+doorSide*.76),Math.max(door.z,door.z+doorSide*.76),.018,tint(glass,.35));
+  }
+}
+
+function aerialDistrict(B, scene, anchor, solid, detail) {
+  const faces = batch(), windows = batch();
+  for (const block of CITY_BLOCKS) {
+    const {x,z,row,column} = block;
+    const pavement = paint(['655b6b','645e70','6c5b6c','676470','5d626f'][(row+column*2)%5]);
+    ground(faces,x-12,x+12,z-9,z+9,.001,pavement);
+    ground(faces,x-11.9,x+11.9,z-.85,z+.85,.007,tint(pavement,1.15));
+    for (const side of [-1,1]) {
+      const edge = z+side*8.72;
+      ground(faces,x-12,x+12,edge-.22,edge+.22,.008,tint(pavement,1.31));
+      tree(faces,x+side*11.45,z,(row+column)%2);
+      const green = paint(side>0?'627f78':'668277');
+      ground(faces,x+side*11.45-.35,x+side*11.45+.35,z-2.84,z+2.84,.009,green);
+    }
+    for (const building of block.buildings) aerialArchitecture(building,faces,windows);
+  }
+  const bodies = meshFor(B,scene,anchor,'City aerial buildings',faces,solid);
+  const lighting = meshFor(B,scene,anchor,'City aerial windows',windows,detail);
+  bodies.metadata = { buildings:CITY_BUILDINGS.length, blocks:CITY_BLOCKS.length };
+  lighting.metadata = { buildings:CITY_BUILDINGS.length };
+  return [bodies,lighting];
 }
 
 export function createCityscape(B, scene, anchor) {
@@ -522,25 +579,28 @@ export function createCityscape(B, scene, anchor) {
   const solid = flatMaterial(B, scene, 'Seoul masonry and sidewalks');
   const detail = flatMaterial(B, scene, 'Seoul luminous fixtures', true);
   const atlas = signs(B, scene);
-  const terrain = batch(), roadSigns = batch(), far = batch();
+  const terrain = batch(), roadSigns = batch(), low = batch();
   roadbed(terrain);
   wayfinding(terrain, roadSigns, atlas.uvs);
-  farArchitecture(far);
+  distantShops(low);
+  const streetDistance = meshFor(B,scene,anchor,'City street distant buildings',low,solid);
   const permanent = [
     meshFor(B, scene, anchor, 'City road network', terrain, solid),
     meshFor(B, scene, anchor, 'City wayfinding', roadSigns, atlas.material),
-    meshFor(B, scene, anchor, 'City background skyline', far, solid),
+    streetDistance,
   ];
   const chunks = new Map();
   let active = new Set();
   let lastX = Infinity, lastZ = Infinity;
   let disposed = false;
+  let aerial = false;
+  let overview = null;
 
   function show(block) {
     let meshes = chunks.get(block.id);
     if (!meshes) {
       const faces = batch(), lights = batch(), boards = batch();
-      pavement(block, faces, lights);
+      pavement(block, faces);
       for (const building of block.buildings) architecture(building, faces, lights, boards, atlas.uvs);
       meshes = [meshFor(B, scene, anchor, `City ${block.id} buildings`, faces, solid),
         meshFor(B, scene, anchor, `City ${block.id} lights`, lights, detail),
@@ -551,7 +611,7 @@ export function createCityscape(B, scene, anchor) {
   }
 
   function update(x, z) {
-    if (disposed || !Number.isFinite(x) || !Number.isFinite(z)) return;
+    if (disposed || aerial || !Number.isFinite(x) || !Number.isFinite(z)) return;
     if (Math.hypot(x - lastX, z - lastZ) < UPDATE_DISTANCE) return;
     lastX = x;
     lastZ = z;
@@ -565,13 +625,24 @@ export function createCityscape(B, scene, anchor) {
     active = next;
   }
 
+  function setAerial(visible) {
+    if (disposed || aerial===visible) return;
+    if (visible && !overview) overview = aerialDistrict(B,scene,anchor,solid,detail);
+    aerial = visible;
+    streetDistance.setEnabled(!visible);
+    for (const id of active) for (const part of chunks.get(id)) part.setEnabled(!visible);
+    for (const part of overview) part.setEnabled(visible);
+  }
+
   update(CITY_ENTRY.x, CITY_ENTRY.z);
   return {
     update,
+    setAerial,
     dispose() {
       if (disposed) return;
       disposed = true;
       for (const mesh of permanent) mesh.dispose();
+      if (overview) for (const mesh of overview) mesh.dispose();
       for (const meshes of chunks.values()) for (const mesh of meshes) mesh.dispose();
       chunks.clear();
       solid.dispose();

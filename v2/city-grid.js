@@ -123,7 +123,13 @@ function nearBlock(block, x, z, margin) {
 export function walkable(x, z, radius = PLAYER_RADIUS) {
   if (!Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(radius) || radius < 0) return false;
   const {minX, maxX, minZ, maxZ} = CITY_BOUNDS;
-  if (x < minX + radius || x > maxX - radius || z < minZ + radius || z > maxZ - radius) return false;
+  if (z < minZ + radius) {
+    // The north avenue continues onto a timber walkway and its river terrace.
+    const onWalkway = x >= -18 + radius && x <= -14 - radius && z >= -78 + radius;
+    const onTerrace = x >= -24 + radius && x <= -8 - radius && z >= -80 + radius && z <= -75 - radius;
+    return onWalkway || onTerrace;
+  }
+  if (x < minX + radius || x > maxX - radius || z > maxZ - radius) return false;
 
   const radiusSquared = radius * radius;
   for (const block of CITY_BLOCKS) {
