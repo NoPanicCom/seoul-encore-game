@@ -171,6 +171,7 @@ let songBuffer;
 let applauseBuffer;
 let cachedBeat;
 let closeTimer;
+let suspendedContext;
 let command = 0;
 
 function hidden() {
@@ -191,6 +192,7 @@ function drop(playback) {
 
 function stopPlayback() {
   command++;
+  suspendedContext = undefined;
   drop(music);
   drop(applause);
   music = undefined;
@@ -286,6 +288,25 @@ export async function startStageMusic({beatMs = DEFAULT_BEAT_MS} = {}) {
 export function stopStageMusic() {
   stopPlayback();
   closeWhenQuiet();
+}
+
+export function pauseStageMusic() {
+  const active = context;
+  if (!active || active.state === 'closed' || (!music && !opening) || suspendedContext === active) return;
+  suspendedContext = active;
+  // Suspending the clock keeps the current buffer source and playback position.
+  void active.suspend().catch(error => {
+    if (suspendedContext === active) suspendedContext = undefined;
+    report(error);
+  });
+}
+
+export function resumeStageMusic() {
+  const active = suspendedContext;
+  suspendedContext = undefined;
+  if (!enabled || hidden() || !active || context !== active || active.state === 'closed') return;
+  // Request resume in the closing gesture even if the preceding suspend is still pending.
+  void active.resume().catch(report);
 }
 
 export function stageApplause() {

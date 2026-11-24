@@ -45,13 +45,19 @@
 @keyframes pass-appear{from{transform:translateY(8px);opacity:.3}}
 .live-set:not(.secret-set) .live-dancer{left:var(--spot);width:auto;height:72%;max-width:25%;aspect-ratio:180 / 268;bottom:18%}
 .live-set:not(.secret-set) .live-dancer b{position:absolute;top:99%;left:50%;transform:translateX(-50%);font:700 11px system-ui;background:#291526d9;color:#fff1fa;border-radius:12px;padding:1px 7px}
+.audience-stage .live-set { height: clamp(215px, 39svh, 355px); }
+.audience-stage .live-set:not(.secret-set) .live-dancer {
+  bottom: 22%;
+  width: min(28%, 21svh);
+  max-width: none;
+  height: auto;
+}
 .live-set:not(.secret-set) .live-dancer:nth-child(odd)>div{animation-delay:-.65s}
 .stick-item small{display:block;color:#fff1ca}.coupon-count{color:#f5d49a;font-weight:700}.walk-panel .stick-item .wand-art{max-height:12svh}.walk-panel .stick-item{min-width:0}
 @media(prefers-reduced-motion:reduce){.drawn-pass{animation:none}}
 
 .live-set:not(.secret-set) .live-dancer>div{background-position:var(--column) 0}
 .live-stage[data-playing=true] .live-set:not(.secret-set) .live-dancer>div{animation-name:concert-poses;animation-duration:1.8s}
-.live-set:not(.secret-set) .held-stick{height:45%;width:18%;bottom:-12%;right:1%}
 @keyframes concert-poses{0%,100%{background-position:var(--column) 0}33%{background-position:var(--column) 50%}67%{background-position:var(--column) 100%}}
 #app>header{position:sticky;top:0;z-index:25;background:#19151e}
 .audio-switch{margin-inline:auto 10px;min-height:44px;padding:5px 12px;color:#ffc8df;background:#332332;border:1px solid #77546c;border-radius:12px;font:700 13px system-ui;white-space:nowrap}

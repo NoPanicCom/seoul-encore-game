@@ -8,11 +8,11 @@
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" href="../tour-icon.png">
   <link rel="apple-touch-icon" href="../tour-icon.png">
-  <link rel="stylesheet" href="./style.css?v=663dbb7088d5">
+  <link rel="stylesheet" href="./style.css?v=ebd69a907caa">
   <title>Seoul Encore · Sofia</title>
   <script defer src="./vendor/babylon.js"></script>
   <script defer src="./vendor/babylonjs.loaders.js"></script>
-  <script type="module" src="./game-3383cd562a54.js"></script>
+  <script type="module" src="./game-ea99fc27cb92.js"></script>
 </head>
 <body>
   <main id="game" data-state="loading" data-area="street" data-replay="false" data-journey="false" data-venue="studio">
@@ -20,22 +20,31 @@
     <canvas id="scene" aria-label="Трёхмерная сцена Seoul Encore" data-label="sceneLabel"></canvas>
     <div class="screen-shade" aria-hidden="true"></div>
     <header class="game-header">
-      <a class="return-button" id="exit-game" href="../?v=kulisa#two-days/sofia" data-label="exit" title="Вернуться в основную игру" aria-label="Вернуться в основную игру">
-        <span aria-hidden="true">‹</span>
-      </a>
-      <div class="wordmark">
-        <span class="wordmark-spark" aria-hidden="true">✦</span>
-        <div><strong>SEOUL ENCORE</strong><small data-text="chapter">Глава Софии</small></div>
-      </div>
-      <div class="settings">
-        <button type="button" id="sound" class="header-control" aria-pressed="true" aria-label="Звук включён">
-          <span class="sound-glyph" aria-hidden="true">♪</span>
-        </button>
-        <button type="button" id="language" class="header-control language" aria-pressed="false" aria-label="Türkçe">
-          <span>РУ</span><span>TR</span>
-        </button>
-      </div>
+      <button type="button" id="sound" class="header-control" aria-pressed="true" aria-label="Звук включён">
+        <span class="sound-glyph" aria-hidden="true">♪</span>
+      </button>
+      <button type="button" id="phone-toggle" class="header-control" aria-haspopup="dialog" aria-expanded="false" aria-controls="phone" aria-label="Открыть телефон" data-label="openPhone" title="Открыть телефон">
+        <span class="phone-glyph" aria-hidden="true"></span>
+      </button>
     </header>
+
+    <dialog id="phone" class="phone" aria-labelledby="phone-title">
+      <header class="panel-heading">
+        <h2 id="phone-title" data-text="phone">Телефон Софии</h2>
+        <button type="button" id="phone-close" class="close-button" data-label="close" aria-label="Закрыть" autofocus><span aria-hidden="true">×</span></button>
+      </header>
+      <div class="phone-actions">
+        <a id="phone-album" class="secondary phone-item" href="../?v=kulisa&amp;from=studio3d#chapter-album/sofia"><span class="phone-symbol" aria-hidden="true">▤</span><span data-text="album">Открыть альбом</span></a>
+        <a id="phone-ticket" class="secondary phone-item" href="../?v=kulisa&amp;from=studio3d#lightshow/lisa"><span class="phone-symbol" aria-hidden="true">♬</span><span data-text="audienceTicket">Билет в зал</span></a>
+        <button id="look-toggle" type="button" class="secondary phone-item" aria-controls="wardrobe" aria-expanded="false"><span class="phone-symbol" aria-hidden="true">✦</span><span data-text="look">Образ</span></button>
+        <button type="button" id="language" class="secondary phone-item" aria-pressed="false" aria-label="Türkçe">
+          <span class="phone-symbol" aria-hidden="true">◎</span><span data-text="language">Язык</span><span class="language-options" aria-hidden="true"><span>РУ</span><span>TR</span></span>
+        </button>
+        <a id="exit-game" class="secondary phone-item" href="../?v=kulisa#two-days/sofia"><span class="phone-symbol" aria-hidden="true">↩</span><span data-text="exit">Вернуться в основную игру</span></a>
+      </div>
+      <p class="phone-instruction touch-hint" data-text="cameraTouch">Свайп по сцене — камера</p>
+      <p class="phone-instruction keyboard-hint" data-text="cameraKeyboard">Потяни сцену или нажми Q / E</p>
+    </dialog>
 
     <section id="mission" class="mission" aria-label="Маршрут" data-label="routeLabel" aria-live="polite" hidden>
       <div class="route" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
@@ -74,13 +83,10 @@
         <p class="keyboard-hint" data-text="moveKeyboard">WASD / Стрелки</p>
       </div>
       <div class="walk-actions">
-        <button id="rehearse" type="button" class="primary" hidden><span data-text="startDuet">Танцевать с Нари</span><span aria-hidden="true">↗</span></button>
-        <button id="resume-invite" type="button" class="primary" hidden></button>
-        <button id="start-concert" type="button" class="primary" hidden><span data-text="startConcert">Начать концерт</span><span aria-hidden="true">♪</span></button>
         <p id="walk-invite-status" class="walk-status" role="status" hidden></p>
-        <button id="look-toggle" type="button" class="secondary" aria-controls="wardrobe" aria-expanded="false"><span aria-hidden="true">✦</span><span data-text="look">Образ</span></button>
-        <p class="touch-hint" data-text="cameraTouch">Свайп по сцене — камера</p>
-        <p class="keyboard-hint" data-text="cameraKeyboard">Потяни сцену или нажми Q / E</p>
+        <button id="rehearse" type="button" class="context-action" hidden><span class="context-icon" aria-hidden="true">♪</span><span data-text="startDuet">Танцевать с Нари</span></button>
+        <button id="resume-invite" type="button" class="context-action" hidden><span class="context-icon" aria-hidden="true">↗</span><span id="resume-invite-label"></span></button>
+        <button id="start-concert" type="button" class="context-action" hidden><span class="context-icon" aria-hidden="true">✦</span><span data-text="startConcert">Начать концерт</span></button>
       </div>
     </div>
 
@@ -115,48 +121,50 @@
       </div>
     </section>
 
-    <section id="dance-panel" class="panel dance-panel" aria-label="Танец" data-label="danceLabel" hidden>
+    <section id="dance-panel" class="dance-panel" aria-label="Танец" data-label="danceLabel" hidden>
       <div class="dance-cue">
         <div class="cue-icon" id="cue-icon" aria-hidden="true"></div>
-        <div>
+        <div class="dance-cue-copy">
           <p id="cue-phase"></p>
           <h2 id="cue-title"></h2>
         </div>
         <div id="dance-step" class="dance-step" aria-hidden="true"></div>
-        <button type="button" id="stop-duet" class="close-button" data-label="close" aria-label="Закрыть"><span aria-hidden="true">×</span></button>
       </div>
-      <div id="beat-meter" class="beat-meter" aria-hidden="true">
-        <div class="beat-window"></div><div id="beat-marker" class="beat-marker"></div>
+      <div id="move-buttons" class="move-buttons" role="group" aria-label="Движения танца" data-label="danceControls" hidden>
+        <span id="beat-meter" class="beat-meter" aria-hidden="true"><span id="beat-marker" class="beat-marker"></span></span>
+        <button type="button" data-move="side" aria-keyshortcuts="1"><span class="move-glyph" aria-hidden="true">↔</span><span data-text="side">Вбок</span><kbd aria-hidden="true">1</kbd></button>
+        <button type="button" data-move="jump" aria-keyshortcuts="2"><span class="move-glyph" aria-hidden="true">↑</span><span data-text="jump">Прыжок</span><kbd aria-hidden="true">2</kbd></button>
+        <button type="button" data-move="spin" aria-keyshortcuts="3" hidden><span class="move-glyph" aria-hidden="true">↻</span><span data-text="spin">Поворот</span><kbd aria-hidden="true">3</kbd></button>
+        <button type="button" data-move="heart" aria-keyshortcuts="3"><span class="move-glyph" aria-hidden="true">♡</span><span data-text="heart">Сердце</span><kbd aria-hidden="true">3</kbd></button>
+        <button type="button" data-move="step" aria-keyshortcuts="3" hidden><span class="move-glyph" aria-hidden="true">⇢</span><span data-text="step">Шаг</span><kbd aria-hidden="true">3</kbd></button>
       </div>
-      <div id="move-buttons" class="move-buttons" hidden>
-        <button type="button" data-move="side"><span aria-hidden="true">↔</span><span data-text="side">Вбок</span><kbd>1</kbd></button>
-        <button type="button" data-move="jump"><span aria-hidden="true">↑</span><span data-text="jump">Прыжок</span><kbd>2</kbd></button>
-        <button type="button" data-move="spin"><span aria-hidden="true">↻</span><span data-text="spin">Поворот</span><kbd>3</kbd></button>
-        <button type="button" data-move="heart"><span aria-hidden="true">♡</span><span data-text="heart">Сердце</span><kbd>4</kbd></button>
-        <button type="button" data-move="step"><span aria-hidden="true">⇢</span><span data-text="step">Шаг</span><kbd>5</kbd></button>
-      </div>
+      <button type="button" id="stop-duet" class="close-button dance-stop" data-label="stopDance" aria-label="Остановить танец"><span aria-hidden="true">×</span></button>
       <p id="dance-feedback" class="dance-feedback" role="status"></p>
     </section>
 
     <section id="result" class="panel result" aria-labelledby="result-title" tabindex="-1" hidden>
-      <p class="result-kicker"><span aria-hidden="true">✦</span> <span id="result-kicker" data-text="resultKicker">Репетиция окончена</span></p>
-      <h2 id="result-title">София × Нари</h2>
-      <p id="result-score" class="result-score" hidden></p>
-      <div id="concert-invite" class="concert-invite" hidden>
-        <p class="invite-speaker" data-text="nari">Нари</p>
-        <p data-text="inviteCopy">Хочешь станцевать со мной на концерте? Арена совсем рядом!</p>
-        <button id="invite-nari" type="button" class="secondary"></button>
-        <p id="invite-status" class="invite-status" role="status" hidden></p>
+      <div class="result-hero">
+        <img id="result-photo" class="result-photo" width="360" height="440" alt="Фотокарта дуэта Софии и Нари" hidden>
+        <div class="result-details">
+          <p class="result-kicker" id="result-kicker" data-text="resultKicker">Репетиция окончена</p>
+          <h2 id="result-title">София × Нари</h2>
+          <p id="result-score" class="result-score" hidden></p>
+        </div>
       </div>
       <p id="result-copy" data-text="resultCopy">Сохрани кадр с вашим дуэтом в альбом Софии.</p>
-      <button id="save-card" type="button" class="primary" data-text="save">Сохранить фотокарту</button>
+      <button id="save-card" type="button" class="primary" data-text="save">В альбом</button>
       <p id="save-status" class="save-status" role="status" hidden></p>
-      <a id="watch-card" class="secondary" data-text="watchAgain" hidden>Смотреть снова</a>
-      <div class="result-actions">
-        <button id="repeat-duet" type="button" class="secondary" data-text="repeat">Танцевать снова</button>
-        <a id="album-link" class="secondary" href="../?v=kulisa#chapter-album/sofia" data-text="album">Открыть альбом</a>
+      <div id="concert-invite" class="concert-invite" hidden>
+        <p><strong class="invite-speaker" data-text="nari">Нари</strong> <span data-text="inviteCopy">Станцуем на сцене?</span></p>
+        <button id="invite-nari" type="button" class="secondary"><span id="invite-nari-label" data-text="acceptInviteShort">К арене</span><span aria-hidden="true">→</span></button>
+        <p id="invite-status" class="invite-status" role="status" hidden></p>
       </div>
-      <button id="return-explore" type="button" class="text-link" data-text="backToWalk">Вернуться в зал</button>
+      <div class="result-actions">
+        <a id="album-link" class="result-tool" href="../?v=kulisa&amp;from=studio3d#chapter-album/sofia" data-label="album" aria-label="Открыть альбом"><span aria-hidden="true">▤</span><span data-text="albumShort">Альбом</span></a>
+        <a id="watch-card" class="result-tool" data-label="watchAgain" aria-label="Смотреть снова" hidden><span aria-hidden="true">▷</span><span data-text="watchShort">Смотреть</span></a>
+        <button id="repeat-duet" type="button" class="result-tool" aria-label="Танцевать снова"><span id="repeat-icon" aria-hidden="true">↻</span><span id="repeat-label">Повторить</span></button>
+        <button id="return-explore" type="button" class="result-tool" aria-label="Вернуться в зал"><span aria-hidden="true">↩</span><span data-text="backShort">Назад</span></button>
+      </div>
     </section>
 
     <noscript>

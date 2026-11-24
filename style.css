@@ -78,3 +78,5 @@ p{line-height:1.45}.intro{color:var(--dim);max-width:38ch;margin:8px 0 18px}
 .lisa-music-choices h3 { margin: 0 0 .2rem; font-size: 1rem; }
 .lisa-music-choices button { min-height: 44px; text-align: start; }
 .lisa-music-choices button[aria-pressed=true] { border-color: #e05b94; box-shadow: inset 4px 0 #e05b94; }
+
+.studio-return{display:inline-flex;align-items:center;color:var(--paper);text-decoration:none;font-weight:700}

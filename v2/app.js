@@ -1,11 +1,14 @@
 import {clearInvitation, readDuet, readInvitation, saveDuet, saveInvitation, startingLook} from './album.js';
 import {createWorld} from './world.js';
 import {worldAudio as audio} from '../js/world-audio.js';
-import {setStageSound, stageApplause, startStageMusic, stopStageMusic} from './stage-music.js';
+import {pauseStageMusic, resumeStageMusic, setStageSound, stageApplause, startStageMusic, stopStageMusic} from './stage-music.js';
 
 const phrases = {
   ru: {
-    chapter: 'Глава Софии',
+    phone: 'Телефон Софии',
+    openPhone: 'Открыть телефон',
+    language: 'Язык',
+    audienceTicket: 'Билет в зал',
     exit: 'Вернуться в основную игру',
     sceneLabel: 'Трёхмерная сцена Seoul Encore',
     routeLabel: 'Маршрут к Нари',
@@ -58,6 +61,8 @@ const phrases = {
     soundOn: 'Звук включён',
     soundOff: 'Звук выключен',
     danceLabel: 'Танец',
+    danceControls: 'Движения танца',
+    stopDance: 'Остановить танец',
     duet: 'София × Нари',
     side: 'Вбок',
     jump: 'Прыжок',
@@ -67,41 +72,50 @@ const phrases = {
     demo: 'Нари показывает движения',
     demoCue: 'Смотри на Нари',
     play: 'Теперь вместе',
-    playCue: 'Нажми, когда полоска загорится',
+    playCue: 'Нажми, когда кольцо загорится',
     concert: 'Прямой эфир · Арена',
-    concertCue: 'Лови ритм на сцене',
+    concertCue: 'Нажми, когда кольцо загорится',
     replay: 'Запись дуэта',
     replayCue: 'Смотри сохранённый танец',
     arenaReplay: 'Запись с арены',
     hit: 'В такт!',
-    early: 'Подожди, пока загорится полоска',
+    early: 'Подожди, пока загорится кольцо',
     wrong: 'Повтори движение, которое показывает Нари',
-    miss: 'Следи за полоской на следующем шаге',
+    miss: 'Следи за следующим кольцом',
     resultKicker: 'Репетиция окончена',
     concertKicker: 'Концерт окончен · Аплодисменты!',
-    scoreLabel: 'Попадания в ритм',
+    scoreLabel: 'В такт',
     resultCopy: 'Сохрани кадр с вашим дуэтом в альбом Софии.',
     concertCopy: 'Сохрани фотокарту с твоего первого концерта с Нари.',
-    inviteCopy: 'Хочешь станцевать со мной на концерте? Арена совсем рядом!',
+    inviteCopy: 'Станцуем на сцене?',
     acceptInvite: 'Пойдём на концерт',
+    acceptInviteShort: 'К арене',
     resumeInvite: 'Вернуться к приглашению Нари',
+    resumeInviteShort: 'Приглашение Нари',
     preparingArena: 'Готовим арену…',
     arenaError: 'Арена не загрузилась. Попробуй ещё раз.',
     replayResult: 'Этот дуэт уже в альбоме Софии.',
     saved: 'Кадр сохранён в альбом Софии.',
     savedWithoutPhoto: 'Дуэт сохранён. Для фотографии не хватило места.',
     saveError: 'Не удалось сохранить фотокарту. Попробуй снова.',
-    save: 'Сохранить фотокарту',
-    savedButton: 'Фотокарта сохранена',
+    save: 'В альбом',
+    photoAlt: 'Фотокарта дуэта Софии и Нари',
     repeat: 'Танцевать снова',
     watchAgain: 'Смотреть снова',
+    watchShort: 'Смотреть',
+    repeatShort: 'Повторить',
     album: 'Открыть альбом',
+    albumShort: 'Альбом',
+    backShort: 'Назад',
     backToWalk: 'Вернуться в зал',
     backToStreet: 'Вернуться на улицу',
     backToArena: 'Вернуться на арену',
   },
   tr: {
-    chapter: 'Sofia’nın bölümü',
+    phone: 'Sofia’nın telefonu',
+    openPhone: 'Telefonu aç',
+    language: 'Dil',
+    audienceTicket: 'Seyirci bileti',
     exit: 'Ana oyuna dön',
     sceneLabel: 'Seoul Encore üç boyutlu sahnesi',
     routeLabel: 'Nari’ye giden yol',
@@ -154,6 +168,8 @@ const phrases = {
     soundOn: 'Ses açık',
     soundOff: 'Ses kapalı',
     danceLabel: 'Dans',
+    danceControls: 'Dans hareketleri',
+    stopDance: 'Dansı durdur',
     duet: 'Sofia × Nari',
     side: 'Yana adım',
     jump: 'Sıçra',
@@ -163,35 +179,41 @@ const phrases = {
     demo: 'Nari hareketleri gösteriyor',
     demoCue: 'Nari’yi izle',
     play: 'Şimdi birlikte',
-    playCue: 'Çubuk parladığında dokun',
+    playCue: 'Halka parlayınca dokun',
     concert: 'Canlı · Arena',
-    concertCue: 'Sahnede ritmi yakala',
+    concertCue: 'Halka parlayınca dokun',
     replay: 'Düet kaydı',
     replayCue: 'Kaydettiğin dansı izle',
     arenaReplay: 'Arena kaydı',
     hit: 'Tam ritminde!',
-    early: 'Çubuk parlayana kadar bekle',
+    early: 'Halka parlayana kadar bekle',
     wrong: 'Nari’nin gösterdiği hareketi yap',
-    miss: 'Bir sonraki adımda çubuğu takip et',
+    miss: 'Sonraki halkayı takip et',
     resultKicker: 'Prova tamamlandı',
     concertKicker: 'Konser bitti · Alkışlar!',
-    scoreLabel: 'Ritmi yakaladığın vuruşlar',
+    scoreLabel: 'Ritim',
     resultCopy: 'Düetinizi Sofia’nın albümüne kaydet.',
     concertCopy: 'Nari’yle ilk konserinin fotokartını albüme kaydet.',
-    inviteCopy: 'Konserde benimle dans eder misin? Arena çok yakın!',
+    inviteCopy: 'Sahnede dans edelim mi?',
     acceptInvite: 'Konsere gidelim',
+    acceptInviteShort: 'Arenaya',
     resumeInvite: 'Nari’nin davetine dön',
+    resumeInviteShort: 'Nari’nin daveti',
     preparingArena: 'Arena hazırlanıyor…',
     arenaError: 'Arena yüklenemedi. Yeniden dene.',
     replayResult: 'Bu düet Sofia’nın albümünde kayıtlı.',
     saved: 'Fotokart Sofia’nın albümüne kaydedildi.',
     savedWithoutPhoto: 'Düet kaydedildi. Fotoğraf için yer kalmadı.',
     saveError: 'Fotokart kaydedilemedi. Yeniden dene.',
-    save: 'Fotokartı kaydet',
-    savedButton: 'Fotokart kaydedildi',
+    save: 'Albüme ekle',
+    photoAlt: 'Sofia ile Nari’nin düet fotokartı',
     repeat: 'Yeniden dans et',
     watchAgain: 'Yeniden izle',
+    watchShort: 'İzle',
+    repeatShort: 'Tekrar',
     album: 'Albümü aç',
+    albumShort: 'Albüm',
+    backShort: 'Geri',
     backToWalk: 'Salona dön',
     backToStreet: 'Sokağa dön',
     backToArena: 'Arenaya dön',
@@ -210,12 +232,17 @@ const watchCard = byId('watch-card');
 const wardrobe = byId('wardrobe');
 const lookToggle = byId('look-toggle');
 const soundButton = byId('sound');
+const phoneToggle = byId('phone-toggle');
+const phone = byId('phone');
 const languageButton = byId('language');
 const jacketButton = byId('jacket');
 const saveButton = byId('save-card');
+const resultPhoto = byId('result-photo');
 const outfits = [...wardrobe.querySelectorAll('[data-outfit]')];
 const wandOptions = wardrobe.querySelector('.wand-select > div');
 const moveButtons = [...byId('move-buttons').querySelectorAll('[data-move]')];
+const beatMeter = byId('beat-meter');
+const beatMarker = byId('beat-marker');
 const finaleButtons = [...byId('finale-select').querySelectorAll('[data-finale]')];
 const phraseMarks = [...byId('duet-banner').querySelectorAll('.phrase i')];
 
@@ -276,16 +303,19 @@ let frame = 0;
 let round;
 let saveStatus = '';
 let cardId = null;
+let previewRound = null;
+let previewPhoto = null;
 let joystickPointer = null;
 let orbitPointer = null;
 let joystickInput = {x: 0, y: 0};
 
 const words = key => phrases[lang][key];
 const setText = (id, value) => { byId(id).textContent = value; };
-const canWalk = () => state === 'walk' && wardrobe.hidden && !arenaPending;
+const canWalk = () => state === 'walk' && wardrobe.hidden && !phone.open && !arenaPending;
 const journey = () => concertFinale !== null;
 const arenaRound = () => round?.venue === 'arena';
 const rhythmState = phase => phase === 'play' || phase === 'concert';
+const stagePerformance = () => arenaRound() && (state === 'concert' || state === 'replay');
 const timing = () => state === 'replay' && arenaRound() ? arenaReplayTiming : timings[state];
 const concertPlan = () => replay && !arenaRound() ? replay : invitation;
 const albumHref = byId('album-link').getAttribute('href');
@@ -294,11 +324,32 @@ function paintSaveStatus() {
   setText('save-status', saveStatus ? words(saveStatus) : '');
   byId('save-status').hidden = !saveStatus;
   byId('save-status').dataset.error = String(saveStatus === 'saveError');
-  byId('result-copy').hidden = cardId !== null;
-  saveButton.textContent = words(cardId ? 'savedButton' : 'save');
+  byId('result-copy').hidden = Boolean(previewPhoto) || cardId !== null;
   saveButton.disabled = cardId !== null;
+  saveButton.hidden = Boolean(replay) || cardId !== null;
   watchCard.hidden = cardId === null;
   if (cardId) watchCard.href = `./#replay/${cardId}`;
+}
+
+function capturePhoto() {
+  const photo = world.capturePhoto();
+  if (!/^data:image\/(?:webp|jpeg);base64,/.test(photo)) throw new Error('Photo capture returned an unsupported image');
+  return photo;
+}
+
+function paintPhotoPreview() {
+  resultPhoto.alt = words('photoAlt');
+  if (state !== 'result' || previewRound === round) return;
+  previewRound = round;
+  previewPhoto = null;
+  try {
+    previewPhoto = replay?.photo ?? capturePhoto();
+    resultPhoto.src = previewPhoto;
+  } catch (error) {
+    console.warn('Seoul Encore photo preview could not be captured.', error);
+    resultPhoto.removeAttribute('src');
+  }
+  resultPhoto.hidden = !previewPhoto;
 }
 
 function paintMission() {
@@ -315,17 +366,19 @@ function paintMission() {
 }
 
 function paintResult() {
+  paintPhotoPreview();
   setText('result-title', words('duet'));
   setText('result-kicker', words(arenaRound() ? 'concertKicker' : 'resultKicker'));
   setText('result-copy', words(replay ? 'replayResult' : arenaRound() ? 'concertCopy' : 'resultCopy'));
-  setText('repeat-duet', words(replay ? 'watchAgain' : 'repeat'));
+  setText('repeat-icon', replay ? '▷' : '↻');
+  setText('repeat-label', words(replay ? 'watchShort' : 'repeatShort'));
+  byId('repeat-duet').setAttribute('aria-label', words(replay ? 'watchAgain' : 'repeat'));
   const returnLabel = replay ? (arenaRound() ? 'album' : 'backToStreet') : (arenaRound() ? 'backToArena' : 'backToWalk');
-  setText('return-explore', words(returnLabel));
+  byId('return-explore').setAttribute('aria-label', words(returnLabel));
   byId('return-explore').hidden = Boolean(replay) && arenaRound();
   const score = byId('result-score');
   score.hidden = Boolean(replay) || !round;
   if (round) score.textContent = `${words('scoreLabel')} · ${round.hits}/${round.moves.length}`;
-  saveButton.hidden = Boolean(replay);
   paintSaveStatus();
   paintInvitation();
 }
@@ -333,13 +386,15 @@ function paintResult() {
 function paintInvitation() {
   byId('concert-invite').hidden = !concertPlan() || journey() || arenaRound();
   resumeButton.hidden = !invitation || Boolean(replay) || journey() || area !== 'street';
-  setText('invite-nari', words(arenaPending ? 'preparingArena' : 'acceptInvite'));
-  setText('resume-invite', words(arenaPending ? 'preparingArena' : 'resumeInvite'));
+  setText('invite-nari-label', words(arenaPending ? 'preparingArena' : 'acceptInviteShort'));
+  inviteButton.setAttribute('aria-label', words(arenaPending ? 'preparingArena' : 'acceptInvite'));
+  setText('resume-invite-label', words(arenaPending ? 'preparingArena' : 'resumeInviteShort'));
+  resumeButton.setAttribute('aria-label', words(arenaPending ? 'preparingArena' : 'resumeInvite'));
   for (const button of [inviteButton, resumeButton]) {
     button.disabled = arenaPending;
     button.setAttribute('aria-busy', String(arenaPending));
   }
-  lookToggle.disabled = arenaPending;
+  lookToggle.disabled = arenaPending || state !== 'walk';
   for (const id of ['invite-status', 'walk-invite-status']) {
     setText(id, arenaError ? words('arenaError') : '');
     byId(id).hidden = !arenaError || (id === 'walk-invite-status' && resumeButton.hidden);
@@ -380,7 +435,7 @@ function paintLanguage() {
   }
   languageButton.setAttribute('aria-pressed', String(lang === 'tr'));
   const nextLanguage = lang === 'tr' ? 'Русский' : 'Türkçe';
-  languageButton.setAttribute('aria-label', nextLanguage);
+  languageButton.setAttribute('aria-label', `${words('language')} · ${nextLanguage}`);
   languageButton.title = nextLanguage;
   paintSound();
   paintJacket();
@@ -445,20 +500,43 @@ function updateLook() {
 function setWardrobe(open, restoreFocus = false) {
   wardrobe.hidden = !open;
   lookToggle.setAttribute('aria-expanded', String(open));
+  game.dataset.lookOpen = String(open);
+  byId('walk-controls').inert = open;
   world.setLookPreview(open);
   if (open) {
     resetControls();
     byId('look-close').focus({preventScroll: true});
   } else if (restoreFocus) {
-    lookToggle.focus({preventScroll: true});
+    phoneToggle.focus({preventScroll: true});
+  }
+}
+
+function openPhone() {
+  if (phone.open) return;
+  if (!wardrobe.hidden) setWardrobe(false);
+  resetControls();
+  paintInvitation();
+  phone.showModal();
+  if (round) round.lastTime = null;
+  if (stagePerformance()) pauseStageMusic();
+  phoneToggle.setAttribute('aria-expanded', 'true');
+  byId('phone-close').focus({preventScroll: true});
+}
+
+function closePhone() {
+  if (!phone.open) return;
+  phone.close();
+  if (stagePerformance()) {
+    resumeStageMusic();
+    playAudio();
   }
 }
 
 function playAudio() {
-  if (!sound) return;
+  if (!sound || phone.open) return;
   if (!arenaRound()) {
     void audio.enter();
-  } else if ((state === 'concert' || state === 'replay') && !stageAudioRequested) {
+  } else if (stagePerformance() && !stageAudioRequested) {
     stageAudioRequested = true;
     const current = round;
     void startStageMusic({beatMs: stageBeatMs}).then(started => {
@@ -535,7 +613,18 @@ function paintCue() {
   const message = byId('dance-feedback');
   message.textContent = feedback ? words(feedback) : '';
   message.dataset.feedback = feedback;
-  for (const button of moveButtons) button.classList.toggle('is-expected', button.dataset.move === current);
+  for (const button of moveButtons) {
+    const move = button.dataset.move;
+    const expected = move === current;
+    button.hidden = !sequence.includes(move);
+    button.classList.toggle('is-expected', expected);
+    if (expected) {
+      button.setAttribute('aria-current', 'step');
+      if (beatMeter.parentElement !== button) button.append(beatMeter);
+    } else {
+      button.removeAttribute('aria-current');
+    }
+  }
   for (const [i, mark] of phraseMarks.entries()) {
     mark.classList.toggle('is-hit', beats.has(i));
     mark.classList.toggle('is-active', i === index);
@@ -543,14 +632,11 @@ function paintCue() {
 }
 
 function paintBeat() {
-  const {duration, cue, tolerance} = timing();
+  const {cue, tolerance} = timing();
   const offset = round.elapsed - cue;
-  if (round.beats.has(round.index)) game.dataset.beat = 'hit';
-  else if (offset < -tolerance) game.dataset.beat = 'early';
-  else if (offset > tolerance) game.dataset.beat = 'late';
-  else game.dataset.beat = 'open';
-  const progress = Math.min(100, 100 * round.elapsed / duration);
-  byId('beat-marker').style.setProperty('--progress', `${progress}%`);
+  const beat = round.beats.has(round.index) ? 'hit' : offset < -tolerance ? 'early' : offset > tolerance ? 'late' : 'open';
+  if (game.dataset.beat !== beat) game.dataset.beat = beat;
+  beatMarker.style.setProperty('--beat-scale', Math.max(.78, 1 - .65 * offset / cue).toFixed(3));
 }
 
 function announceDance(move, actor) {
@@ -577,6 +663,7 @@ function startRound(next, venue = 'studio') {
   game.dataset.hits = '0';
   setState(next);
   paintCue();
+  if (rhythmState(next)) paintBeat();
   frame = requestAnimationFrame(tick);
 }
 
@@ -608,6 +695,11 @@ function nextBeat() {
 }
 
 function tick(now) {
+  if (phone.open) {
+    round.lastTime = null;
+    frame = requestAnimationFrame(tick);
+    return;
+  }
   if (round.lastTime !== null) round.elapsed += Math.min(125, now - round.lastTime);
   round.lastTime = now;
   const {cue, duration} = timing();
@@ -629,7 +721,7 @@ function tick(now) {
 }
 
 function answer(move) {
-  if (!rhythmState(state) || round.beats.has(round.index)) return;
+  if (!rhythmState(state) || phone.open || !round.moves.includes(move) || round.beats.has(round.index)) return;
   if (game.dataset.beat !== 'open') {
     round.feedback = game.dataset.beat === 'late' ? 'miss' : 'early';
   } else if (move !== round.moves[round.index]) {
@@ -686,7 +778,7 @@ async function beginConcertWalk() {
     paintFinale();
     setState('walk');
     paintMission();
-    lookToggle.focus({preventScroll: true});
+    phoneToggle.focus({preventScroll: true});
     audio.cue('spotlight');
   } catch (error) {
     concertFinale = null;
@@ -718,15 +810,14 @@ function backToWalk() {
   world.endDance();
   setState('walk');
   paintMission();
-  (nearNari ? (journey() ? startConcert : rehearsal) : lookToggle).focus({preventScroll: true});
+  (nearNari ? (journey() ? startConcert : rehearsal) : phoneToggle).focus({preventScroll: true});
   playAudio();
 }
 
 function saveCard() {
   if (state !== 'result' || replay || cardId) return;
   try {
-    const photo = world.capturePhoto();
-    if (!/^data:image\/(?:webp|jpeg);base64,/.test(photo)) throw new Error('Photo capture returned an unsupported image');
+    const photo = previewPhoto ?? capturePhoto();
     cardId = saveDuet({...look, finalMove: round.moves.at(-1), venue: round.venue, photo});
     saveStatus = readDuet(cardId)?.photo ? 'saved' : 'savedWithoutPhoto';
     if (arenaRound() && saveStatus === 'saved') {
@@ -804,7 +895,7 @@ async function load() {
 }
 
 document.addEventListener('pointerup', event => {
-  if (state !== 'loading' && state !== 'error' && event.target instanceof Element && !event.target.closest('a, #sound')) playAudio();
+  if (!phone.open && state !== 'loading' && state !== 'error' && event.target instanceof Element && !event.target.closest('a, #sound')) playAudio();
 }, {passive: true});
 joystick.addEventListener('pointerdown', event => {
   if (!canWalk() || event.button !== 0 || joystickPointer !== null) return;
@@ -841,7 +932,7 @@ canvas.addEventListener('webglcontextlost', event => {
 
 document.addEventListener('keydown', event => {
   const editing = event.target instanceof Element && event.target.matches('input, textarea, select, [contenteditable]');
-  if (event.altKey || event.ctrlKey || event.metaKey || editing) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || editing || phone.open) return;
   if (event.code === 'Escape') {
     if (!wardrobe.hidden) setWardrobe(false, true);
     else if (state === 'result' || Object.hasOwn(timings, state)) backToWalk();
@@ -858,11 +949,11 @@ document.addEventListener('keydown', event => {
   } else if (canWalk() && nearNari && event.code === 'KeyF' && !event.repeat) {
     enterPerformance();
   } else if (rhythmState(state) && !event.repeat) {
-    const index = /^(?:Digit|Numpad)([1-5])$/.exec(event.code);
+    const index = /^(?:Digit|Numpad)([1-3])$/.exec(event.code);
     if (index) {
       event.preventDefault();
       playAudio();
-      answer(moveButtons[Number(index[1]) - 1].dataset.move);
+      answer(round.moves[Number(index[1]) - 1]);
     }
   }
 });
@@ -870,6 +961,14 @@ document.addEventListener('keyup', event => {
   if (keysHeld.delete(event.code)) moveInput();
 });
 window.addEventListener('blur', resetControls);
+window.addEventListener('pageshow', event => {
+  if (!event.persisted) return;
+  lang = preference('encore1.lang') === 'tr' ? 'tr' : 'ru';
+  sound = preference('encore1.sound') !== 'off';
+  audio.setEnabled(sound);
+  setStageSound(sound);
+  paintLanguage();
+});
 window.addEventListener('hashchange', () => location.reload());
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
@@ -878,7 +977,25 @@ document.addEventListener('visibilitychange', () => {
   if (round) round.lastTime = null;
 });
 
-lookToggle.addEventListener('click', () => setWardrobe(wardrobe.hidden));
+phoneToggle.addEventListener('click', openPhone);
+byId('phone-close').addEventListener('click', closePhone);
+phone.addEventListener('cancel', event => {
+  event.preventDefault();
+  closePhone();
+});
+phone.addEventListener('close', () => {
+  phoneToggle.setAttribute('aria-expanded', 'false');
+  if (wardrobe.hidden) phoneToggle.focus({preventScroll: true});
+});
+phone.addEventListener('click', event => {
+  if (event.target !== phone) return;
+  const {top, bottom, left, right} = phone.getBoundingClientRect();
+  if (event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom) closePhone();
+});
+lookToggle.addEventListener('click', () => {
+  closePhone();
+  setWardrobe(true);
+});
 byId('look-close').addEventListener('click', () => setWardrobe(false, true));
 jacketButton.addEventListener('click', () => {
   look.jacket = !look.jacket;

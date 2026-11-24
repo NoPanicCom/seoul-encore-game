@@ -42,13 +42,15 @@ export function renderMinho(lang, selected, owned = new Set()) {
     <button class="shop-go" data-act="stick-concert" ${selected ? '' : 'disabled'}>${tr ? 'Konsere götür' : 'Взять на концерт'} →</button>
   </section>`;
 }
-export function renderHeldStick(id, lang, playing, watching = false) {
+export function renderHeldStick(id, lang, playing, watching = false, primary = false) {
     const item = sticks[id];
     const content = `<span class="wand-aura"></span>${wand(id)}<i class="wand-grip" aria-hidden="true"></i>`;
     const model = `class="held-stick" data-held-stick="${id}" style="--stick:${item.color}"`;
+    const label = playing || !primary ? (lang === 'tr' ? 'Ritimle yak' : 'Зажечь в такт') : (lang === 'tr' ? 'Ritim oyununu başlat' : 'Начать игру в ритм');
     const held = watching ? `<div ${model} aria-hidden="true">${content}</div>` :
-        `<button type="button" ${model} data-act="${playing ? 'tap' : 'play'}" aria-label="${item[lang]} · ${lang === 'tr' ? 'Ritimle yak' : 'Зажечь в такт'}">${content}</button>`;
-    return `<div class="fan-lights" aria-hidden="true" style="${audienceStyle(id)}">${'<i></i>'.repeat(12)}</div>${held}`;
+        `<button type="button" ${primary ? 'id="pad" ' : ''}${model} data-act="${playing ? 'tap' : 'play'}" aria-label="${item[lang]} · ${label}">${content}</button>`;
+    const rows = [17, 16, 15, 14].map((count, row) => `<div class="fan-row" style="--fan-row:${row}">${'<i></i>'.repeat(count)}</div>`).join('');
+    return `<div class="fan-lights" aria-hidden="true" style="${audienceStyle(id)}">${rows}</div>${held}`;
 }
 export function lightBeat(area, beat) {
     // The hit rank advances on each accepted tap, including after a missed beat.

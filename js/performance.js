@@ -1,6 +1,6 @@
 import { concertCostume } from './travel-look.js';
 import { renderHeldStick, renderArena } from './lightstick.js';
-export function renderPerformance(member, lang, playing, lights, stick = null, secret = false, watching = false, costumes = {}, roseCue = null) {
+export function renderPerformance(member, lang, playing, lights, stick = null, secret = false, watching = false, costumes = {}, roseCue = null, primaryStick = false) {
     const cue = lang === 'ru' ? 'Поймай звезду у круга' : 'Yıldız halkaya gelince dokun';
     const palette = ['#ff80c2', '#bca2ff', '#ffe29e'];
     const colors = lights.map((key, index) => '--cue-' + index + ':' + palette[key]).join(';');
@@ -14,7 +14,7 @@ export function renderPerformance(member, lang, playing, lights, stick = null, s
     const stage = `<div class="live-set${secret ? ' secret-set' : ''}" ${!secret && roseCue ? 'data-yuna-cue="' + roseCue + '"' : ''} style="${colors}">
     <div class="live-light" aria-hidden="true"></div>${dancers}
     ${stick && secret ? renderArena(stick) : ''}
-    ${stick ? renderHeldStick(stick, lang, playing, watching) : ''}
+    ${stick ? renderHeldStick(stick, lang, playing, watching, primaryStick) : ''}
     <span class="live-bug">${secret ? 'LISA • ENCORE' : 'BLACKPINK • SEOUL'}</span>
   </div>`;
     if (watching)

@@ -17,6 +17,7 @@ const ARENA_END_Z = 30.05;
 const FOLLOW_GAP = .95;
 const TAU = Math.PI * 2;
 const MOVE_DURATION = 800;
+const GREETING_DURATION = 1.48;
 const DANCE_MOVES = new Set(['side', 'spin', 'heart', 'step', 'jump']);
 const NEON_MATERIAL = /tube|filament|lettering/i;
 const MODEL_URL = new URL('./models/', import.meta.url).href;
@@ -263,6 +264,14 @@ function animateActor(actor, style, time, elapsed, effort = 1) {
     rightArm = [-lift * .31 * strideScale, .16, -.19, .11];
     leftLeg = walkingLeg(actor.legs.L, time % 1, height, strideScale);
     rightLeg = walkingLeg(actor.legs.R, (time + .5) % 1, height, strideScale);
+  } else if (style === 'greet') {
+    const rise = clamp(Math.min(time / .22, (1 - time) / .23), 0, 1);
+    const lift = rise * rise * (3 - 2 * rise);
+    const wave = Math.sin((time - .22) * TAU * 3.5);
+    bodyTilt = .06 * lift;
+    bodyTwist = .10 * lift;
+    rightArm = [.21 * lift, .14 + 1.46 * lift, .14 * lift,
+      .11 + (1.27 + .29 * wave) * lift, (.10 + .22 * wave) * lift];
   } else if (style === 'side') {
     const sway = Math.sin(beat) * hit;
     travelX = .34 * sway;
@@ -330,7 +339,7 @@ function animateActor(actor, style, time, elapsed, effort = 1) {
   ]) {
     set(side + '-shoulder', arm[0], 0, mirror * arm[1]);
     set(side + '-elbow', arm[2], 0, mirror * arm[3]);
-    set(side + '-hand', .12 * bodyTwist, 0, -.06 * mirror);
+    set(side + '-hand', .12 * bodyTwist, 0, mirror * (-.06 + (arm[4] ?? 0)));
     set(side + '-hip', leg[0], 0, mirror * leg[2]);
     set(side + '-knee', leg[1], 0, 0);
     set(side + '-foot', leg[3] ?? -.42 * leg[1], 0, 0);
@@ -426,6 +435,8 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
   let establishing = 1;
   let currentArea = areaAt(player.z);
   let nearNari = false;
+  let nariGreeted = false;
+  let greetingEnds = 0;
   let exploration = null;
   let journey = null;
   let arena = null;
@@ -557,6 +568,10 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     }
     if (nearNari !== near) {
       nearNari = near;
+      if (near && !journey && !nariGreeted) {
+        nariGreeted = true;
+        greetingEnds = time + GREETING_DURATION;
+      }
       onNear?.(near);
     }
   }
@@ -656,7 +671,11 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
       nari.yaw = blendAngle(nari.yaw, Math.atan2(player.x - nari.x, player.z - nari.z), damping(9, elapsed));
     }
     animateWalk(player, moved, elapsed);
-    animateWalk(nari, followed, elapsed);
+    if (!journey && time < greetingEnds) {
+      animateActor(nari, 'greet', 1 - (greetingEnds - time) / GREETING_DURATION, elapsed);
+    } else {
+      animateWalk(nari, followed, elapsed);
+    }
   }
 
   function resize() {
@@ -685,6 +704,7 @@ export async function createWorld(canvas, { onArea, onNear, onMove } = {}) {
     const concert = venue === 'arena';
     if (concert && !arena) throw new Error('Konser sahnesi yüklenmedi');
     setLookPreview(false);
+    greetingEnds = 0;
     exploration = {
       venue,
       startedAt: performance.now(),

@@ -14,29 +14,100 @@
 .stick-item[aria-pressed=true] .wand-check{display:block}
 .shop-bag{margin:10px 0;text-align:center;font-size:13px;color:#dbcada;min-height:1.4em}
 .shop-go{display:block;background:#ffaacb;color:#331a2a;border:1px solid #ffc3db;border-radius:10px;min-height:48px;width:100%;font-weight:800;font-size:16px;padding:9px 12px}.shop-go:disabled{opacity:.48;cursor:default}
-.held-stick{position:absolute;bottom:-8%;right:4%;height:73%;width:28%;background:none;isolation:isolate;z-index:2;padding:0;transform:rotate(13deg);transform-origin:50% 95%;touch-action:manipulation}
-.held-stick:is([data-held-stick=hammer],[data-held-stick=white-star]){right:10%;transform:rotate(10deg)}
-.live-set:not(.secret-set) .held-stick:is([data-held-stick=hammer],[data-held-stick=white-star]){right:7%;bottom:-5%}
-.live-set:has(.held-stick:is([data-held-stick=hammer],[data-held-stick=white-star])) .live-dancer[data-artist=lisa] b{left:24%}
-.held-stick .wand-art{height:100%;width:100%;filter:brightness(.86) drop-shadow(0 3px 3px #160c21aa)}
-.wand-aura{position:absolute;inset:0 7% 55%;background:var(--stick);border-radius:50%;filter:blur(11px);opacity:0}
-.wand-grip{position:absolute;bottom:-5%;left:38%;width:39%;height:26%;border-radius:40% 50% 0 45%;background:linear-gradient(100deg,#7d464e,#ebaa91 53%,#ad7072);transform:rotate(-18deg);box-shadow:inset 1px 1px 1px #ffd2ae77}
+.held-stick {
+  position: absolute;
+  right: clamp(16px, 6%, 28px);
+  bottom: clamp(11px, 5%, 18px);
+  z-index: 3;
+  isolation: isolate;
+  display: grid;
+  place-items: end center;
+  width: clamp(54px, 23%, 101px);
+  height: clamp(74px, 51%, 122px);
+  padding: 0;
+  border-radius: 14px;
+  background: none;
+  transform: rotate(11deg);
+  transform-origin: 50% 90%;
+  touch-action: manipulation;
+}
+.secret-set .held-stick { height: clamp(86px, 56%, 140px); }
+.live-set:has(.held-stick) .live-dancer[data-artist=lisa] b { left: 16%; }
+button.held-stick:focus-visible { outline: 2px solid #fff4e8; outline-offset: 2px; }
+.held-stick .wand-art {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-position: center bottom;
+  filter: drop-shadow(0 4px 4px #150b1a) drop-shadow(0 0 3px var(--stick));
+}
+.wand-aura {
+  position: absolute;
+  inset: 4% 5% 44%;
+  background: var(--stick);
+  border-radius: 50%;
+  filter: blur(13px);
+  opacity: .10;
+}
+.audience-stage .held-stick.ready::before {
+  content: "";
+  position: absolute;
+  inset: -2% -2% 47%;
+  border: 2px solid #fff3c8;
+  border-radius: 50%;
+  box-shadow: 0 0 14px var(--stick), inset 0 0 7px var(--stick);
+  pointer-events: none;
+}
+.audience-stage .held-stick.ready .wand-aura { opacity: .46; }
+.wand-grip{position:absolute;bottom:-1%;left:48%;width:35%;height:23%;border-radius:40% 50% 0 45%;background:linear-gradient(100deg,#7d464e,#ebaa91 53%,#ad7072);transform:rotate(-18deg);box-shadow:inset 1px 1px 1px #ffd2ae77}
 .wand-grip::before{content:"";position:absolute;left:-26%;top:-2%;width:77%;height:33%;border-radius:45%;transform:rotate(15deg);background:linear-gradient(#f6bb9d,#cb8a78)}
 .live-set::after{pointer-events:none}
-.fan-lights{position:absolute;bottom:2%;left:1%;right:1%;height:16%;display:flex;align-items:end;justify-content:space-around;z-index:1;pointer-events:none}
+.fan-lights {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+  height: 27%;
+  background: linear-gradient(0deg, #1d0e258c, transparent 86%);
+  pointer-events: none;
+}
+.fan-row {
+  position: absolute;
+  inset-inline: calc(var(--fan-row) * 3%);
+  bottom: calc(4% + var(--fan-row) * 21%);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: calc(39% - var(--fan-row) * 5%);
+  opacity: calc(.44 - var(--fan-row) * .07);
+}
 .fan-lights i,.encore-arena i{display:block;background:var(--wand-art) center bottom/contain no-repeat;filter:drop-shadow(0 0 2px var(--stick))}
-.fan-lights i{width:clamp(9px,3.4%,18px);height:59%;opacity:.44;transform:rotate(-12deg)}.fan-lights i:nth-child(3n){height:42%;align-self:center;transform:rotate(16deg)}.fan-lights i:nth-child(3n+2){height:73%;transform:rotate(8deg)}
-.live-set[data-pulse=even] .wand-aura,.live-set[data-pulse=even] .fan-lights i{animation:fan-glow-a .53s ease-out}.live-set[data-pulse=odd] .wand-aura,.live-set[data-pulse=odd] .fan-lights i{animation:fan-glow-b .53s ease-out}
-.live-set[data-pulse] .fan-lights i:nth-child(3n){animation-delay:.09s}.live-set[data-pulse] .fan-lights i:nth-child(3n+2){animation-delay:.14s}
+.fan-row i { width: clamp(8px, 4.5%, 19px); height: 84%; transform: rotate(-12deg); }
+.fan-row i:nth-child(3n) { height: 71%; transform: translateY(1px) rotate(16deg); }
+.fan-row i:nth-child(3n+2) { height: 100%; transform: translateY(-1px) rotate(8deg); }
+.live-set[data-pulse=even] .fan-row { animation-name: fan-wave-a; }
+.live-set[data-pulse=odd] .fan-row { animation-name: fan-wave-b; }
+.live-set[data-pulse] .fan-row {
+  animation-duration: .29s;
+  animation-delay: calc(28ms + var(--fan-row) * 66ms);
+  animation-timing-function: ease-out;
+}
+.live-set[data-pulse=even] .wand-aura { animation: wand-aura-a .48s ease-out; }
+.live-set[data-pulse=odd] .wand-aura { animation: wand-aura-b .48s ease-out; }
 .live-set[data-pulse=even] .held-stick .wand-art{animation:stick-on-a .48s ease-out}.live-set[data-pulse=odd] .held-stick .wand-art{animation:stick-on-b .48s ease-out}
-@keyframes fan-glow-a{0%,27%{opacity:.94}100%{opacity:.16}}
-@keyframes fan-glow-b{0%,27%{opacity:.94}100%{opacity:.16}}
-@keyframes stick-on-a{0%,28%{filter:brightness(1.38) drop-shadow(0 0 6px var(--stick))}}
-@keyframes stick-on-b{0%,28%{filter:brightness(1.38) drop-shadow(0 0 6px var(--stick))}}
+@keyframes fan-wave-a { 16%, 36% { opacity: 1; transform: translateY(-3px); filter: brightness(1.65); } }
+@keyframes fan-wave-b { 16%, 36% { opacity: 1; transform: translateY(-3px); filter: brightness(1.65); } }
+@keyframes wand-aura-a { 0%, 27% { opacity: .8; } }
+@keyframes wand-aura-b { 0%, 27% { opacity: .8; } }
+@keyframes stick-on-a{0%,28%{filter:brightness(1.38) drop-shadow(0 0 9px var(--stick))}}
+@keyframes stick-on-b{0%,28%{filter:brightness(1.38) drop-shadow(0 0 9px var(--stick))}}
 @keyframes stick-lift{50%{transform:translateY(-3px) rotate(-3deg)}}
 .stadium-finish{height:clamp(150px,32svh,270px);border-radius:16px;display:grid;place-items:center;background:linear-gradient(0deg,#2210248c,transparent),url('art/mainstage.webp') center/cover}
 .stadium-finish .wand-art{height:84%;width:45%;transform:rotate(12deg);filter:drop-shadow(0 0 9px var(--stick))}.stick-finale .show-score{color:#efcbdd}.stick-finale .show-score strong{color:var(--stick);font-size:21px}
-@media(prefers-reduced-motion:reduce){.stick-item[aria-pressed=true] .wand-art{animation:none}.live-set[data-pulse] .fan-lights i{animation:none}.live-set[data-pulse] .held-stick .wand-art{animation:none}.live-set[data-pulse] .wand-aura{animation:none;opacity:.4}}
+@media(prefers-reduced-motion:reduce){
+  .stick-item[aria-pressed=true] .wand-art,.live-set[data-pulse] .held-stick .wand-art{animation:none}
+  .live-set[data-pulse] .fan-row{animation:none;opacity:.8}
+  .live-set[data-pulse] .wand-aura{animation:none;opacity:.4}
+}
 
 .live-stage .light-feedback{min-height:1.4em;margin:0;font-size:13px;color:#ffdfb6}.live-stage .light-feedback:empty{display:none}
 
