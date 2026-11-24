@@ -152,6 +152,8 @@
   background: linear-gradient(145deg, #392439, #22162c 76%);
 }
 .sumi-order, .sumi-result { display: grid; gap: 8px; }
+.sumi-delivery-actions { display: grid; gap: 6px; }
+.sumi-result[data-saved="false"] .sumi-delivery-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sumi-speech { display: grid; gap: 3px; }
 .sumi-order[data-phase="ordering"] .sumi-speech { padding: 9px 10px; border-left: 2px solid #ffd4ad85; border-radius: 5px; background: #fde0dc0b; }
 .sumi-name { color: #ffd4ad; font: 800 12px/1.2 system-ui, sans-serif; }

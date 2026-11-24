@@ -156,6 +156,7 @@ const directions = names(
   ['на юг', 'güney'], ['на юго-запад', 'güneybatı'], ['на запад', 'batı'], ['на северо-запад', 'kuzeybatı'],
 );
 const stampKey = 'encore.v2.city-passport';
+const sumiNoticeDuration = 2400;
 const palette = ['#b074a0', '#a27acd', '#725cad', '#746fc6', '#578aba', '#61a6b0', '#77ab89', '#bd9580'];
 
 function element(tag, className, text) {
@@ -252,6 +253,7 @@ export function createCityActivities({
   let sumiSession = null;
   let frame = 0;
   let revealTimer = 0;
+  let sumiNoticeTimer = 0;
   let position = cleanPosition(null, bounds);
   let selected = null;
   let zoom = 1;
@@ -263,6 +265,11 @@ export function createCityActivities({
     cancelAnimationFrame(frame);
     clearTimeout(revealTimer);
     frame = revealTimer = 0;
+  }
+
+  function stopSumiNotice() {
+    clearTimeout(sumiNoticeTimer);
+    sumiNoticeTimer = 0;
   }
 
   function paintHeading() {
@@ -299,6 +306,7 @@ export function createCityActivities({
   function finishClose() {
     if (!mode) return;
     stopAnimation();
+    stopSumiNotice();
     if (round?.sumi) onSumiAction?.('idle');
     mapObserver?.disconnect();
     mapObserver = undefined;
@@ -322,11 +330,24 @@ export function createCityActivities({
     stopAnimation();
     paintHeading();
     if (round.sumi) {
+      const order = round.sumi;
+      const finished = order.finished();
       dialog.dataset.activity = 'sumi-order';
-      dialog.dataset.cityState = round.sumi.finished() ? 'result' : 'activity';
-      content.replaceChildren(round.sumi.render());
+      dialog.dataset.cityState = finished ? 'result' : 'activity';
+      content.replaceChildren(order.render());
+      if (finished && !order.needsSave()) {
+        if (!sumiNoticeTimer) {
+          sumiNoticeTimer = setTimeout(() => {
+            sumiNoticeTimer = 0;
+            if (dialog.open && round?.sumi === order && order.finished()) close();
+          }, sumiNoticeDuration);
+        }
+      } else {
+        stopSumiNotice();
+      }
       return;
     }
+    stopSumiNotice();
     delete dialog.dataset.activity;
     dialog.dataset.cityState = round.finished ? 'result' : 'activity';
     if (round.finished) {
@@ -570,6 +591,11 @@ export function createCityActivities({
     if (place?.id !== SUMI_CAFE_ID) throw new RangeError('Unknown Sumi delivery building');
     openSumi(place, 'delivered');
     sumiSession.deliver();
+  }
+
+  function callNextSumi(building) {
+    if (known.get(building?.id)?.id !== SUMI_CAFE_ID || (dialog.open && round?.sumi !== sumiSession)) return false;
+    return sumiSession?.callNext() ?? false;
   }
 
   function play(building, phase = 'ordering') {
@@ -855,6 +881,7 @@ export function createCityActivities({
     selected = initialTarget ? known.get(initialTarget.id) ?? null : null;
     if (!dialog.open || mode !== 'map') {
       stopAnimation();
+      stopSumiNotice();
       if (round?.sumi) onSumiAction?.('idle');
       round = null;
       zoom = 1;
@@ -870,6 +897,8 @@ export function createCityActivities({
   return {
     play,
     finishSumiDelivery,
+    callNextSumi,
+    sumiDeliveryNeedsSave: () => sumiSession?.needsSave() ?? false,
     map,
     close,
     isOpen: () => dialog.open,

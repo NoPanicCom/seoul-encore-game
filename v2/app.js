@@ -26,9 +26,21 @@ const phrases = {
     sumiOrdering: 'Подойди к гостю у стойки',
     sumiCarrying: 'Неси поднос к столику с клубникой',
     sumiDelivered: 'Гость получил клубничное молоко',
+    sumiDrinking: 'Гость пробует клубничное молоко',
+    sumiPaying: 'Гость идёт платить за молоко',
+    sumiLeaving: 'Гость уходит. Можно выйти следом',
+    sumiDirty: 'Забери пустой стакан со столика',
+    sumiClearing: 'Отнеси пустой стакан на стойку',
+    sumiWiping: 'Вернись с Пикселем и протри столик',
+    sumiCleaning: 'София протирает столик',
+    sumiReady: 'Столик готов! Позови нового гостя',
+    collectCup: 'Взять стакан',
+    returnCup: 'Поставить',
+    wipeTable: 'Протереть',
+    nextGuest: 'Позвать гостя',
+    saveCafeStamp: 'Сохранить штамп',
     takeGuestOrder: 'Заказ',
     serveGuest: 'Подать',
-    guestReceipt: 'К гостю',
     interiorObjective: 'Подойди к месту задания',
     cityRoute: 'У указателя CITY — вход в кварталы',
     cityError: 'Не удалось открыть локацию. Попробуй ещё раз.',
@@ -204,9 +216,21 @@ const phrases = {
     sumiOrdering: 'Tezgâhtaki müşteriye yaklaş',
     sumiCarrying: 'Tepsiyi çilek işaretli masaya götür',
     sumiDelivered: 'Çilekli süt müşteriye ulaştı',
+    sumiDrinking: 'Müşteri çilekli sütünü içiyor',
+    sumiPaying: 'Müşteri ödeme için kasaya gidiyor',
+    sumiLeaving: 'Müşteri çıkıyor. Peşinden yürüyebilirsin',
+    sumiDirty: 'Masadaki boş bardağı al',
+    sumiClearing: 'Boş bardağı tezgâha götür',
+    sumiWiping: 'Pixel’le masaya dönüp masayı sil',
+    sumiCleaning: 'Sofia masayı siliyor',
+    sumiReady: 'Masa hazır! Yeni müşteriyi çağır',
+    collectCup: 'Bardağı al',
+    returnCup: 'Bardağı bırak',
+    wipeTable: 'Masayı sil',
+    nextGuest: 'Müşteri çağır',
+    saveCafeStamp: 'Damgayı kaydet',
     takeGuestOrder: 'Siparişi al',
     serveGuest: 'Servis et',
-    guestReceipt: 'Müşteri',
     interiorObjective: 'Etkinlik noktasına yaklaş',
     cityRoute: 'CITY tabelasından mahallelere geç',
     cityError: 'Mekân açılamadı. Tekrar dene.',
@@ -533,20 +557,35 @@ function paintCityTarget() {
   directionTimer=setTimeout(paintCityTarget,400);
 }
 
+const sumiObjectives = {
+  arriving:'sumiArriving', ordering:'sumiOrdering', preparing:'sumiCounter',
+  carrying:'sumiCarrying', delivered:'sumiDelivered', drinking:'sumiDrinking',
+  paying:'sumiPaying', leaving:'sumiLeaving', dirty:'sumiDirty',
+  clearing:'sumiClearing', wiping:'sumiWiping', cleaning:'sumiCleaning', ready:'sumiReady',
+};
+
+function sumiControl(phase, atTable) {
+  if (phase === 'ready') return cityUi.sumiDeliveryNeedsSave()
+    ? {label:'saveCafeStamp',icon:'☆'} : {label:'nextGuest',icon:'♫'};
+  if (atTable) {
+    if (phase === 'carrying') return {label:'serveGuest',icon:'♡'};
+    if (phase === 'dirty') return {label:'collectCup',icon:'☕'};
+    if (phase === 'wiping') return {label:'wipeTable',icon:'✧'};
+  } else {
+    if (phase === 'ordering') return {label:'takeGuestOrder',icon:'☕'};
+    if (phase === 'preparing') return {label:'sumiTalk',icon:'♡'};
+    if (phase === 'clearing') return {label:'returnCup',icon:'☕'};
+  }
+  return null;
+}
+
 function hongdaeContext() {
   if (spot==='city-enter' || spot==='street-city-enter') return {label:'enterCity',icon:'↗'};
   if (spot==='city-exit') return {label:cityReturn==='street'?'exitToYG':'exitCity',icon:'↩'};
   if (spot==='room-exit') return {label:'exitRoom',icon:'↩'};
   if (area==='city' && spot?.startsWith('door:')) return {label:'doorAction',icon:'⌂'};
   if (area==='interior' && (spot==='sumi-table' || spot===`activity:${SUMI_CAFE_ID}`)) {
-    const phase=world?.sumiDeliveryState();
-    if (spot==='sumi-table') {
-      if (phase==='carrying') return {label:'serveGuest',icon:'♡'};
-      if (phase==='delivered') return {label:'guestReceipt',icon:'♡'};
-    } else if (phase==='ordering') return {label:'takeGuestOrder',icon:'☕'};
-    else if (phase==='preparing') return {label:'sumiTalk',icon:'♡'};
-    else if (phase==='delivered') return {label:'sumiTalk',icon:'♡'};
-    return null;
+    return sumiControl(world?.sumiDeliveryState(), spot==='sumi-table');
   }
   if (area==='interior' && spot?.startsWith('activity:')) return {label:'activityAction',icon:'✦'};
   if (area === 'street' && spot === 'hongdae-enter') return hongdaeActions[spot];
@@ -630,8 +669,7 @@ function paintMission() {
   const sumiPhase=area==='interior' && building?.id===SUMI_CAFE_ID ? world?.sumiDeliveryState() : null;
   if (sumiPhase) {
     game.dataset.sumiDelivery=sumiPhase;
-    const hint={arriving:'sumiArriving',ordering:'sumiOrdering',preparing:'sumiCounter',carrying:'sumiCarrying',delivered:'sumiDelivered'};
-    objectiveText=words(hint[sumiPhase]);
+    objectiveText=words(sumiObjectives[sumiPhase]);
   } else delete game.dataset.sumiDelivery;
   setText('objective',objectiveText);
   rehearsal.hidden = journey() || !nearNari || inHongdae() || Boolean(context);
@@ -1174,18 +1212,26 @@ async function actInCity() {
   const at=spot;
   const building=cityBuilding();
   resetControls();
-  if (at==='sumi-table' && building?.id===SUMI_CAFE_ID) {
-    if (world.deliverSumiDrink()) {
+  const atTable = at === 'sumi-table';
+  if (building?.id === SUMI_CAFE_ID && (atTable || at === `activity:${SUMI_CAFE_ID}`)) {
+    const phase = world.sumiDeliveryState();
+    const control = sumiControl(phase, atTable);
+    if (!control) return;
+    if (phase === 'ordering' || phase === 'preparing') cityUi.play(building, phase);
+    else if (phase === 'carrying' && world.deliverSumiDrink()) {
       audio.cue('delivery');
       cityUi.finishSumiDelivery(building);
-    } else if (world.sumiDeliveryState()==='delivered') cityUi.play(building,'delivered');
+    } else if (phase === 'dirty' && world.collectSumiCup()) audio.cue('glass');
+    else if (phase === 'clearing' && world.returnSumiCup()) audio.cue('glass');
+    else if (phase === 'wiping' && world.resetSumiTable()) audio.cue('cloth');
+    else if (phase === 'ready') {
+      if (cityUi.sumiDeliveryNeedsSave()) cityUi.play(building, 'delivered');
+      else cityUi.callNextSumi(building);
+    }
     return;
   }
   if(at?.startsWith('activity:') && building) {
-    if (building.id===SUMI_CAFE_ID) {
-      const phase=world.sumiDeliveryState();
-      if (phase==='ordering' || phase==='preparing' || phase==='delivered') cityUi.play(building,phase);
-    } else cityUi.play(building);
+    cityUi.play(building);
     return;
   }
   hongdaePending=true;
@@ -1506,7 +1552,10 @@ async function load() {
 
   try {
     world = await createWorld(canvas, {
-      onSumiState:()=>paintMission(),
+      onSumiState(phase) {
+        if (phase === 'leaving' && game.dataset.sumiDelivery === 'paying') audio.cue('register');
+        paintMission();
+      },
       onArea(next) {
         area = next;
         game.dataset.area = area;

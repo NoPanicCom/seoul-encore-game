@@ -29,8 +29,7 @@ const text = {
   pickupError: phrase('Поднос пока у кассы. Попробуй взять его ещё раз.', 'Tepsi hâlâ tezgahta. Yeniden almayı dene.'),
   delivered: phrase('Заказ доставлен', 'Sipariş teslim edildi'),
   thanks: phrase('Спасибо, София! Клубничное молоко получилось чудесным.', 'Teşekkür ederim Sofia! Çilekli süt harika olmuş.'),
-  replay: phrase('Принять новый заказ', 'Yeni sipariş al'),
-  replayError: phrase('Новый заказ пока недоступен. Попробуй ещё раз.', 'Yeni sipariş henüz hazır değil. Yeniden dene.'),
+  watch: phrase('Понаблюдать за гостем', 'Müşteriyi izle'),
   drinkAlt: phrase('Стакан розового клубничного молока с ягодой на краю', 'Kenarında çilek olan bir bardak pembe çilekli süt'),
   saved: phrase('Заказ добавлен в паспорт.', 'Sipariş pasaporta eklendi.'),
   savedAgain: phrase('Отметка о заказе уже есть в паспорте.', 'Bu siparişin damgası zaten pasaportunda.'),
@@ -116,9 +115,10 @@ export function createSumiOrder({
       const status = element('p', 'city-message sumi-status', words(feedback));
       status.id = 'sumi-feedback';
       status.setAttribute('role', 'status');
-      result.append(layout, status);
-      if (saved) result.append(button('sumi-replay', 'city-secondary', words('replay')));
-      else result.append(button('sumi-retry-save', 'city-primary', words('retrySave')));
+      const actions = element('div', 'sumi-delivery-actions');
+      if (!saved) actions.append(button('sumi-retry-save', 'city-primary', words('retrySave')));
+      actions.append(button('sumi-watch-customer', saved ? 'city-primary' : 'city-secondary', words('watch')));
+      result.append(layout, status, actions);
       panel.append(result);
       return panel;
     }
@@ -169,7 +169,7 @@ export function createSumiOrder({
     }
     feedback = wasCompleted ? 'savedAgain' : 'saved';
     wasCompleted = true;
-    change('#sumi-replay');
+    change('#sumi-watch-customer');
   }
 
   function handleClick(chosen) {
@@ -231,30 +231,31 @@ export function createSumiOrder({
       }
     } else if (phase === 'delivered' && chosen.id === 'sumi-retry-save' && !saved) {
       save();
-    } else if (phase === 'delivered' && chosen.id === 'sumi-replay' && saved) {
-      if (onReplay?.() === true) {
-        phase = 'ordering';
-        stirs = 0;
-        greeted = false;
-        feedback = '';
-        resumePhase = null;
-        onExit();
-      } else {
-        feedback = 'replayError';
-        change('#sumi-replay');
-      }
+    } else if (phase === 'delivered' && chosen.id === 'sumi-watch-customer') {
+      onExit();
     }
   }
 
   function deliver() {
     if (phase === 'delivered') {
-      change(saved ? '#sumi-replay' : '#sumi-retry-save');
+      change(saved ? '#sumi-watch-customer' : '#sumi-retry-save');
       return;
     }
     phase = 'delivered';
     stirs = 3;
     onAction?.('serve');
     save();
+  }
+
+  function callNext() {
+    if (phase !== 'delivered' || !saved || onReplay?.() !== true) return false;
+    phase = 'ordering';
+    stirs = 0;
+    greeted = false;
+    feedback = '';
+    resumePhase = null;
+    onExit();
+    return true;
   }
 
   const preparing = () => ['fruit', 'milk', 'stir', 'tray'].includes(phase);
@@ -287,8 +288,9 @@ export function createSumiOrder({
   }
 
   return {
-    render, handleClick, deliver, sync,
+    render, handleClick, deliver, sync, callNext,
     finished: () => phase === 'delivered',
+    needsSave: () => phase === 'delivered' && !saved,
     resume: () => onAction?.(preparing() ? 'prepare' : 'idle'),
   };
 }

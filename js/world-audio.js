@@ -205,6 +205,7 @@ function brush(mixer, start, length, peak) {
 }
 const repeatDelay = {
     step: .28, pixel: .26, delivery: .37, spotlight: .28, curtain: 1.05, note: .074, groove: .18,
+    register: .5, glass: .22, cloth: .7,
 };
 function useCue(key, play) {
     const mixer = mix;
@@ -230,6 +231,18 @@ function cue(event) {
                 for (const [index, midi] of [69, 72, 76].entries()) {
                     ring(mixer, start + index * .072, frequency(midi), .25, .105, 'triangle');
                 }
+                break;
+            case 'register':
+                ring(mixer, start, 880, .066, .049);
+                ring(mixer, start + .095, 1175, .12, .054);
+                break;
+            case 'glass':
+                ring(mixer, start, 1470, .13, .045);
+                ring(mixer, start, 2240, .052, .017);
+                break;
+            case 'cloth':
+                brush(mixer, start, .21, .039);
+                brush(mixer, start + .28, .26, .033);
                 break;
             case 'spotlight':
                 ring(mixer, start, frequency(76), .16, .115, 'triangle');

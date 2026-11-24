@@ -7,6 +7,9 @@ const BODY_RADIUS = .23;
 const PLAYER_CLEARANCE = .55;
 const TAU = 2 * Math.PI;
 const SUMI_GUEST_SEED = 45;
+const FIRST_SUMI_GUEST = 'sumi-guest-1';
+const SUMI_PALETTES = [7, 4, 0, 3, 2, 5, 1, 6];
+const DEPARTURE_PHASES = new Set(['release', 'sumi-exit', 'depart-corner']);
 const AWAY_FROM_STREET = { x: Infinity, z: Infinity };
 
 const LOOKS = [
@@ -148,20 +151,28 @@ function createRig(B, scene, anchor, material, look, seed) {
 
   // Each resident is a single skinned mesh. One weighted joint per vertex keeps the gait cheap.
   const hipPos = new B.Vector3(0, .79, 0);
+  const gripOffset = new B.Vector3(-.005, -.163, .028);
+  const mouthCenter = new B.Vector3(0, .058, .165);
   const turn = (joint, x, y = 0, z = 0) => joint.setYawPitchRoll(y, x, z, B.Space.LOCAL);
   function pose(phase, walking, time, action = 'stand') {
-    if (action === 'sit' || action === 'thanks') {
+    if (action === 'sit' || action === 'thanks' || action === 'drink') {
       hipPos.y = .55;
       hips.setPosition(hipPos, B.Space.LOCAL);
       const gratitude = action === 'thanks' ? .5 + .5 * Math.sin(time * TAU / 1.45) : 0;
+      const sip = action === 'drink' ? Math.sin(Math.PI * (Math.min(3.6, Math.max(0, time)) % 1.2) / 1.2) ** 2 : 0;
       turn(chest, .084 + gratitude * .13);
-      turn(head, -.04 + gratitude * .20, .07 * gratitude);
+      turn(head, -.04 + gratitude * .20 - sip * .11, .07 * gratitude - sip * .11);
       for (const { side, shoulder, elbow, hip, knee, ankle } of limbs) {
         turn(hip, -1.46, side * .10);
         turn(knee, 1.56);
         turn(ankle, -.095);
         turn(shoulder, -.31 - gratitude * .34, 0, side * .18);
         turn(elbow, -.48 - gratitude * .58);
+      }
+      if (action === 'drink') {
+        const hand = limbs[0];
+        turn(hand.shoulder, -.31 - sip * 1.09, .40 * sip, -.18 + .22 * sip);
+        turn(hand.elbow, -.48 - sip * 1.08, .28 * sip);
       }
       return;
     }
@@ -182,8 +193,26 @@ function createRig(B, scene, anchor, material, look, seed) {
       turn(shoulder, -.37 * forward * walking - .058, 0, side * .108);
       turn(elbow, -.16 - Math.max(0, forward) * .19 * walking);
     }
+    if (action === 'pay') {
+      const reach = Math.sin(Math.PI * Math.min(1, Math.max(0, time / 1.2))) ** .65;
+      turn(chest, .12 * reach, -.09 * reach);
+      turn(head, .12 * reach);
+      turn(limbs[0].shoulder, -.058 - .88 * reach, .20 * reach, -.108);
+      turn(limbs[0].elbow, -.16 - .64 * reach);
+    }
   }
-  return { mesh, pose, dispose() { mesh.dispose(); skeleton.dispose(); } };
+  return {
+    mesh, pose,
+    getHandWorldPosition() {
+      mesh.computeWorldMatrix(true);
+      return limbs[0].elbow.getAbsolutePositionFromLocal(gripOffset, mesh);
+    },
+    getMouthWorldPosition() {
+      mesh.computeWorldMatrix(true);
+      return head.getAbsolutePositionFromLocal(mouthCenter, mesh);
+    },
+    dispose() { mesh.dispose(); skeleton.dispose(); },
+  };
 }
 
 function residentMaterial(B, scene) {
@@ -194,14 +223,20 @@ function residentMaterial(B, scene) {
   return material;
 }
 
-export function createSumiGuest(B, scene, anchor) {
+export function createSumiGuest(B, scene, anchor, visitorId = FIRST_SUMI_GUEST) {
+  const number = Number(/^sumi-guest-([1-9]\d*)$/.exec(visitorId)?.[1]);
+  if (!Number.isSafeInteger(number)) throw new RangeError('Sumi misafir kimliği geçersiz');
   const material = residentMaterial(B, scene);
-  const rig = createRig(B, scene, anchor, material, LOOKS[7], SUMI_GUEST_SEED);
-  rig.mesh.metadata = { visitorId: 'sumi-guest-1' };
+  const look = LOOKS[SUMI_PALETTES[(number - 1) % SUMI_PALETTES.length]];
+  const seed = number === 1 ? SUMI_GUEST_SEED : 100 + number % 4093;
+  const rig = createRig(B, scene, anchor, material, look, seed);
+  rig.mesh.metadata = { visitorId };
   let disposed = false;
   return {
     mesh: rig.mesh,
     pose: rig.pose,
+    getHandWorldPosition: rig.getHandWorldPosition,
+    getMouthWorldPosition: rig.getMouthWorldPosition,
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -266,20 +301,22 @@ function residentFor(B, scene, anchor, material, lane, x, z, time) {
   return npc;
 }
 
-function startSumiGuest(B, scene, anchor, time) {
-  const rig = createSumiGuest(B, scene, anchor);
+function startSumiGuest(B, scene, anchor, time, visitorId) {
+  const rig = createSumiGuest(B, scene, anchor, visitorId);
   // Visible ahead of Sofia at the city gate, then across the boulevard and along the café pavement.
-  const x = CITY_ENTRY.x + .75;
-  const z = CITY_ENTRY.z - 2.55;
-  const edge = x < sumiLane.block.x ? sumiLane.left : sumiLane.right;
-  const yaw = Math.atan2(edge - x, 0);
+  const first = visitorId === FIRST_SUMI_GUEST;
+  const edge = sumiLane.left;
+  const x = first ? CITY_ENTRY.x + .75 : edge;
+  const z = first ? CITY_ENTRY.z - 2.55 : sumiLane.z - sumiAddress.door.nz * 3.3;
+  const yaw = first ? Math.atan2(edge - x, 0) : sumiAddress.door.yaw;
+  const corner = { x: edge, z: sumiLane.z };
   rig.mesh.position.set(x, .004, z);
   rig.mesh.rotation.y = yaw;
   rig.pose(0, 0, time);
   return {
     rig, lane: sumiLane, x, z, yaw, target: sumiAddress,
-    phase: 'approach', to: { x: edge, z }, corner: { x: edge, z: sumiLane.z },
-    sumiGuest: true, stride: 0, speed: 1.28, effort: 0, resume: time,
+    phase: first ? 'approach' : 'corner', to: first ? { x: edge, z } : corner, corner,
+    visitorId, stride: 0, speed: 1.28, effort: 0, resume: time,
   };
 }
 
@@ -297,7 +334,7 @@ function reached(npc, time) {
   } else if (phase === 'enter') {
     npc.rig.mesh.setEnabled(false);
     npc.to = null;
-    if (npc.sumiGuest) {
+    if (npc.visitorId) {
       npc.phase = 'arrived';
     } else {
       npc.phase = 'inside';
@@ -308,6 +345,15 @@ function reached(npc, time) {
     const at = npc.lane.buildings.indexOf(target);
     const offset = 1 + (npc.lane.id + npc.count) % (npc.lane.buildings.length - 1);
     approachPlan(npc, npc.lane.buildings[(at + offset) % npc.lane.buildings.length]);
+  } else if (phase === 'sumi-exit') {
+    npc.to = npc.exitSteps.shift();
+    if (!npc.to) {
+      npc.phase = 'depart-corner';
+      npc.to = { x: npc.corner.x, z: npc.corner.z - target.door.nz * 3.15 };
+    }
+  } else if (phase === 'depart-corner') {
+    npc.phase = 'left';
+    npc.to = null;
   }
 }
 
@@ -321,6 +367,53 @@ function fits(npc, x, z, player, residents) {
     peer === npc || peer.phase === 'inside' || !approaching(peer.x, peer.z, BODY_RADIUS * 2));
 }
 
+function clearsPerson(from, to, person, clearance) {
+  if (!Number.isFinite(person.x)) return true;
+  const dx = to.x - from.x, dz = to.z - from.z;
+  const qx = person.x - from.x, qz = person.z - from.z;
+  const length = dx * dx + dz * dz;
+  if (!length) return true;
+  const nearest = Math.max(0, Math.min(1, (qx * dx + qz * dz) / length));
+  const distance = (qx - dx * nearest) ** 2 + (qz - dz * nearest) ** 2;
+  // If Sofia walks into the guest's space, permit a step that moves the guest away.
+  return distance >= Math.min(clearance ** 2, qx * qx + qz * qz) - 1e-8;
+}
+
+function sumiExitSegment(npc, from, to, player, peers) {
+  if (!clearsPerson(from, to, player, PLAYER_CLEARANCE)) return false;
+  if (peers.some(peer => peer !== npc && peer.rig.mesh.isEnabled() &&
+      !clearsPerson(from, to, peer, BODY_RADIUS * 2))) return false;
+  const { door } = npc.target;
+  const jamb = door.width / 2 - BODY_RADIUS - .015;
+  const dx = to.x - from.x, dz = to.z - from.z;
+  const samples = Math.ceil(Math.hypot(dx, dz) / .08);
+  for (let i = 1; i <= samples; i++) {
+    const x = from.x + dx * i / samples, z = from.z + dz * i / samples;
+    const depth = (z - door.z) * door.nz;
+    if (depth < 0 || (!walkable(x, z, BODY_RADIUS) && (depth > .245 || Math.abs(x - door.x) > jamb))) return false;
+  }
+  return true;
+}
+
+function sumiExitRoute(npc, player, peers) {
+  const { door } = npc.target;
+  const depth = (npc.z - door.z) * door.nz;
+  const point = (offset, distance) => ({ x: door.x + offset, z: door.z + door.nz * distance });
+  const routes = [[point(depth < .245 ? 0 : npc.x - door.x, .81), npc.corner]];
+  const jamb = door.width / 2 - BODY_RADIUS - .015;
+  for (const side of [-1, 1]) {
+    const ahead = depth < .245 ? [point(side * jamb, depth), point(side * jamb, .245)] : [];
+    for (const bypass of [.81, .245, 1.48]) {
+      // Step past the jamb before taking the vacant side, then return to the sidewalk.
+      const outer = point(side * .76, Math.max(depth, .245));
+      const mergeX = Math.min(npc.x - door.x, -1.17);
+      routes.push([...ahead, outer, point(side * .76, bypass), point(mergeX, bypass), point(mergeX, .81), npc.corner]);
+    }
+  }
+  return routes.find(points => points.every((to, index) =>
+    sumiExitSegment(npc, index ? points[index - 1] : npc, to, player, peers)));
+}
+
 function stepAlong(npc, player, residents, dt, time) {
   const dx = npc.to.x - npc.x, dz = npc.to.z - npc.z;
   const distance = Math.hypot(dx, dz);
@@ -332,7 +425,16 @@ function stepAlong(npc, player, residents, dt, time) {
   const sx = dx * step / distance, sz = dz * step / distance;
   const inDoor = npc.phase === 'enter' || npc.phase === 'exit';
   let x = npc.x + sx, z = npc.z + sz;
-  if (inDoor) {
+  if (npc.phase === 'sumi-exit') {
+    if (!sumiExitSegment(npc, npc, { x, z }, player, residents)) {
+      const route = sumiExitRoute(npc, player, residents);
+      if (route) {
+        npc.to = route.shift();
+        npc.exitSteps = route;
+      }
+      return 0;
+    }
+  } else if (inDoor) {
     // Only the last fraction inside the named doorway bypasses the exterior wall collider.
     if (Math.hypot(x - player.x, z - player.z) < PLAYER_CLEARANCE &&
         Math.hypot(x - player.x, z - player.z) < Math.hypot(npc.x - player.x, npc.z - player.z)) return 0;
@@ -381,6 +483,8 @@ export function createCityPedestrians(B, scene, anchor, { onSumiGuestEnter } = {
   const material = residentMaterial(B, scene);
   const residents = [];
   let sumiGuest;
+  let visitorNumber = 1;
+  let waitingVisitor = FIRST_SUMI_GUEST;
   let time = 0, nextRefresh = 0;
   let lastX = Infinity, lastZ = Infinity;
   let disposed = false;
@@ -406,10 +510,29 @@ export function createCityPedestrians(B, scene, anchor, { onSumiGuestEnter } = {
   }
 
   function advanceGuest(player, peers, elapsed) {
-    if (sumiGuest?.phase === 'arrived') return;
-    sumiGuest ??= startSumiGuest(B, scene, anchor, time);
+    if (!sumiGuest && waitingVisitor) {
+      sumiGuest = startSumiGuest(B, scene, anchor, time, waitingVisitor);
+      waitingVisitor = null;
+    }
+    if (!sumiGuest || sumiGuest.phase === 'arrived') return;
+    if (sumiGuest.phase === 'release') {
+      if (Math.hypot(sumiGuest.x - player.x, sumiGuest.z - player.z) < PLAYER_CLEARANCE) return;
+      const route = sumiExitRoute(sumiGuest, player, peers);
+      if (!route) return;
+      sumiGuest.phase = 'sumi-exit';
+      sumiGuest.yaw = sumiAddress.door.yaw;
+      sumiGuest.speed = 1.41;
+      sumiGuest.to = route.shift();
+      sumiGuest.exitSteps = route;
+      sumiGuest.rig.mesh.setEnabled(true);
+    }
     animateResident(sumiGuest, player, peers, elapsed, time);
-    if (sumiGuest.phase === 'arrived') onSumiGuestEnter?.({ buildingId: SUMI_CAFE_ID });
+    if (sumiGuest.phase === 'left') {
+      sumiGuest.rig.dispose();
+      sumiGuest = null;
+    } else if (sumiGuest.phase === 'arrived') {
+      onSumiGuestEnter?.({ buildingId: SUMI_CAFE_ID, visitorId: sumiGuest.visitorId });
+    }
   }
 
   return {
@@ -425,11 +548,23 @@ export function createCityPedestrians(B, scene, anchor, { onSumiGuestEnter } = {
       }
       const player = { x, z };
       advanceGuest(player, residents, elapsed);
-      const peers = sumiGuest.phase === 'arrived' ? residents : [...residents, sumiGuest];
+      const peers = sumiGuest?.rig.mesh.isEnabled() ? [...residents, sumiGuest] : residents;
       for (const npc of residents) animateResident(npc, player, peers, elapsed, time);
     },
-    hasSumiGuestArrived() {
-      return sumiGuest?.phase === 'arrived';
+    hasSumiGuestArrived(visitorId) {
+      return sumiGuest?.phase === 'arrived' && (visitorId === undefined || visitorId === sumiGuest.visitorId);
+    },
+    releaseSumiGuest(visitorId) {
+      if (disposed || sumiGuest?.phase !== 'arrived' || sumiGuest.visitorId !== visitorId) return false;
+      sumiGuest.phase = 'release';
+      return true;
+    },
+    startSumiVisit() {
+      if (disposed) return null;
+      if (waitingVisitor) return waitingVisitor;
+      if (sumiGuest && !DEPARTURE_PHASES.has(sumiGuest.phase)) return sumiGuest.visitorId;
+      waitingVisitor = `sumi-guest-${++visitorNumber}`;
+      return waitingVisitor;
     },
     advanceSumiGuest(dt) {
       if (disposed || !Number.isFinite(dt) || dt < 0) return;
